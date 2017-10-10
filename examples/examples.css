@@ -1,0 +1,24 @@
+﻿html, body, #map {
+    height: 100%;
+    margin: 0px;
+}
+
+.gmxPanel {
+    background-color: #ffffff;
+    border-radius: 5px;
+    box-shadow: 0 1px 7px rgba(0,0,0,0.65);
+    padding: 10px;
+}
+
+#infoPanel {
+    position: absolute;
+    left: 0px;
+    right: 0px;
+    top: 21px;
+    text-align: center;
+    z-index: 1;
+}
+
+#info {
+    display: inline-block;
+}

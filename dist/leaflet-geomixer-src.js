@@ -4667,11 +4667,11 @@ var GmxEventsManager = L.Handler.extend({
             return 0;
         };
 
-        var skipNodeName = {
-            IMG: true,
-            DIV: true,
-            path: true
-        };
+        // var skipNodeName = {
+            // IMG: true,
+            // DIV: true,
+            // path: true
+        // };
 
         var clearLastHover = function () {
             if (_this._lastLayer) {
@@ -4682,16 +4682,16 @@ var GmxEventsManager = L.Handler.extend({
 
         var eventCheck = function (ev) {
             var type = ev.type,
-                map = _this._map,
-                skipNode = false;
+                map = _this._map;
+                // skipNode = false;
             if (ev.originalEvent) {
                 map.gmxMouseDown = L.Browser.webkit ? ev.originalEvent.which : ev.originalEvent.buttons;
-                var target = ev.originalEvent.target;
-                skipNode = skipNodeName[target.nodeName] && !L.DomUtil.hasClass(target, 'leaflet-tile') && !L.DomUtil.hasClass(target, 'leaflet-popup-tip-container');
+                // var target = ev.originalEvent.target;
+                // skipNode = skipNodeName[target.nodeName] && !L.DomUtil.hasClass(target, 'leaflet-tile') && !L.DomUtil.hasClass(target, 'leaflet-popup-tip-container');
             }
             if (map._animatingZoom ||
                 isDrawing() ||
-                skipNode ||
+                !ev.latlng ||
                 (type === 'click' &&  map._skipClick) ||        // from drawing
                 (type === 'mousemove' &&  map.gmxMouseDown)
                 ) {
@@ -6910,7 +6910,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         this._anyDrawings = false; //are we drawing something?
         this.repaintObservers = {};    // external observers like screen
 
-        var _this = this;
+        // var _this = this;
 
         this._gmx = {
             hostName: gmxAPIutils.normalizeHostname(options.hostName || 'maps.kosmosnimki.ru'),
@@ -6937,9 +6937,9 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             this._gmx.crossOrigin = options.crossOrigin;
         }
 
-        this.on('tileunload', function(e) {
+        // this.on('tileunload', function(e) {
             //_this._clearTileSubscription(e.tile.zKey);
-        });
+        // });
     },
 
     // extended from L.TileLayer.Canvas
@@ -7071,7 +7071,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 			gmxTilePoint = gmxAPIutils.getTileNumFromLeaflet(coords, zoom),
 		    // tileElem = this._tiles[zKey];
 		    tileElem = this.gmxGetCanvasTile(coords);
-			
 
         if (!tileElem.promise) {
             gmx._tilesToLoad++;
@@ -7498,7 +7497,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 		var tile = L.DomUtil.create('canvas', 'leaflet-tile');
 		tile.width = tile.height = this.options.tileSize;
 		tile.onselectstart = tile.onmousemove = L.Util.falseFn;
-		
+
 		return tile;
 	},
 
@@ -7524,13 +7523,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         return this._tiles[zKey];
     },
 
-	// _getTilePos: function (coords) {
-		// var tileSize = this.getTileSize ? this.getTileSize().x : this._getTileSize(),
-			// tileSizePoint = L.point([tileSize, tileSize]);
-			
-		// return coords.scaleBy(tileSizePoint).subtract(this._level.origin);
-	// },
-
     appendTileToContainer: function (tileLink) {
         var tilePos = this._getTilePos(tileLink.coords),
 			tile = tileLink.el,
@@ -7540,7 +7532,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         L.DomUtil.setPosition(tile, tilePos, L.Browser.chrome || L.Browser.android23);
 		// tile.style.left = tilePos.x + 'px';
 		// tile.style.top = tilePos.y + 'px';
-		
     },
 
     addData: function(data, options) {
@@ -7701,11 +7692,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         }
     },
 
-    _removeInProgressDrawing: function(zKey) {
-        // delete this._drawInProgress[zKey];
-        // this._chkDrawingState();
-    },
-
     _drawTileAsync: function (tileElem, data) {
         var gmx = this._gmx,
 			_this = this;
@@ -7718,7 +7704,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 				// }
 			});
 		});
-		
 	},
 
     _prpZoomData: function() {
@@ -7747,8 +7732,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
 	_getWrapTileNum: function () {
 		var crs = this._map.options.crs,
-		    scale = crs.scale(this._map.getZoom());
-		    size = L.point([scale, scale])
+		    scale = crs.scale(this._map.getZoom()),
+		    size = L.point([scale, scale]),
 			tileSize = this.getTileSize ? this.getTileSize().x : this._getTileSize();
 
 		return size.divideBy(tileSize)._floor();
@@ -7773,7 +7758,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             tileRange = this._pxBoundsToTileRange(pixelBounds),
 		    margin = this.options.keepBuffer || 2,
 		    noPruneRange = new L.Bounds(tileRange.getBottomLeft().subtract([margin, -margin]),
-		                              tileRange.getTopRight().add([margin, -margin]));
+		                              tileRange.getTopRight().add([margin, -margin])),
             limit = this._getWrapTileNum();
 
         if (tileRange.min.y < 0) { tileRange.min.y = 0; }
@@ -8060,7 +8045,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     _updateShiftY: function() {
         var gmx = this._gmx;
         if (gmx.applyShift && this._map) {
-			gmx.currentZoom = this._tileZoom || map._zoom;
+			gmx.currentZoom = this._tileZoom;
 			gmx.tileSize = gmxAPIutils.tileSizes[gmx.currentZoom];
 			gmx.mInPixel = 256 / gmx.tileSize;
 			gmx.deltaY = this._getShiftY(gmx.currentZoom);

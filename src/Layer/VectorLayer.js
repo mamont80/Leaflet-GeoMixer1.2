@@ -26,7 +26,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         this._anyDrawings = false; //are we drawing something?
         this.repaintObservers = {};    // external observers like screen
 
-        var _this = this;
+        // var _this = this;
 
         this._gmx = {
             hostName: gmxAPIutils.normalizeHostname(options.hostName || 'maps.kosmosnimki.ru'),
@@ -53,9 +53,9 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             this._gmx.crossOrigin = options.crossOrigin;
         }
 
-        this.on('tileunload', function(e) {
+        // this.on('tileunload', function(e) {
             //_this._clearTileSubscription(e.tile.zKey);
-        });
+        // });
     },
 
     // extended from L.TileLayer.Canvas
@@ -187,7 +187,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 			gmxTilePoint = gmxAPIutils.getTileNumFromLeaflet(coords, zoom),
 		    // tileElem = this._tiles[zKey];
 		    tileElem = this.gmxGetCanvasTile(coords);
-			
 
         if (!tileElem.promise) {
             gmx._tilesToLoad++;
@@ -614,7 +613,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 		var tile = L.DomUtil.create('canvas', 'leaflet-tile');
 		tile.width = tile.height = this.options.tileSize;
 		tile.onselectstart = tile.onmousemove = L.Util.falseFn;
-		
+
 		return tile;
 	},
 

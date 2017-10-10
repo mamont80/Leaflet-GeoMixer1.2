@@ -45,11 +45,11 @@ var GmxEventsManager = L.Handler.extend({
             return 0;
         };
 
-        var skipNodeName = {
-            IMG: true,
-            DIV: true,
-            path: true
-        };
+        // var skipNodeName = {
+            // IMG: true,
+            // DIV: true,
+            // path: true
+        // };
 
         var clearLastHover = function () {
             if (_this._lastLayer) {
@@ -60,12 +60,12 @@ var GmxEventsManager = L.Handler.extend({
 
         var eventCheck = function (ev) {
             var type = ev.type,
-                map = _this._map,
-                skipNode = false;
+                map = _this._map;
+                // skipNode = false;
             if (ev.originalEvent) {
                 map.gmxMouseDown = L.Browser.webkit ? ev.originalEvent.which : ev.originalEvent.buttons;
-                var target = ev.originalEvent.target;
-                skipNode = skipNodeName[target.nodeName] && !L.DomUtil.hasClass(target, 'leaflet-tile') && !L.DomUtil.hasClass(target, 'leaflet-popup-tip-container');
+                // var target = ev.originalEvent.target;
+                // skipNode = skipNodeName[target.nodeName] && !L.DomUtil.hasClass(target, 'leaflet-tile') && !L.DomUtil.hasClass(target, 'leaflet-popup-tip-container');
             }
             if (map._animatingZoom ||
                 isDrawing() ||

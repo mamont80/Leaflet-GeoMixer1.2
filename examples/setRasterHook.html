@@ -1,0 +1,127 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+	<title>GeoMixer Vector Layer Example</title>
+	<meta charset="utf-8" />
+    <style>
+        html, body, #map {
+            height: 100%;
+            width: 100%;
+            margin: 0px;
+        }
+        #infoPanel {
+            position: absolute;
+			left: 0px;
+			right: 0px;
+			top: 21px;
+            text-align: center;
+			z-index: 1000;
+        }
+        
+        #info {
+			background-color: #ffffff;
+			border-radius: 5px;
+            box-shadow: 0 1px 7px rgba(0,0,0,0.65);
+            padding: 10px;
+        }
+        #result {
+            background-color: slategray;
+            color: white;
+			border-radius: 5px;
+            box-shadow: 0 1px 7px rgba(0,0,0,0.65);
+            padding: 3px;
+            display: none;
+            width: 100px;
+        }
+    </style>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css"
+	  integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ=="
+	  crossorigin=""/>
+	<script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"
+	  integrity="sha512-lInM/apFSqyy1o6s89K4iQUKg6ppXEgsVxT35HbzUupEVRh2Eu9Wdl4tHj7dZO0s1uvplcYGmt3498TtHq+log=="
+	  crossorigin=""></script>
+
+	<script src="../build/leaflet-geomixer-dev.js?key=U92596WMIH"></script>
+</head>
+<body>
+	<div id="map"></div>
+     <div id="infoPanel">
+        <span id="info">
+                Use this button for <button id="setImageProcessingHook">set/remove</button> ImageProcessingHook for tile rasters
+        </span>
+    </div>
+	<script>
+		var map = L.map('map').setView([60, 50], 3);
+
+        var osm = L.tileLayer('//tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=4', {
+			maxZoom: 18,
+			attribution: '<a href="http://2gis.com">2gis</a>'
+		}).addTo(map);
+		
+		var startDate = new Date('2013/03/21');
+		var oneDay = 1000*60*60*24,	// milliseconds in one day
+            now = startDate.getTime(),
+            ddt1 = new Date( now - now % oneDay - oneDay), //beginning of the previous UTC day
+            ddt2 = new Date(ddt1.getTime() + oneDay); //beginning of the current UTC day
+
+        L.gmx.loadLayers([
+            {mapID: 'AZR6A', layerID: 'EB271FC4D2AD425A9BAA78ADEA041AB9'}
+        ]).then(function(modisLayer) {
+            modisLayer.addTo(map);
+            modisLayer.setDateInterval(ddt1, ddt2);
+
+            //controls
+            var isImageProcessingHook = false;
+            document.getElementById("setImageProcessingHook").onclick = function() {
+                isImageProcessingHook = !isImageProcessingHook;
+                if (isImageProcessingHook) {
+                    var processingType = 'Deferred';
+                    modisLayer.setRasterHook(function(img, attrs) {
+                        var setCanvas = function(content) {
+                            var canvas = document.createElement('canvas'),
+                                width = content.width,
+                                height = content.height;
+                            canvas.width = width;
+                            canvas.height = height;
+                            var ctx = canvas.getContext('2d');
+                            ctx.drawImage(content, 0, 0);
+                            gmxAPIutils.setLabel(ctx, 'Geomixer', [width/2, height/2], {
+                                font: '22px "Arial"'
+                                ,strokeStyle: '#FF0000'
+                                ,fillStyle: '#FFFFFF'
+                                ,shadowBlur: 6
+                                ,shadowColor: '#000000'
+                            });
+                           return canvas;
+                        };
+                        if (processingType === 'Deferred') {
+                            var def = new L.gmx.Deferred();
+                            setTimeout(function() {
+                                def.resolve(setCanvas(img));
+                            }, 0);
+                            return def;
+                        } else if (processingType === 'notDeferred') {
+                            return setCanvas(img);
+                        } else if (processingType === 'IgnoreRaster') {
+                            var ignoreIDS = {63121: true, 63120: true};
+                            return ignoreIDS[attrs.id] ? null : img;
+                        }
+                        return img;
+                    }); 
+                } else {
+                    modisLayer.removeRasterHook();
+                }
+            }
+
+
+            L.control.layers({
+                OSM: osm
+            }, {
+                MODIS: modisLayer
+           }, {collapsed: false}).addTo(map);
+        })
+	</script>
+</body>
+</html>

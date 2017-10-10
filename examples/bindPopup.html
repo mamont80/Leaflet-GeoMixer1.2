@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+	<title>GeoMixer Vector Layer Example</title>
+	<meta charset="utf-8" />
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0px;
+        }
+        
+        #infoPanel {
+            position: absolute;
+			left: 0px;
+			right: 0px;
+			top: 21px;
+            text-align: center;
+			z-index: 1000;
+        }
+        
+        #info {
+			background-color: #ffffff;
+			border-radius: 5px;
+            box-shadow: 0 1px 7px rgba(0,0,0,0.65);
+            padding: 10px;
+        }
+    </style>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css"
+	  integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ=="
+	  crossorigin=""/>
+	<script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"
+	  integrity="sha512-lInM/apFSqyy1o6s89K4iQUKg6ppXEgsVxT35HbzUupEVRh2Eu9Wdl4tHj7dZO0s1uvplcYGmt3498TtHq+log=="
+	  crossorigin=""></script>
+
+	<script src="../build/leaflet-geomixer-dev.js?key=U92596WMIH"></script>
+</head>
+<body>
+	<div id="map" style="width: 100%; height: 100%"></div>
+    <div id="infoPanel">
+        <span id="info">
+                Add layer with <b>historical places of Moscow region</b> with photo from a <a href="http://maps.kosmosnimki.ru/api/index.html?H2DUP" target="_blank">GeoMixer map</a>
+        </span>
+    </div>
+	<script>
+		var map = L.map('map').setView([55.73, 37.59], 8);
+
+        var osm = L.tileLayer('//tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=4', {
+			maxZoom: 18,
+			attribution: '<a href="http://2gis.com">2gis</a>'
+		});
+
+        L.gmx.loadLayer('H2DUP', 'B2CC196063834EF48A163EC14C392FAE').then(function(testLayer) {
+            testLayer
+                .bindPopup('', { maxWidth: 560 })
+                .on('popupopen', function(ev) {
+                    var popup = ev.popup,
+                        props = ev.gmx.properties,
+                        container = L.DomUtil.create('div', 'myPopup'),
+                        prop = L.DomUtil.create('div', 'myName', container);
+                        image = L.DomUtil.create('img', 'myImage', container);
+                    
+                    prop.innerHTML = '<h3>' + props['Наименование'] + '</h3>';
+                    L.extend(image, {
+                        width: 300,
+                        galleryimg: 'no',
+                        onselectstart: L.Util.falseFn,
+                        onmousemove: L.Util.falseFn,
+                        onload: function(ev) {
+                            popup.update();
+                        },
+                        src: props['Фото1']
+                    });
+                    prop = L.DomUtil.create('div', 'myName', container);
+                    prop.innerHTML = '<b>Адрес:</b> ' + props['Адрес современный'];
+                    prop = L.DomUtil.create('div', 'myName', container);
+                    prop.innerHTML = '<b>Категория:</b> ' + props['Категория'];
+                    popup.setContent(container);
+                }, testLayer);
+
+            osm.addTo(map);
+            testLayer.addTo(map);
+        })
+	</script>
+</body>
+</html>

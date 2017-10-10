@@ -69,7 +69,7 @@ var GmxEventsManager = L.Handler.extend({
             }
             if (map._animatingZoom ||
                 isDrawing() ||
-                skipNode ||
+                !ev.latlng ||
                 (type === 'click' &&  map._skipClick) ||        // from drawing
                 (type === 'mousemove' &&  map.gmxMouseDown)
                 ) {

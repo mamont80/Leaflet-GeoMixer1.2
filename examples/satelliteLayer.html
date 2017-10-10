@@ -30,11 +30,11 @@
 
 	<script>
 
-	var sputnik = L.tileLayer('//btilecart.kosmosnimki.ru/r/{z}/{x}/{y}.png'
+	var sputnik = L.tileLayer('//tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=4'
 		,
 		{
 			id: 'sputnik',
-			attribution: '<a href="http://kosmosnimki.ru">kosmosnimki</a>'
+			attribution: '<a href="http://2gis.com">2gis</a>'
 		}
 	);
 
@@ -47,7 +47,7 @@
 
 	L.gmx.loadLayer('1D30C72D02914C5FB90D1D448159CAB6', 'C9458F2DCB754CEEACC54216C7D1EB0A').then(function(satelliteLayer) {
 		L.control.layers({
-			"Sputnik": sputnik,
+			"2gis": sputnik,
 			"SatelliteLayer": satelliteLayer
 		}, {}).addTo(map);
 		satelliteLayer.addTo(map);

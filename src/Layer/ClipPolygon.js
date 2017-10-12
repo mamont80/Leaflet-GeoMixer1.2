@@ -164,7 +164,8 @@ L.gmx.VectorLayer.include({
                     if (tile && Object.keys(_this._gmx._clipPolygons).length > 0) {
                         clipTileByPolygon({
                             tile: tile,
-                            tpx: hookInfo.tpx,
+							topLeft: hookInfo.topLeft,
+							tpx: hookInfo.tpx,
                             tpy: hookInfo.tpy,
                             gmx: {mInPixel: gmx.mInPixel},
                             clipPolygons: _this._gmx._clipPolygons

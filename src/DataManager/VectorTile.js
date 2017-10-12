@@ -22,7 +22,7 @@ var VectorTile = function(dataProvider, options) {
     this.attributes = options.attributes;
     this.isGeneralized = options.isGeneralized;
     this.isFlatten = options.isFlatten;
-    this.bounds = gmxAPIutils.getTileBounds(this.x, this.y, this.z);
+    this.bounds = gmxAPIutils.getBoundsByTilePoint(options);
     this.gmxTilePoint = {x: this.x, y: this.y, z: this.z, s: this.s, d: this.d};
     this.vectorTileKey = VectorTile.makeTileKey(this.x, this.y, this.z, this.v, this.s, this.d);
 
@@ -77,11 +77,11 @@ VectorTile.prototype = {
         if (this.state === 'notLoaded') {
             this.state = 'loading';
             var _this = this;
-            this.dataProvider.load(_this.x, _this.y, _this.z, _this.v, _this.s, _this.d, function(data, bbox, srs, isGeneralized) {
-                _this.bbox = bbox;
-                _this.srs = srs;
-                if (isGeneralized) { _this.isGeneralized = isGeneralized; }
-                _this.addData(data);
+            this.dataProvider.load(_this.x, _this.y, _this.z, _this.v, _this.s, _this.d, function(data) {
+                _this.bbox = data.bbox;
+                _this.srs = data.srs;
+                _this.isGeneralized = data.isGeneralized;
+                _this.addData(data.values);
             });
         }
 

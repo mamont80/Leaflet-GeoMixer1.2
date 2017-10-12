@@ -7,6 +7,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
         //clickable: false
     },
     initFromDescription: function(ph) {
+// ph.properties.RasterSRS = '3857';
         var props = ph.properties,
             styles = props.styles[0] || {MinZoom: props.MinZoom || 0, MaxZoom: props.MaxZoom || 21},
             vectorProperties = {
@@ -15,6 +16,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
                 identityField: 'ogc_fid',
                 GeometryType: 'POLYGON',
                 IsRasterCatalog: true,
+				RasterSRS: props.RasterSRS || '3857',
                 Copyright: props.Copyright || '',
                 RCMinZoomForRasters: styles.MinZoom,
                 visible: props.visible,
@@ -43,7 +45,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
 
         gmx.rasterBGfunc = function(x, y, z) {
 			var url = L.gmxUtil.protocol + '//' + gmx.hostName + '/' +
-					'TileSender.ashx?ModeKey=tile' +
+					'TileSender.ashx?ModeKey=tile&ftc=osm' +
 					'&z=' + z +
 					'&x=' + x +
 					'&y=' + y;
@@ -91,9 +93,17 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
                     }
                 }
             }
-			callback(objects, [bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y]);
+			// callback(objects, [bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y], gmx.srs);
+			callback({
+                bbox: [bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y],
+                srs: gmx.srs,
+                isGeneralized: false,
+                values: objects
+			});
 		}};
-		gmx.dataManager._rasterVectorTile = new VectorTile(vectorDataProvider, {x: -0.5, y: -0.5, z: 0, v: 0, s: -2, d: -2});
+		// var tHash = {x: -0.5, y: -0.5, z: 0, v: 0, s: -2, d: -2};
+		var tHash = {x: 0, y: 0, z: 0, v: 0, s: -2, d: -2};
+		gmx.dataManager._rasterVectorTile = new VectorTile(vectorDataProvider, tHash);
 		gmx.dataManager.addTile(gmx.dataManager._rasterVectorTile);
 
         return this;

@@ -7,11 +7,12 @@ var gmxVectorTileLoader = {
         var key = gmxVectorTileLoader._getKey(tileInfo);
 
         if (!this._loadedTiles[key]) {
-            var def = new L.gmx.Deferred();
-            this._loadedTiles[key] = def;
+            // var def = new L.gmx.Deferred();
+            // this._loadedTiles[key] = def;
 
             var requestParams = {
                 ModeKey: 'tile',
+                ftc: 'osm',
                 r: 'j',
                 LayerName: tileInfo.layerID,
                 z: tileInfo.z,
@@ -28,11 +29,24 @@ var gmxVectorTileLoader = {
                 requestParams.Span = tileInfo.s;
             }
 
-            gmxAPIutils.requestJSONP(tileSenderPrefix, requestParams, {callbackParamName: null}).then(null, function() {
-                def.reject();
-            });
+			// gmxAPIutils.requestJSONP(tileSenderPrefix, requestParams, {callbackParamName: null}).then(null, function() {
+                // def.reject();
+            // });
+			var promise = new Promise(function(resolve, reject) {
+				var query = tileSenderPrefix + '&' + Object.keys(requestParams).map(function(name) {
+					return name + '=' + requestParams[name];
+				}).join('&');
+				fetch(query)
+					.then(function(response) { return response.text(); })
+					.then(function(txt) {
+						txt = txt.replace('gmxAPI._vectorTileReceiver(', '');
+						var data = JSON.parse(txt.substr(0, txt.length -1));
+						resolve(data);
+						// resolve(data.values, null, data.srs, data.isGeneralized);
+					});
+			});
+            this._loadedTiles[key] = promise;
         }
-
         return this._loadedTiles[key];
     }
 };

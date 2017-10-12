@@ -2,10 +2,17 @@
 
 var ImageRequest = function(id, url, options) {
     this._id = id;
-    this.def = new L.gmx.Deferred(L.gmx.imageLoader._cancelRequest.bind(L.gmx.imageLoader, this));
+    // this.def = new L.gmx.Deferred(L.gmx.imageLoader._cancelRequest.bind(L.gmx.imageLoader, this));
     this.remove = L.gmx.imageLoader._removeRequestFromCache.bind(L.gmx.imageLoader, this);
     this.url = url;
     this.options = options || {};
+    this.promise = this.def = new Promise(function(resolve, reject) {
+		this.resolve = resolve;
+		this.reject = function() {
+			reject();
+			L.gmx.imageLoader._cancelRequest(this);
+		};
+	}.bind(this));
 };
 
 var GmxImageLoader = L.Class.extend({
@@ -22,7 +29,7 @@ var GmxImageLoader = L.Class.extend({
         this.uniqueID = 0;
     },
 
-    _checkIE11bugFix: function(def, image) {
+    _checkIE11bugFix: function(request, image) {
 		if (!this.divIE11bugFix) {
 			var div = document.createElement('div');
 			this.divIE11bugFix = div;
@@ -31,7 +38,7 @@ var GmxImageLoader = L.Class.extend({
 			document.body.insertBefore(div, document.body.childNodes[0]);
 		}
 		var ieResolve = function() {
-			def.resolve(image);
+			request.resolve(image);
 			// if (image.parentNode) {
 				// image.parentNode.removeChild(image);
 			// }
@@ -41,7 +48,6 @@ var GmxImageLoader = L.Class.extend({
     },
 
     _resolveRequest: function(request, image, canceled) {
-        var def = request.def;
         if (image) {
             if (!canceled && request.options.cache) {
                 var url = request.url,
@@ -51,12 +57,12 @@ var GmxImageLoader = L.Class.extend({
                 if (!cacheItem.requests[cacheKey]) { cacheItem.requests[cacheKey] = request; }
             }
 			if (L.gmxUtil.isIE11 && /\.svg[\?$]/.test(request.url)) {   // skip bug in IE11
-				this._checkIE11bugFix(def, image);
+				this._checkIE11bugFix(request, image);
 			} else {
-				def.resolve(image);
+				request.resolve(image);
 			}
         } else if (!canceled) {
-            def.reject();
+            request.reject();
         }
         this.fire('requestdone', {request: request});
     },

@@ -129,7 +129,7 @@ var chkVersion = function (layer, callback) {
             chkHost = function(hostName) {
 				var url = L.gmxUtil.protocol + '//' + hostName + script,
                     layersStr = JSON.stringify(hosts[hostName]);
-				var params = 'WrapStyle=None';
+				var params = 'WrapStyle=None&ftc=osm';
 				if (layersVersion.needBbox) {
 					var crs = L.Projection.Mercator;
 					if (map.options.srs === '3857') {

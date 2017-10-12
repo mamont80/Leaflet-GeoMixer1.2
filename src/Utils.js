@@ -714,7 +714,7 @@ var gmxAPIutils = {
         return new L.DivIcon(iconOptions);
     },
 
-    toPixels: function(p, tpx, tpy, mInPixel) { // get pixel point
+    toPixels: function(p, tpx, tpy, mInPixel, topLeft) { // get pixel point
         var px1 = p[0] * mInPixel; 	px1 = (0.5 + px1) << 0;
         var py1 = p[1] * mInPixel;	py1 = (0.5 + py1) << 0;
         return [px1 - tpx, tpy - py1].concat(p.slice(2));
@@ -732,7 +732,8 @@ var gmxAPIutils = {
             sy = currentStyle.sy || style.sy || 4,
             weight = currentStyle.weight || style.weight || 0,
             iconAnchor = currentStyle.iconAnchor || style.iconAnchor || null,
-            px = attr.tpx,
+			topLeft = attr.topLeft,
+			px = attr.tpx,
             py = attr.tpy;
 
         if (!iconCenter && iconAnchor) {
@@ -911,7 +912,8 @@ var gmxAPIutils = {
             style.rotateRes = currentStyle.rotate || 0;
             if ('opacity' in style) { ctx.globalAlpha = currentStyle.opacity || style.opacity; }
             if (gmx.transformFlag) {
-                ctx.setTransform(gmx.mInPixel, 0, 0, gmx.mInPixel, -attr.tpx, attr.tpy);
+//						topLeft = attr.topLeft,
+				ctx.setTransform(gmx.mInPixel, 0, 0, gmx.mInPixel, -attr.tpx, attr.tpy);
                 ctx.drawImage(image, px1, -py1, sx, sy);
                 ctx.setTransform(gmx.mInPixel, 0, 0, -gmx.mInPixel, -attr.tpx, attr.tpy);
             } else {
@@ -1007,7 +1009,7 @@ var gmxAPIutils = {
         var lastX = null, lastY = null;
         ctx.beginPath();
         for (var i = 0, len = coords.length; i < len; i++) {
-            var p = gmxAPIutils.toPixels(coords[i], attr.tpx, attr.tpy, gmx.mInPixel),
+            var p = gmxAPIutils.toPixels(coords[i], attr.tpx, attr.tpy, gmx.mInPixel, attr.topLeft),
                 x = p[0],
                 y = p[1];
             if (lastX !== x || lastY !== y) {
@@ -1033,6 +1035,7 @@ var gmxAPIutils = {
             hiddenFlag = false,
             hash = {
                 gmx: gmx,
+				topLeft: attr.topLeft,
                 tpx: attr.tpx,
                 tpy: attr.tpy,
                 coords: null,
@@ -1064,6 +1067,7 @@ var gmxAPIutils = {
             mInPixel = gmx.mInPixel,
             coords = attr.coords,
             hiddenLines = attr.hiddenLines || null,
+			topLeft = attr.topLeft,
             px = attr.tpx,
             py = attr.tpy,
             cnt = 0, cntHide = 0,
@@ -1097,6 +1101,7 @@ var gmxAPIutils = {
         var hiddenLines = attr.hiddenLines || null,
             coords = attr.coords,
             ctx = attr.ctx,
+			topLeft = attr.topLeft,
             px = attr.tpx,
             py = attr.tpy,
             cnt = 0, cntHide = 0,
@@ -1131,6 +1136,7 @@ var gmxAPIutils = {
     polygonToCanvasFill: function(attr) {     // Polygon fill
         if (attr.coords.length < 3) { return; }
         var coords = attr.coords,
+			topLeft = attr.topLeft,
             px = attr.tpx,
             py = attr.tpy,
             vectorSize = 1,
@@ -2252,7 +2258,15 @@ var gmxAPIutils = {
         var zn = Math.pow(10, prec ? prec : 4);
         return Math.round(zn * x) / zn;
     },
-
+	getBoundsByTilePoint: function(tPoint) {  //tPoint - OSM tile point
+        var tileSize = gmxAPIutils.tileSizes[tPoint.z],
+            minx = tPoint.x * tileSize - gmxAPIutils.worldWidthMerc,
+            maxy = gmxAPIutils.worldWidthMerc - tPoint.y * tileSize;
+		return gmxAPIutils.bounds([
+			[minx, maxy - tileSize],
+			[minx + tileSize, maxy]
+		]);
+	},
     getTileBounds: function(x, y, z) {  //x, y, z - GeoMixer tile coordinates
         var tileSize = gmxAPIutils.tileSizes[z],
             minx = x * tileSize,
@@ -2901,6 +2915,7 @@ L.extend(L.gmxUtil, {
     getCircleLatLngs: gmxAPIutils.getCircleLatLngs,
     normalizeHostname: gmxAPIutils.normalizeHostname,
     getTileBounds: gmxAPIutils.getTileBounds,
+	getBoundsByTilePoint: gmxAPIutils.getBoundsByTilePoint,
     parseTemplate: gmxAPIutils.parseTemplate
 });
 

@@ -107,6 +107,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
             style: style,
             styleExtend: geoItem.styleExtend || {},
             ctx: ctx,
+			topLeft: options.topLeft,
             tpx: options.tpx,
             tpy: options.tpy
         };
@@ -153,6 +154,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
                 pixelsMap = dataOption.pixels = utils.getCoordsPixels({
                     gmx: gmx,
                     coords: coords,
+					topLeft: options.topLeft,
                     tpx: options.tpx,
                     tpy: options.tpy,
                     hiddenLines: hiddenLines

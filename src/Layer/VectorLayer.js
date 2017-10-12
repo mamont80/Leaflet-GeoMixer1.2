@@ -161,18 +161,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         }
     },
 
-    _update: function () {
-		/*
-        if (!this._map ||
-            this.isExternalVisible && this.isExternalVisible(this._map._zoom) // External layer enabled on this.zoom
-            ) {
-            this._clearAllSubscriptions();
-            return;
-        }
-		*/
-        this._gmx.styleManager.promise.then(this.__update.bind(this));
-    },
-
     _addTile: function (coords) {
         var zoom = this._tileZoom || this._map._zoom,
             gmx = this._gmx;
@@ -261,7 +249,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
             if (this._animated) {
                 // clear scaled tiles after all new tiles are loaded (for performance)
-                this._setClearBgBuffer(0);
+                // this._setClearBgBuffer(0);
             }
         }
     },
@@ -320,8 +308,15 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         gmx.rawProperties = ph.rawProperties || ph.properties;
 
         this._updateProperties(ph.properties);
-        if (gmx.srs) {
-			ph.properties.srs = gmx.srs;
+        // if (gmx.srs) {
+			// ph.properties.srs = gmx.srs;
+		// } else if (gmx.rawProperties.RasterSRS) {
+			// ph.properties.srs = gmx.srs = gmx.rawProperties.RasterSRS;
+		// }
+        if (gmx.rawProperties.type === 'Vector') {
+			ph.properties.srs = gmx.srs = '3857';
+        } else if (gmx.rawProperties.RasterSRS) {
+			ph.properties.srs = gmx.srs = gmx.rawProperties.RasterSRS;
 		}
 
         ph.properties.needBbox = gmx.needBbox;
@@ -813,7 +808,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 			_this = this;
 		return new Promise(function(resolve, reject) {
 			gmx.styleManager.promise.then(function () {
-				new ScreenVectorTile(_this, tileElem.coords, tileElem.coords.z).drawTile(data).then(resolve, reject);
+				new ScreenVectorTile(_this, tileElem).drawTile(data).then(resolve, reject);
+				// new ScreenVectorTile(_this, tileElem.coords, tileElem.coords.z).drawTile(data).then(resolve, reject);
 				// var screenTile = new ScreenVectorTile(_this, tileElem.coords, tileElem.coords.z);
 					// var screenTileDrawPromise = screenTile.drawTile(data);
 					// screenTileDrawPromise.then(resolve, reject);
@@ -827,15 +823,15 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         // this.repaint();
     },
 
-    _setClearBgBuffer: function (zd) {
-        if (this._clearBgBufferTimer) { clearTimeout(this._clearBgBufferTimer); }
-        var _this = this;
-        this._clearBgBufferTimer = setTimeout(function () {
-            if (_this._bgBuffer) {
-                _this._clearBgBuffer();
-            }
-        }, zd || 0);
-    },
+    // _setClearBgBuffer: function (zd) {
+        // if (this._clearBgBufferTimer) { clearTimeout(this._clearBgBufferTimer); }
+        // var _this = this;
+        // this._clearBgBufferTimer = setTimeout(function () {
+            // if (_this._bgBuffer) {
+                // _this._clearBgBuffer();
+            // }
+        // }, zd || 0);
+    // },
 
     _getNeedPopups: function () {
         var out = {},
@@ -854,6 +850,18 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
 		return size.divideBy(tileSize)._floor();
 	},
+
+    _update: function () {
+		/*
+        if (!this._map ||
+            this.isExternalVisible && this.isExternalVisible(this._map._zoom) // External layer enabled on this.zoom
+            ) {
+            this._clearAllSubscriptions();
+            return;
+        }
+		*/
+        this._gmx.styleManager.promise.then(this.__update.bind(this));
+    },
 
     __update: function () {
         var map = this._map;
@@ -891,7 +899,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 		}
 
         if (zoom > this.options.maxZoom || zoom < this.options.minZoom) {
-            this._setClearBgBuffer(500);
+            // this._setClearBgBuffer(500);
             return;
         }
 
@@ -902,6 +910,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
                 coords.z = this._tileZoom;
                 var zKey = this._tileCoordsToKey(coords);
 
+//console.log('_addTile', zKey, this._tiles[zKey]);
                 if (!this._tiles[zKey]) {
                     this._addTile(coords);
                     // this._addTile(zKey, coords);
@@ -1061,7 +1070,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
                 gmx.rasterBGfunc = function(x, y, z, item) {
                     var properties = item.properties,
 						url = L.gmxUtil.protocol + '//' + gmx.hostName
-							+ '/TileSender.ashx?ModeKey=tile'
+							+ '/TileSender.ashx?ModeKey=tile&ftc=osm'
 							+ '&x=' + x
 							+ '&y=' + y
 							+ '&z=' + z;
@@ -1160,10 +1169,10 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 	},
     _updateShiftY: function() {
         var gmx = this._gmx;
+		gmx.currentZoom = this._tileZoom;
+		gmx.tileSize = gmxAPIutils.tileSizes[gmx.currentZoom];
+		gmx.mInPixel = 256 / gmx.tileSize;
         if (gmx.applyShift && this._map) {
-			gmx.currentZoom = this._tileZoom;
-			gmx.tileSize = gmxAPIutils.tileSizes[gmx.currentZoom];
-			gmx.mInPixel = 256 / gmx.tileSize;
 			gmx.deltaY = this._getShiftY(gmx.currentZoom);
 			gmx.shiftX = Math.floor(gmx.mInPixel * (gmx.shiftXlayer || 0));
 			gmx.shiftY = Math.floor(gmx.deltaY + gmx.mInPixel * (gmx.shiftYlayer || 0));

@@ -525,7 +525,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
             var observer = null,
 				dataManager = gmx.dataManager;
-            for (var key in gmx.tileSubscriptions) {
+            for (var key in this._tiles) {
                 observer = dataManager.getObserver(key);
                 observer.setDateInterval(beginDate, endDate);
             }
@@ -588,7 +588,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         if (this._map) {
             if (!zKeys) {
                 zKeys = {};
-                for (var key in this._gmx.tileSubscriptions) { zKeys[key] = true; }
+                for (var key in this._tiles) { zKeys[key] = true; }
                 L.extend(zKeys, this.repaintObservers);
             }
             this._gmx.dataManager._triggerObservers(zKeys);
@@ -1126,26 +1126,26 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         this._updateProperties(this._gmx.rawProperties);
     },
 
-    getViewRasters: function() {
-        var gmx = this._gmx,
-			hash = {},
-			out = [];
+    // getViewRasters: function() {
+        // var gmx = this._gmx,
+			// hash = {},
+			// out = [];
 
-        for (var zKey in gmx.tileSubscriptions) {
-            var subscription = gmx.tileSubscriptions[zKey],
-				screenTile = subscription.screenTile;
-            if (screenTile) {
-                screenTile.itemsView.forEach(function(it) {
-					hash[it.id] = true;
-				});
-            }
-        }
-        for (var id in hash) {
-			out.push(id);
-		}
+        // for (var zKey in gmx.tileSubscriptions) {
+            // var subscription = gmx.tileSubscriptions[zKey],
+				// screenTile = subscription.screenTile;
+            // if (screenTile) {
+                // screenTile.itemsView.forEach(function(it) {
+					// hash[it.id] = true;
+				// });
+            // }
+        // }
+        // for (var id in hash) {
+			// out.push(id);
+		// }
 
-        return out;
-    },
+        // return out;
+    // },
 
     getPropItem: function (key, propArr) {
         return gmxAPIutils.getPropItem(key, propArr, this._gmx.tileAttributeIndexes);

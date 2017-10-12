@@ -3,14 +3,14 @@ function ScreenVectorTile(layer, tileElem) {
     this.layer = layer;
 	var tilePoint = tileElem.coords,
 		zoom = tilePoint.z;
-	
+
     this.tilePoint = tilePoint;
     this.zoom = zoom;
     this.gmx = layer._gmx;
     this.zKey = this.layer._tileCoordsToKey(tilePoint, zoom);
     var utils = gmxAPIutils;
     this.worldWidthMerc = utils.worldWidthMerc;
-	
+
     var gmxTilePoint = utils.getTileNumFromLeaflet(tilePoint, zoom);
     this.tbounds = utils.getTileBounds(gmxTilePoint.x, gmxTilePoint.y, gmxTilePoint.z);
     this.tpx = 256 * gmxTilePoint.x;
@@ -211,8 +211,8 @@ ScreenVectorTile.prototype = {
             gmx = this.gmx,
             indexes = gmx.tileAttributeIndexes,
             rasters = this.rasters,
-            mainRasterLoader = null,
-            recursiveLoaders,
+            // mainRasterLoader = null,
+            // recursiveLoaders,
             shiftX = Number(gmx.shiftXfield ? gmxAPIutils.getPropItem(gmx.shiftXfield, properties, indexes) : 0) % this.worldWidthMerc,
             shiftY = Number(gmx.shiftYfield ? gmxAPIutils.getPropItem(gmx.shiftYfield, properties, indexes) : 0),
             isShift = shiftX || shiftY,
@@ -223,10 +223,9 @@ ScreenVectorTile.prototype = {
             item = gmx.dataManager.getItem(idr),
             gmxTilePoint = this.gmxTilePoint,
             tilePoint = this.tilePoint,
-            resCanvas = null,
-            imageItem = null;
+            resCanvas = null;
 
-		var itemRasterPromise = new Promise(function(resolve, reject) {
+		var itemRasterPromise = new Promise(function(resolve) {
 			//Promise.all(this._getNeedRasterItems(geoItems).map(this._getItemRasters.bind(this))).then(resolve);
 
 			if (gmx.IsRasterCatalog && (gmx.rawProperties.type === 'Raster' || gmxAPIutils.getPropItem('GMX_RasterCatalogID', properties, indexes))) {
@@ -238,7 +237,7 @@ ScreenVectorTile.prototype = {
 				url = urlBG;                        // Image urlBG from properties
 				itemImageProcessingHook = gmx.imageQuicklookProcessingHook;
 			}
-			var mainRasterLoader = new Promise(function(resolve1, reject1) {
+			new Promise(function(resolve1, reject1) {
 				if (isTiles) {
 					// mainRasterLoader = new L.gmx.Deferred(function() {
 						// recursiveLoaders.forEach(function(it) {
@@ -342,7 +341,7 @@ ScreenVectorTile.prototype = {
 								}
 							}
 						};
-					recursiveLoaders = tileToLoadPoints.map(function(it) {
+					tileToLoadPoints.map(function(it) {
 						var loader = _this._loadTileRecursive(it, urlFunction);
 						loader.then(function(loadResult) {
 							onLoadFunction(loadResult.gtp, it, loadResult.image);
@@ -430,7 +429,6 @@ ScreenVectorTile.prototype = {
 					// };
 				}
 			}.bind(this));
-			
 		}.bind(this));
         return itemRasterPromise;
     },

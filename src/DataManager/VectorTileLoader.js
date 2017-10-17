@@ -32,7 +32,7 @@ var gmxVectorTileLoader = {
 			// gmxAPIutils.requestJSONP(tileSenderPrefix, requestParams, {callbackParamName: null}).then(null, function() {
                 // def.reject();
             // });
-			var promise = new Promise(function(resolve, reject) {
+			var promise = new Promise(function(resolve) {
 				var query = tileSenderPrefix + '&' + Object.keys(requestParams).map(function(name) {
 					return name + '=' + requestParams[name];
 				}).join('&');

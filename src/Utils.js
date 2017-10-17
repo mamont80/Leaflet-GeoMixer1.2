@@ -714,7 +714,7 @@ var gmxAPIutils = {
         return new L.DivIcon(iconOptions);
     },
 
-    toPixels: function(p, tpx, tpy, mInPixel, topLeft) { // get pixel point
+    toPixels: function(p, tpx, tpy, mInPixel) { // get pixel point	, topLeft
         var px1 = p[0] * mInPixel; 	px1 = (0.5 + px1) << 0;
         var py1 = p[1] * mInPixel;	py1 = (0.5 + py1) << 0;
         return [px1 - tpx, tpy - py1].concat(p.slice(2));
@@ -732,7 +732,7 @@ var gmxAPIutils = {
             sy = currentStyle.sy || style.sy || 4,
             weight = currentStyle.weight || style.weight || 0,
             iconAnchor = currentStyle.iconAnchor || style.iconAnchor || null,
-			topLeft = attr.topLeft,
+			// topLeft = attr.topLeft,
 			px = attr.tpx,
             py = attr.tpy;
 
@@ -1067,7 +1067,7 @@ var gmxAPIutils = {
             mInPixel = gmx.mInPixel,
             coords = attr.coords,
             hiddenLines = attr.hiddenLines || null,
-			topLeft = attr.topLeft,
+			// topLeft = attr.topLeft,
             px = attr.tpx,
             py = attr.tpy,
             cnt = 0, cntHide = 0,
@@ -1101,7 +1101,7 @@ var gmxAPIutils = {
         var hiddenLines = attr.hiddenLines || null,
             coords = attr.coords,
             ctx = attr.ctx,
-			topLeft = attr.topLeft,
+			// topLeft = attr.topLeft,
             px = attr.tpx,
             py = attr.tpy,
             cnt = 0, cntHide = 0,
@@ -1136,7 +1136,7 @@ var gmxAPIutils = {
     polygonToCanvasFill: function(attr) {     // Polygon fill
         if (attr.coords.length < 3) { return; }
         var coords = attr.coords,
-			topLeft = attr.topLeft,
+			// topLeft = attr.topLeft,
             px = attr.tpx,
             py = attr.tpy,
             vectorSize = 1,

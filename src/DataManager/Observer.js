@@ -27,7 +27,7 @@ var Observer = L.Class.extend({
         this.filters = options.filters || [];
         this.targetZoom = options.targetZoom || null;
         this.active = 'active' in options ? options.active : true;
-        this.srs = options.srs || '3395';	// '3857'
+        this.srs = options.srs || '3857';	// '3857' '3395'
 
         if (options.bounds) {   // set bbox by LatLngBounds
             this.setBounds(options.bounds);

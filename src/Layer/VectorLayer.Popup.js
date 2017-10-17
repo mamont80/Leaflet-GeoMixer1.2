@@ -87,6 +87,7 @@ L.gmx.VectorLayer.include({
 	closePopup: function () {
 		if (this._popup) {
 			this._popup._close();
+			this.getPopups().forEach(this._clearPopup);
             this.fire('popupclose', {popup: this._popup});
 		}
 		return this;

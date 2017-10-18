@@ -32,17 +32,22 @@ var gmxVectorTileLoader = {
 			// gmxAPIutils.requestJSONP(tileSenderPrefix, requestParams, {callbackParamName: null}).then(null, function() {
                 // def.reject();
             // });
-			var promise = new Promise(function(resolve) {
+			var promise = new Promise(function(resolve, reject) {
 				var query = tileSenderPrefix + '&' + Object.keys(requestParams).map(function(name) {
 					return name + '=' + requestParams[name];
 				}).join('&');
 				fetch(query)
 					.then(function(response) { return response.text(); })
 					.then(function(txt) {
-						txt = txt.replace('gmxAPI._vectorTileReceiver(', '');
-						var data = JSON.parse(txt.substr(0, txt.length -1));
-						resolve(data);
-						// resolve(data.values, null, data.srs, data.isGeneralized);
+						var pref = 'gmxAPI._vectorTileReceiver(';
+						if (txt.substr(0, pref.length)) {
+							txt = txt.replace(pref, '');
+							var data = JSON.parse(txt.substr(0, txt.length -1));
+							resolve(data);
+							// resolve(data.values, null, data.srs, data.isGeneralized);
+						} else {
+							reject();
+						}
 					});
 			});
             this._loadedTiles[key] = promise;

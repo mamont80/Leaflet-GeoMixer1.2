@@ -4962,7 +4962,7 @@ var gmxVectorTileLoader = {
 					.then(function(response) { return response.text(); })
 					.then(function(txt) {
 						var pref = 'gmxAPI._vectorTileReceiver(';
-						if (txt.substr(0, pref.length)) {
+						if (txt.substr(0, pref.length) === pref) {
 							txt = txt.replace(pref, '');
 							var data = JSON.parse(txt.substr(0, txt.length -1));
 							resolve(data);

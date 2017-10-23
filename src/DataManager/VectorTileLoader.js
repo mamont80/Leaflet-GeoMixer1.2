@@ -36,7 +36,10 @@ var gmxVectorTileLoader = {
 				var query = tileSenderPrefix + '&' + Object.keys(requestParams).map(function(name) {
 					return name + '=' + requestParams[name];
 				}).join('&');
-				fetch(query)
+				fetch(query, {
+					mode: 'cors',
+					credentials: 'include'
+				})
 					.then(function(response) { return response.text(); })
 					.then(function(txt) {
 						var pref = 'gmxAPI._vectorTileReceiver(';

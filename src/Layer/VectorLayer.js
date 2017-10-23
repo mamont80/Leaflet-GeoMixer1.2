@@ -54,8 +54,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         }
 
         // this.on('tileunload', function(e) {
-            //_this._clearTileSubscription(e.tile.zKey);
-        // });
+            // this._clearTiles([e.tile.zKey]);
+        // }.bind(this));
     },
 
     // extended from L.TileLayer.Canvas
@@ -125,15 +125,18 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         if (!this.options.updateWhenIdle) {
             map.off('move', this._limitedUpdate, this);
         }
+        this._clearTiles();
+        var gmx = this._gmx;
+		if (gmx.labelsLayer) {	// удалить из labelsLayer
+			map._labelsLayer.remove(this);
+		}
+
         this._container = null;
         this._map = null;
 
-        // this._clearAllSubscriptions();
         map.off('zoomstart', this._zoomStart, this);
         map.off('zoomend', this._zoomEnd, this);
         this.off('stylechange', this._onStyleChange, this);
-
-        var gmx = this._gmx;
 
         delete gmx.map;
         if (gmx.properties.type === 'Vector') {
@@ -555,6 +558,18 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         };
     },
 
+    _clearTiles: function(keys) {
+        keys = keys || Object.keys(this._tiles);
+
+		keys.forEach(function(zKey) {
+			var it = this._tiles[zKey];
+			it.observer.deactivate();
+            this.removeObserver(it.observer);
+            delete this._tiles[zKey];
+		}.bind(this));
+        this._gmx._tilesToLoad = 0;
+    },
+
     addObserver: function (options) {
         return this._gmx.dataManager.addObserver(options);
     },
@@ -894,6 +909,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 				c = tileLink.coords;
 			if (c.z !== this._tileZoom || !noPruneRange.contains(new L.Point(c.x, c.y))) {
 				tileLink.current = false;
+				tileLink.observer.deactivate();
+				this.removeObserver(tileLink.observer);
 			}
 			L.DomUtil.setPosition(tileLink.el, this._getTilePos(c), L.Browser.chrome || L.Browser.android23);
 		}

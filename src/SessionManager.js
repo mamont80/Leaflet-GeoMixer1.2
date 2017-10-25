@@ -50,33 +50,31 @@ var gmxSessionManager = {
 
         if (!(serverHost in keys)) {
             apiKey = typeof apiKey === 'undefined' ? this._searchScriptAPIKey() : apiKey;
-            keys[serverHost] = new L.gmx.Deferred();
-            if (apiKey) {
-                gmxAPIutils.requestJSONP(
-                    L.gmxUtil.protocol + '//' + serverHost + '/ApiKey.ashx',
-                    {
-                        WrapStyle: 'func',
-                        Key: apiKey
-                    }
-                ).then(function(response) {
-                    if (response && response.Status === 'ok') {
-                        keys[serverHost].resolve(response.Result.Key);
-                    } else {
-                        keys[serverHost].reject();
-                    }
-                }, keys[serverHost].reject);
-            } else {
-                keys[serverHost].resolve('');
-            }
+            keys[serverHost] = new Promise(function(resolve, reject) {
+				if (apiKey) {
+					gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/ApiKey.ashx',
+						{
+							WrapStyle: 'func',
+							Key: apiKey
+						}
+					).then(function(response) {
+						if (response && response.Status === 'ok') {
+							resolve(response.Result.Key);
+						} else {
+							reject();
+						}
+					}, reject);
+				} else {
+					resolve('');
+				}
+			});
         }
         return keys[serverHost];
     },
 
     //get already received session key
     getSessionKey: function(serverHost) {
-        var keyPromise = this._sessionKeys[serverHost];
-
-        return keyPromise && keyPromise.getFulfilledData() && keyPromise.getFulfilledData()[0];
+		return this._sessionKeys[serverHost];
     },
     _sessionKeys: {} //deferred for each host
 };

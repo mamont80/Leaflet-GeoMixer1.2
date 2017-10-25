@@ -2,7 +2,6 @@
 
 var ImageRequest = function(id, url, options) {
     this._id = id;
-    // this.def = new L.gmx.Deferred(L.gmx.imageLoader._cancelRequest.bind(L.gmx.imageLoader, this));
     this.remove = L.gmx.imageLoader._removeRequestFromCache.bind(L.gmx.imageLoader, this);
     this.url = url;
     this.options = options || {};

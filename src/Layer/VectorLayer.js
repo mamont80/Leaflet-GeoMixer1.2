@@ -15,8 +15,10 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     initialize: function(options) {
         options = L.setOptions(this, options);
 
-        this.initPromise = new L.gmx.Deferred();
-		// return new Promise(function(resolve, reject) {
+        this._initPromise = new Promise(function(resolve, reject) {
+			this._resolve = resolve;
+			this._reject = reject;
+		}.bind(this));
 
         this._drawQueue = [];
         this._drawQueueHash = {};
@@ -31,6 +33,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         this._gmx = {
             hostName: gmxAPIutils.normalizeHostname(options.hostName || 'maps.kosmosnimki.ru'),
             mapName: options.mapID,
+			sessionKey: this.options.sessionKey,
 			iconsUrlReplace: this.options.iconsUrlReplace,
             skipTiles: options.skipTiles,
             needBbox: options.skipTiles === 'All',
@@ -367,7 +370,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             this.setDateInterval(gmx.dateBegin, gmx.dateEnd);
         }
 
-        this.initPromise.resolve();
+        this._resolve();
         return this;
     },
 
@@ -398,12 +401,9 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     setRasterOpacity: function (opacity) {
-        var _this = this;
         if (this._gmx.rasterOpacity !== opacity) {
             this._gmx.rasterOpacity = opacity;
-            this.initPromise.then(function() {
-                _this.repaint();
-            });
+            this._initPromise.then(this.repaint.bind(this));
         }
         return this;
     },
@@ -418,18 +418,16 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     setStyles: function (styles) {
-        var _this = this;
-
-        this.initPromise.then(function() {
-            _this._gmx.styleManager.clearStyles();
+        this._initPromise.then(function() {
+            this._gmx.styleManager.clearStyles();
             if (styles) {
                 styles.forEach(function(it, i) {
-                    _this.setStyle(it, i, true);
-                });
+                    this.setStyle(it, i, true);
+                }.bind(this));
             } else {
-                _this.fire('stylechange');
+                this.fire('stylechange');
             }
-        });
+        }.bind(this));
         return this;
     },
 
@@ -438,13 +436,11 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     setStyle: function (style, num, createFlag) {
-        var _this = this,
-            gmx = this._gmx;
-        this.initPromise.then(function() {
-            gmx.styleManager.setStyle(style, num, createFlag).then(function () {
-                _this.fire('stylechange', {num: num || 0});
-            });
-        });
+        this._initPromise.then(function() {
+            this._gmx.styleManager.setStyle(style, num, createFlag).then(function () {
+                this.fire('stylechange', {num: num || 0});
+            }.bind(this));
+        }.bind(this));
         return this;
     },
 
@@ -988,10 +984,10 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     _updateProperties: function (prop) {
-        var gmx = this._gmx,
-            apikeyRequestHost = this.options.apikeyRequestHost || gmx.hostName;
+        var gmx = this._gmx;
+            // apikeyRequestHost = this.options.apikeyRequestHost || gmx.hostName;
 
-        gmx.sessionKey = prop.sessionKey = this.options.sessionKey || gmxSessionManager.getSessionKey(apikeyRequestHost); //should be already received
+        //gmx.sessionKey = prop.sessionKey = this.options.sessionKey || gmxSessionManager.getSessionKey(apikeyRequestHost); //should be already received
 
         if (this.options.parentOptions) {
 			prop = this.options.parentOptions;

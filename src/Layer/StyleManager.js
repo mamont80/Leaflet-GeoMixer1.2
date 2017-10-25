@@ -155,7 +155,6 @@ StyleManager.prototype = {
                 style = this._prepareItem({});
                 this._styles[num] = style;
             }
-            // this.deferred = new L.gmx.Deferred();
             style.version = ++this._maxVersion;
             if ('Filter' in st) {
                 style.Filter = st.Filter;

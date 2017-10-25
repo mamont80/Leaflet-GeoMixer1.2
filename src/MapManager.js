@@ -26,22 +26,28 @@ var gmxMapManager = {
 				ModeKey: 'map'
 			};
 			if (options.srs === 3857) { opt.cs = 'wm'; }
-            var def = new L.gmx.Deferred();
+			var promise = new Promise(function(resolve, reject) {
+				gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
+					opt.key = sessionKey;
+
+					gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/TileSender.ashx', opt).then(function(json) {
+						if (json && json.Status === 'ok' && json.Result) {
+							json.Result.properties.hostName = serverHost;
+							json.Result.properties.sessionKey = sessionKey;
+							L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
+							L.gmx._maps[serverHost][mapName] = {
+								_rawTree: json.Result,
+								_nodes: {}
+							};
+							resolve(json.Result);
+						} else {
+							reject(json);
+						}
+					}, reject);
+				}, reject);
+			});
             maps[serverHost] = maps[serverHost] || {};
-            maps[serverHost][mapName] = {promise: def};
-
-            gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
-				opt.key = sessionKey;
-
-				gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/TileSender.ashx', opt).then(function(json) {
-                    if (json && json.Status === 'ok' && json.Result) {
-                        json.Result.properties.hostName = serverHost;
-                        def.resolve(json.Result);
-                    } else {
-                        def.reject(json);
-                    }
-                }, def.reject);
-            }, def.reject);
+            maps[serverHost][mapName] = {promise: promise};
         }
         return maps[serverHost][mapName].promise;
     },
@@ -65,31 +71,19 @@ var gmxMapManager = {
 
     //we will (lazy) create index by layer name to speed up multiple function calls
     findLayerInfo: function(serverHost, mapID, layerID) {
-        var hostMaps = this._maps[serverHost],
-            mapInfo = hostMaps && hostMaps[mapID];
+		var hostMaps = L.gmx._maps[serverHost],
+			layerInfo = null;
 
-        if (!mapInfo) {
-            return null;
-        }
-
-        if (mapInfo.layers) {
-            return mapInfo.layers[layerID];
-        }
-
-        var serverData = mapInfo.promise.getFulfilledData();
-
-        if (!serverData) {
-            return null;
-        }
-
-        mapInfo.layers = {};
-
-        //create index by layer name
-        gmxMapManager.iterateLayers(serverData[0], function(layerInfo) {
-            mapInfo.layers[layerInfo.properties.name] = layerInfo;
-        });
-
-        return mapInfo.layers[layerID];
+		if (hostMaps && hostMaps[mapID]) {
+			var mapInfo = hostMaps[mapID];
+			if (!mapInfo._nodes[layerID]) {
+				gmxMapManager.iterateNode(mapInfo._rawTree, function(it) {
+					mapInfo._nodes[it.content.properties.name] = it;
+				});
+			}
+			layerInfo = mapInfo._nodes[layerID];
+		}
+		return layerInfo ? layerInfo.content : null;
     },
     iterateLayers: function(treeInfo, callback) {
         var iterate = function(arr) {
@@ -123,5 +117,9 @@ var gmxMapManager = {
     },
     _maps: {} //Promise for each map. Structure: maps[serverHost][mapID]: {promise:, layers:}
 };
+
+L.gmx = L.gmx || {};
+L.gmx._maps = {};			// свойства слоев по картам
+L.gmx._clientLayers = {};	// свойства слоев без карт (клиентские слои)
 
 L.gmx.gmxMapManager = gmxMapManager;

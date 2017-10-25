@@ -70,7 +70,6 @@ L.gmx.VectorLayer.include({
     },
 
 	openPopup: function (latlng, options) {
-
 		if (this._popup) {
 			// open the popup from one of the path's points if not specified
 			latlng = latlng || this._latlng ||
@@ -84,10 +83,12 @@ L.gmx.VectorLayer.include({
 		return this;
 	},
 
-	closePopup: function () {
+	closePopup: function (type) {
 		if (this._popup) {
 			this._popup._close();
+			if (type !== 'mouseout') {
 			this.getPopups().forEach(this._clearPopup.bind(this));
+			}
             this.fire('popupclose', {popup: this._popup});
 		}
 		return this;
@@ -120,7 +121,7 @@ L.gmx.VectorLayer.include({
 
     _outPopup: function (ev) {
         if (this._popup._state === 'mouseover' && !ev.gmx.prevId) {
-            this.closePopup();
+            this.closePopup(ev.type);
         }
     },
 
@@ -185,7 +186,9 @@ L.gmx.VectorLayer.include({
         if (offset) {
             var protoOffset = L.Popup.prototype.options.offset;
             _popup.options.offset = [-protoOffset[0] - offset[0], protoOffset[1] - offset[1]];
-        }
+        } else {
+			_popup.options.offset[1] = type === 'mouseover' ? -7 : 7;
+		}
 
         if (this._popupopen) {
             this._popupopen({

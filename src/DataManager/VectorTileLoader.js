@@ -7,9 +7,6 @@ var gmxVectorTileLoader = {
         var key = gmxVectorTileLoader._getKey(tileInfo);
 
         if (!this._loadedTiles[key]) {
-            // var def = new L.gmx.Deferred();
-            // this._loadedTiles[key] = def;
-
             var requestParams = {
                 ModeKey: 'tile',
                 ftc: 'osm',
@@ -29,9 +26,6 @@ var gmxVectorTileLoader = {
                 requestParams.Span = tileInfo.s;
             }
 
-			// gmxAPIutils.requestJSONP(tileSenderPrefix, requestParams, {callbackParamName: null}).then(null, function() {
-                // def.reject();
-            // });
 			var promise = new Promise(function(resolve, reject) {
 				var query = tileSenderPrefix + '&' + Object.keys(requestParams).map(function(name) {
 					return name + '=' + requestParams[name];
@@ -47,7 +41,6 @@ var gmxVectorTileLoader = {
 							txt = txt.replace(pref, '');
 							var data = JSON.parse(txt.substr(0, txt.length -1));
 							resolve(data);
-							// resolve(data.values, null, data.srs, data.isGeneralized);
 						} else {
 							reject();
 						}

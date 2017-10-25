@@ -202,9 +202,9 @@ var DataManager = L.Class.extend({
         var hostName = this.options.hostName,
             sessionKey = this.options.sessionKey;
 
-        if (!sessionKey) {
-            sessionKey = L.gmx.gmxSessionManager.getSessionKey(hostName);
-        }
+        // if (!sessionKey) {
+            // sessionKey = L.gmx.gmxSessionManager.getSessionKey(hostName);
+        // }
         this.tileSenderPrefix = L.gmxUtil.protocol + '//' + hostName + '/' +
             'TileSender.ashx?WrapStyle=None' +
             '&key=' + encodeURIComponent(sessionKey);

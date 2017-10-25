@@ -8,10 +8,6 @@
 //      isGeneralized: flag for generalized tile
 var VectorTile = function(dataProvider, options) {
     this.dataProvider = dataProvider;
-    this.loadDef = new L.gmx.Deferred();
-    this.data = null;
-    this.dataOptions = null;
-
     this.x = options.x;
     this.y = options.y;
     this.z = options.z;
@@ -30,8 +26,7 @@ var VectorTile = function(dataProvider, options) {
         this.beginDate = new Date(options.dateZero.valueOf() + this.s * this.d * gmxAPIutils.oneDay * 1000);
         this.endDate = new Date(options.dateZero.valueOf() + (this.s + 1) * this.d * gmxAPIutils.oneDay * 1000);
     }
-
-    this.state = 'notLoaded'; //notLoaded, loading, loaded
+	this.clear();
 };
 
 VectorTile.prototype = {
@@ -60,7 +55,7 @@ VectorTile.prototype = {
 
         this.state = 'loaded';
 
-        this.loadDef.resolve(this.data);
+        this._resolve(this.data);
         return dataBounds;
     },
 
@@ -89,11 +84,14 @@ VectorTile.prototype = {
     },
 
     clear: function() {
-        this.state = 'notLoaded';
+        this.state = 'notLoaded';	 //notLoaded, loading, loaded
         this.data = null;
         this.dataOptions = null;
 
-        this.loadDef = new L.gmx.Deferred();
+		this.loadDef = new Promise(function(resolve, reject) {
+			this._resolve = resolve;
+			this._reject = reject;
+        }.bind(this));
     },
 
     // TODO: Для упаковки атрибутов

@@ -27,7 +27,10 @@ L.gmx.addLayerClassLoader = function(layerClassLoader) {
 
 L.gmx._loadLayerClass = function(type) {
     if (!L.gmx._loadingLayerClasses[type]) {
-        var promise = new L.gmx.Deferred();
+		// var promise = new Promise(function(resolve, reject) {
+		// }).
+
+		var promise = new L.gmx.Deferred();
         promise.resolve();
 
         L.gmx._layerClassLoaders.forEach(function(loader) {
@@ -60,72 +63,73 @@ L.gmx._loadLayerClass = function(type) {
 };
 
 L.gmx.loadLayer = function(mapID, layerID, options) {
-
-    var promise = new L.gmx.Deferred(),
-        layerParams = {
+    return new Promise(function(resolve, reject) {
+        var layerParams = {
             mapID: mapID,
             layerID: layerID
         };
 
-    options = options || {};
-	if (!options.skipTiles) { options.skipTiles = 'All'; }
+		options = options || {};
+		if (!options.skipTiles) { options.skipTiles = 'All'; }
 
-    for (var p in options) {
-        layerParams[p] = options[p];
-    }
+		for (var p in options) {
+			layerParams[p] = options[p];
+		}
 
-    var hostName = gmxAPIutils.normalizeHostname(options.hostName || DEFAULT_HOSTNAME);
-    layerParams.hostName = hostName;
+		var hostName = gmxAPIutils.normalizeHostname(options.hostName || DEFAULT_HOSTNAME);
+		layerParams.hostName = hostName;
 
-    gmxMapManager.loadMapProperties({
-			srs: options.srs,
-			hostName: hostName,
-			apiKey: options.apiKey,
-			mapName: mapID,
-			skipTiles: options.skipTiles
-		}).then(function() {
-            var layerInfo = gmxMapManager.findLayerInfo(hostName, mapID, layerID);
+		gmxMapManager.loadMapProperties({
+				srs: options.srs,
+				hostName: hostName,
+				apiKey: options.apiKey,
+				mapName: mapID,
+				skipTiles: options.skipTiles
+			}).then(function() {
+				var layerInfo = gmxMapManager.findLayerInfo(hostName, mapID, layerID);
 
-            if (!layerInfo) {
-                promise.reject('There is no layer ' + layerID + ' in map ' + mapID);
-                return;
-            }
+				if (!layerInfo) {
+					reject('There is no layer ' + layerID + ' in map ' + mapID);
+					return;
+				}
 
-            //to know from what host the layer was loaded
-            layerInfo.properties.hostName = hostName;
+				//to know from what host the layer was loaded
+				layerInfo.properties.hostName = hostName;
 
-            var type = layerInfo.properties.ContentID || layerInfo.properties.type;
+				var type = layerInfo.properties.ContentID || layerInfo.properties.type;
 
-            var doCreateLayer = function() {
-                var layer = L.gmx.createLayer(layerInfo, layerParams);
-                if (layer) {
-                    promise.resolve(layer);
-                } else {
-                    promise.reject('Unknown type of layer ' + layerID);
-                }
-            };
+				var doCreateLayer = function() {
+					var layer = L.gmx.createLayer(layerInfo, layerParams);
+					if (layer) {
+						resolve(layer);
+					} else {
+						reject('Unknown type of layer ' + layerID);
+					}
+				};
 
-            if (type in L.gmx._layerClasses) {
-                doCreateLayer();
-            } else {
-                L.gmx._loadLayerClass(type).then(doCreateLayer);
-            }
-        },
-        function(response) {
-            promise.reject('Can\'t load layer ' + layerID + ' from map ' + mapID + ': ' + response.error);
-        }
-    );
-
-    return promise;
+				if (type in L.gmx._layerClasses) {
+					doCreateLayer();
+				} else {
+					L.gmx._loadLayerClass(type).then(doCreateLayer);
+				}
+			},
+			function(response) {
+				reject('Can\'t load layer ' + layerID + ' from map ' + mapID + ': ' + response.error);
+			}
+		);
+	});
 };
 
 L.gmx.loadLayers = function(layers, globalOptions) {
-    var defs = layers.map(function(layerInfo) {
-        var options = L.extend({}, globalOptions, layerInfo.options);
-        return L.gmx.loadLayer(layerInfo.mapID, layerInfo.layerID, options);
-    });
-
-    return L.gmx.Deferred.all.apply(null, defs);
+	return new Promise(function(resolve) {
+		Promise.all(layers.map(function(layerInfo) {
+			var options = L.extend({}, globalOptions, layerInfo.options);
+			return L.gmx.loadLayer(layerInfo.mapID, layerInfo.layerID, options);
+		}))
+		.then(function(res) {
+			resolve(res);
+		})
+	});
 };
 
 L.gmx.loadMap = function(mapID, options) {
@@ -135,39 +139,38 @@ L.gmx.loadMap = function(mapID, options) {
 
 	if (!options.skipTiles) { options.skipTiles = 'All'; }
 
-    var def = new L.gmx.Deferred();
+    return new Promise(function(resolve, reject) {
+		gmxMapManager.loadMapProperties(options).then(function(mapInfo) {
+			var loadedMap = new L.gmx.gmxMap(mapInfo, options);
 
-    gmxMapManager.loadMapProperties(options).then(function(mapInfo) {
-        var loadedMap = new L.gmx.gmxMap(mapInfo, options);
+			loadedMap.layersCreated.then(function() {
+				if (options.leafletMap || options.setZIndex) {
+					var curZIndex = 0,
+						layer, rawProperties;
 
-        loadedMap.layersCreated.then(function() {
-            if (options.leafletMap || options.setZIndex) {
-                var curZIndex = 0,
-                    layer, rawProperties;
+					for (var l = loadedMap.layers.length - 1; l >= 0; l--) {
+						layer = loadedMap.layers[l];
+						rawProperties = layer.getGmxProperties();
+						if (mapInfo.properties.LayerOrder === 'VectorOnTop' && layer.setZIndexOffset && rawProperties.type !== 'Raster') {
+							layer.setZIndexOffset(DEFAULT_VECTOR_LAYER_ZINDEXOFFSET);
+						}
+						if (options.setZIndex && layer.setZIndex) {
+							layer.setZIndex(++curZIndex);
+						}
 
-                for (var l = loadedMap.layers.length - 1; l >= 0; l--) {
-                    layer = loadedMap.layers[l];
-					rawProperties = layer.getGmxProperties();
-					if (mapInfo.properties.LayerOrder === 'VectorOnTop' && layer.setZIndexOffset && rawProperties.type !== 'Raster') {
-                        layer.setZIndexOffset(DEFAULT_VECTOR_LAYER_ZINDEXOFFSET);
-                    }
-                    if (options.setZIndex && layer.setZIndex) {
-                        layer.setZIndex(++curZIndex);
-                    }
-
-                    if (options.leafletMap && rawProperties.visible) {
-                        layer.addTo(options.leafletMap);
-                    }
-                }
-            }
-            def.resolve(loadedMap);
-        });
-    },
-    function(response) {
-        var errorMessage = (response && response.ErrorInfo && response.ErrorInfo.ErrorMessage) || 'Server error';
-        def.reject('Can\'t load map ' + mapID + ' from ' + options.hostName + ': ' + errorMessage);
+						if (options.leafletMap && rawProperties.visible) {
+							layer.addTo(options.leafletMap);
+						}
+					}
+				}
+				resolve(loadedMap);
+			});
+		},
+		function(response) {
+			var errorMessage = (response && response.ErrorInfo && response.ErrorInfo.ErrorMessage) || 'Server error';
+			reject('Can\'t load map ' + mapID + ' from ' + options.hostName + ': ' + errorMessage);
+		});
     });
-    return def;
 };
 
 L.gmx.DummyLayer = function(props) {

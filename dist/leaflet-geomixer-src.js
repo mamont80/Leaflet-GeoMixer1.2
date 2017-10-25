@@ -727,7 +727,6 @@ L.gmx.Deferred = Deferred;
 
 var ImageRequest = function(id, url, options) {
     this._id = id;
-    // this.def = new L.gmx.Deferred(L.gmx.imageLoader._cancelRequest.bind(L.gmx.imageLoader, this));
     this.remove = L.gmx.imageLoader._removeRequestFromCache.bind(L.gmx.imageLoader, this);
     this.url = url;
     this.options = options || {};
@@ -4296,33 +4295,31 @@ var gmxSessionManager = {
 
         if (!(serverHost in keys)) {
             apiKey = typeof apiKey === 'undefined' ? this._searchScriptAPIKey() : apiKey;
-            keys[serverHost] = new L.gmx.Deferred();
-            if (apiKey) {
-                gmxAPIutils.requestJSONP(
-                    L.gmxUtil.protocol + '//' + serverHost + '/ApiKey.ashx',
-                    {
-                        WrapStyle: 'func',
-                        Key: apiKey
-                    }
-                ).then(function(response) {
-                    if (response && response.Status === 'ok') {
-                        keys[serverHost].resolve(response.Result.Key);
-                    } else {
-                        keys[serverHost].reject();
-                    }
-                }, keys[serverHost].reject);
-            } else {
-                keys[serverHost].resolve('');
-            }
+            keys[serverHost] = new Promise(function(resolve, reject) {
+				if (apiKey) {
+					gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/ApiKey.ashx',
+						{
+							WrapStyle: 'func',
+							Key: apiKey
+						}
+					).then(function(response) {
+						if (response && response.Status === 'ok') {
+							resolve(response.Result.Key);
+						} else {
+							reject();
+						}
+					}, reject);
+				} else {
+					resolve('');
+				}
+			});
         }
         return keys[serverHost];
     },
 
     //get already received session key
     getSessionKey: function(serverHost) {
-        var keyPromise = this._sessionKeys[serverHost];
-
-        return keyPromise && keyPromise.getFulfilledData() && keyPromise.getFulfilledData()[0];
+		return this._sessionKeys[serverHost];
     },
     _sessionKeys: {} //deferred for each host
 };
@@ -4358,22 +4355,28 @@ var gmxMapManager = {
 				ModeKey: 'map'
 			};
 			if (options.srs === 3857) { opt.cs = 'wm'; }
-            var def = new L.gmx.Deferred();
+			var promise = new Promise(function(resolve, reject) {
+				gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
+					opt.key = sessionKey;
+
+					gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/TileSender.ashx', opt).then(function(json) {
+						if (json && json.Status === 'ok' && json.Result) {
+							json.Result.properties.hostName = serverHost;
+							json.Result.properties.sessionKey = sessionKey;
+							L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
+							L.gmx._maps[serverHost][mapName] = {
+								_rawTree: json.Result,
+								_nodes: {}
+							};
+							resolve(json.Result);
+						} else {
+							reject(json);
+						}
+					}, reject);
+				}, reject);
+			});
             maps[serverHost] = maps[serverHost] || {};
-            maps[serverHost][mapName] = {promise: def};
-
-            gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
-				opt.key = sessionKey;
-
-				gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/TileSender.ashx', opt).then(function(json) {
-                    if (json && json.Status === 'ok' && json.Result) {
-                        json.Result.properties.hostName = serverHost;
-                        def.resolve(json.Result);
-                    } else {
-                        def.reject(json);
-                    }
-                }, def.reject);
-            }, def.reject);
+            maps[serverHost][mapName] = {promise: promise};
         }
         return maps[serverHost][mapName].promise;
     },
@@ -4397,31 +4400,19 @@ var gmxMapManager = {
 
     //we will (lazy) create index by layer name to speed up multiple function calls
     findLayerInfo: function(serverHost, mapID, layerID) {
-        var hostMaps = this._maps[serverHost],
-            mapInfo = hostMaps && hostMaps[mapID];
+		var hostMaps = L.gmx._maps[serverHost],
+			layerInfo = null;
 
-        if (!mapInfo) {
-            return null;
-        }
-
-        if (mapInfo.layers) {
-            return mapInfo.layers[layerID];
-        }
-
-        var serverData = mapInfo.promise.getFulfilledData();
-
-        if (!serverData) {
-            return null;
-        }
-
-        mapInfo.layers = {};
-
-        //create index by layer name
-        gmxMapManager.iterateLayers(serverData[0], function(layerInfo) {
-            mapInfo.layers[layerInfo.properties.name] = layerInfo;
-        });
-
-        return mapInfo.layers[layerID];
+		if (hostMaps && hostMaps[mapID]) {
+			var mapInfo = hostMaps[mapID];
+			if (!mapInfo._nodes[layerID]) {
+				gmxMapManager.iterateNode(mapInfo._rawTree, function(it) {
+					mapInfo._nodes[it.content.properties.name] = it;
+				});
+			}
+			layerInfo = mapInfo._nodes[layerID];
+		}
+		return layerInfo ? layerInfo.content : null;
     },
     iterateLayers: function(treeInfo, callback) {
         var iterate = function(arr) {
@@ -4456,6 +4447,10 @@ var gmxMapManager = {
     _maps: {} //Promise for each map. Structure: maps[serverHost][mapID]: {promise:, layers:}
 };
 
+L.gmx = L.gmx || {};
+L.gmx._maps = {};			// свойства слоев по картам
+L.gmx._clientLayers = {};	// свойства слоев без карт (клиентские слои)
+
 L.gmx.gmxMapManager = gmxMapManager;
 
 
@@ -4476,117 +4471,121 @@ var gmxMap = L.Class.extend({
 		this.properties.BaseLayers = this.properties.BaseLayers ? JSON.parse(this.properties.BaseLayers) : [];
 		this.rawTree = mapInfo;
 
-		this.layersCreated = new L.gmx.Deferred();
+		// var hostName = this.properties.hostName,
+		var mapID = this.properties.name;
 
-		var missingLayerTypes = {},
-			dataSources = {};
+		this.layersCreated = new Promise(function(resolve) {
+			var missingLayerTypes = {},
+				dataSources = {};
 
-		gmxMapManager.iterateLayers(mapInfo, function(layerInfo) {
-			var props = layerInfo.properties,
-				meta = props.MetaProperties || {},
-				options = {
-					mapID: mapInfo.properties.name,
-					layerID: props.name
-				};
+			gmxMapManager.iterateLayers(mapInfo, function(layerInfo) {
+				var props = layerInfo.properties,
+					options = {
+						mapID: mapID,
+						sessionKey: mapInfo.properties.sessionKey,
+						layerID: props.name
+					};
 
-			props.hostName = mapInfo.properties.hostName;
-			if (mapInfo.srs) {
-				props.srs = mapInfo.srs;
-			}
-
-			var type = props.ContentID || props.type,
-				layerOptions = L.extend(options, commonLayerOptions);
-
-			if (props.dataSource || 'parentLayer' in meta) {      	// Set dataSource layer
-				layerOptions.parentLayer = props.dataSource || '';
-				if ('parentLayer' in meta) {      	// todo удалить после изменений вов вьювере
-					layerOptions.parentLayer = meta.parentLayer.Value || '';
+				props.hostName = mapInfo.properties.hostName;
+				if (mapInfo.srs) {
+					props.srs = mapInfo.srs;
 				}
-				dataSources[options.layerID] = {
-					info: layerInfo,
-					options: layerOptions
-				};
-			} else if (type in L.gmx._layerClasses) {
-				_this.addLayer(L.gmx.createLayer(layerInfo, layerOptions));
-			} else {
-				missingLayerTypes[type] = missingLayerTypes[type] || [];
-				missingLayerTypes[type].push({
-					info: layerInfo,
-					options: layerOptions
-				});
-			}
-		});
 
-		//load missing layer types
-		var loaders = [];
-		for (var type in missingLayerTypes) {
-			loaders.push(L.gmx._loadLayerClass(type).then(/*eslint-disable no-loop-func */function (type) {/*eslint-enable */
-				var it = missingLayerTypes[type];
-				for (var i = 0, len = it.length; i < len; i++) {
-					_this.addLayer(L.gmx.createLayer(it[i].info, it[i].options));
-				}
-			}.bind(null, type)));
-		}
-		var hosts = {}, host, id, it;
-		for (id in dataSources) {
-			it = dataSources[id];
-			var opt = it.options,
-				pId = opt.parentLayer,
-				pLayer = this.layersByID[pId];
-			if (pLayer) {
-				it.options.parentOptions = pLayer.getGmxProperties();
-				it.options.dataManager = this.dataManagers[pId] || new DataManager(it.options.parentOptions, true);
-				this.dataManagers[pId] = it.options.dataManager;
-				this.addLayer(L.gmx.createLayer(it.info, it.options));
-			} else {
-				host = opt.hostName;
-				if (!hosts[host]) { hosts[host] = {}; }
-				if (!hosts[host][pId]) { hosts[host][pId] = []; }
-				hosts[host][pId].push(id);
-			}
-		}
-		for (host in hosts) {
-			var arr = [],
-				prefix = L.gmxUtil.protocol + '//' + host;
-			for (id in hosts[host]) {
-				arr.push({Layer: id});
-			}
-			loaders.push(L.gmxUtil.requestJSONP(prefix + '/Layer/GetLayerJson.ashx',
-				{
-					WrapStyle: 'func',
-					Layers: JSON.stringify(arr)
-				},
-				{
-					ids: hosts[host]
-				}
-			).then(function(json, opt) {
-				if (json && json.Status === 'ok' && json.Result) {
-					json.Result.forEach(function(it) {
-						var dataManager = _this.addDataManager(it),
-							props = it.properties,
-							pId = props.name;
-						if (opt && opt.ids && opt.ids[pId]) {
-							opt.ids[pId].forEach(function(id) {
-								var pt = dataSources[id];
-								pt.options.parentOptions = it.properties;
-								pt.options.dataManager = dataManager;
-								_this.addLayer(L.gmx.createLayer(pt.info, pt.options));
-							});
-						}
-					});
+				var type = props.ContentID || props.type,
+					meta = props.MetaProperties || {},
+					layerOptions = L.extend(options, commonLayerOptions);
+
+				if (props.dataSource || 'parentLayer' in meta) {      	// Set dataSource layer
+					layerOptions.parentLayer = props.dataSource || '';
+					if ('parentLayer' in meta) {      	// todo удалить после изменений вов вьювере
+						layerOptions.parentLayer = meta.parentLayer.Value || '';
+					}
+					dataSources[options.layerID] = {
+						info: layerInfo,
+						options: layerOptions
+					};
+				} else if (type in L.gmx._layerClasses) {
+					_this.addLayer(L.gmx.createLayer(layerInfo, layerOptions));
 				} else {
-					console.info('Error: loading ', prefix + '/Layer/GetLayerJson.ashx', json.ErrorInfo);
-					if (opt && opt.ids) {
-						for (var pId in opt.ids) {
-							opt.ids[pId].forEach(function(id) {
-								_this.addLayer(new L.gmx.DummyLayer(dataSources[id].info.properties));
-							});
+					missingLayerTypes[type] = missingLayerTypes[type] || [];
+					missingLayerTypes[type].push({
+						info: layerInfo,
+						options: layerOptions
+					});
+				}
+			});
+
+			//load missing layer types
+			var loaders = [];
+			for (var type in missingLayerTypes) {
+				loaders.push(L.gmx._loadLayerClass(type).then(/*eslint-disable no-loop-func */function (type) {/*eslint-enable */
+					var it = missingLayerTypes[type];
+					for (var i = 0, len = it.length; i < len; i++) {
+						_this.addLayer(L.gmx.createLayer(it[i].info, it[i].options));
+					}
+				}.bind(null, type)));
+			}
+			var hosts = {}, host, id, it;
+			for (id in dataSources) {
+				it = dataSources[id];
+				var opt = it.options,
+					pId = opt.parentLayer,
+					pLayer = this.layersByID[pId];
+				if (pLayer) {
+					it.options.parentOptions = pLayer.getGmxProperties();
+					it.options.dataManager = this.dataManagers[pId] || new DataManager(it.options.parentOptions, true);
+					this.dataManagers[pId] = it.options.dataManager;
+					this.addLayer(L.gmx.createLayer(it.info, it.options));
+				} else {
+					host = opt.hostName;
+					if (!hosts[host]) { hosts[host] = {}; }
+					if (!hosts[host][pId]) { hosts[host][pId] = []; }
+					hosts[host][pId].push(id);
+				}
+			}
+			for (host in hosts) {
+				var arr = [],
+					prefix = L.gmxUtil.protocol + '//' + host;
+				for (id in hosts[host]) {
+					arr.push({Layer: id});
+				}
+				loaders.push(L.gmxUtil.requestJSONP(prefix + '/Layer/GetLayerJson.ashx',
+					{
+						WrapStyle: 'func',
+						Layers: JSON.stringify(arr)
+					},
+					{
+						ids: hosts[host]
+					}
+				).then(function(json, opt) {
+					if (json && json.Status === 'ok' && json.Result) {
+						json.Result.forEach(function(it) {
+							var dataManager = _this.addDataManager(it),
+								props = it.properties,
+								pId = props.name;
+							if (opt && opt.ids && opt.ids[pId]) {
+								opt.ids[pId].forEach(function(id) {
+									var pt = dataSources[id];
+									pt.options.parentOptions = it.properties;
+									pt.options.dataManager = dataManager;
+									_this.addLayer(L.gmx.createLayer(pt.info, pt.options));
+								});
+							}
+						});
+					} else {
+						console.info('Error: loading ', prefix + '/Layer/GetLayerJson.ashx', json.ErrorInfo);
+						if (opt && opt.ids) {
+							for (var pId in opt.ids) {
+								opt.ids[pId].forEach(function(id) {
+									_this.addLayer(new L.gmx.DummyLayer(dataSources[id].info.properties));
+								});
+							}
 						}
 					}
-				}
-			}));
-		}
-		L.gmx.Deferred.all.apply(null, loaders).then(this.layersCreated.resolve);
+				}));
+			}
+			Promise.all(loaders).then(resolve);
+		});
 	},
 
 	addDataManager: function(it) {
@@ -4929,9 +4928,6 @@ var gmxVectorTileLoader = {
         var key = gmxVectorTileLoader._getKey(tileInfo);
 
         if (!this._loadedTiles[key]) {
-            // var def = new L.gmx.Deferred();
-            // this._loadedTiles[key] = def;
-
             var requestParams = {
                 ModeKey: 'tile',
                 ftc: 'osm',
@@ -4951,9 +4947,6 @@ var gmxVectorTileLoader = {
                 requestParams.Span = tileInfo.s;
             }
 
-			// gmxAPIutils.requestJSONP(tileSenderPrefix, requestParams, {callbackParamName: null}).then(null, function() {
-                // def.reject();
-            // });
 			var promise = new Promise(function(resolve, reject) {
 				var query = tileSenderPrefix + '&' + Object.keys(requestParams).map(function(name) {
 					return name + '=' + requestParams[name];
@@ -4969,7 +4962,6 @@ var gmxVectorTileLoader = {
 							txt = txt.replace(pref, '');
 							var data = JSON.parse(txt.substr(0, txt.length -1));
 							resolve(data);
-							// resolve(data.values, null, data.srs, data.isGeneralized);
 						} else {
 							reject();
 						}
@@ -5007,10 +4999,6 @@ window.gmxAPI._vectorTileReceiver = window.gmxAPI._vectorTileReceiver || functio
 //      isGeneralized: flag for generalized tile
 var VectorTile = function(dataProvider, options) {
     this.dataProvider = dataProvider;
-    this.loadDef = new L.gmx.Deferred();
-    this.data = null;
-    this.dataOptions = null;
-
     this.x = options.x;
     this.y = options.y;
     this.z = options.z;
@@ -5029,8 +5017,7 @@ var VectorTile = function(dataProvider, options) {
         this.beginDate = new Date(options.dateZero.valueOf() + this.s * this.d * gmxAPIutils.oneDay * 1000);
         this.endDate = new Date(options.dateZero.valueOf() + (this.s + 1) * this.d * gmxAPIutils.oneDay * 1000);
     }
-
-    this.state = 'notLoaded'; //notLoaded, loading, loaded
+	this.clear();
 };
 
 VectorTile.prototype = {
@@ -5059,7 +5046,7 @@ VectorTile.prototype = {
 
         this.state = 'loaded';
 
-        this.loadDef.resolve(this.data);
+        this._resolve(this.data);
         return dataBounds;
     },
 
@@ -5088,11 +5075,14 @@ VectorTile.prototype = {
     },
 
     clear: function() {
-        this.state = 'notLoaded';
+        this.state = 'notLoaded';	 //notLoaded, loading, loaded
         this.data = null;
         this.dataOptions = null;
 
-        this.loadDef = new L.gmx.Deferred();
+		this.loadDef = new Promise(function(resolve, reject) {
+			this._resolve = resolve;
+			this._reject = reject;
+        }.bind(this));
     },
 
     // TODO: Для упаковки атрибутов
@@ -5962,9 +5952,9 @@ var DataManager = L.Class.extend({
         var hostName = this.options.hostName,
             sessionKey = this.options.sessionKey;
 
-        if (!sessionKey) {
-            sessionKey = L.gmx.gmxSessionManager.getSessionKey(hostName);
-        }
+        // if (!sessionKey) {
+            // sessionKey = L.gmx.gmxSessionManager.getSessionKey(hostName);
+        // }
         this.tileSenderPrefix = L.gmxUtil.protocol + '//' + hostName + '/' +
             'TileSender.ashx?WrapStyle=None' +
             '&key=' + encodeURIComponent(sessionKey);
@@ -6944,8 +6934,10 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     initialize: function(options) {
         options = L.setOptions(this, options);
 
-        this.initPromise = new L.gmx.Deferred();
-		// return new Promise(function(resolve, reject) {
+        this._initPromise = new Promise(function(resolve, reject) {
+			this._resolve = resolve;
+			this._reject = reject;
+		}.bind(this));
 
         this._drawQueue = [];
         this._drawQueueHash = {};
@@ -6960,6 +6952,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         this._gmx = {
             hostName: gmxAPIutils.normalizeHostname(options.hostName || 'maps.kosmosnimki.ru'),
             mapName: options.mapID,
+			sessionKey: this.options.sessionKey,
 			iconsUrlReplace: this.options.iconsUrlReplace,
             skipTiles: options.skipTiles,
             needBbox: options.skipTiles === 'All',
@@ -7296,7 +7289,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             this.setDateInterval(gmx.dateBegin, gmx.dateEnd);
         }
 
-        this.initPromise.resolve();
+        this._resolve();
         return this;
     },
 
@@ -7327,12 +7320,9 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     setRasterOpacity: function (opacity) {
-        var _this = this;
         if (this._gmx.rasterOpacity !== opacity) {
             this._gmx.rasterOpacity = opacity;
-            this.initPromise.then(function() {
-                _this.repaint();
-            });
+            this._initPromise.then(this.repaint.bind(this));
         }
         return this;
     },
@@ -7347,18 +7337,16 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     setStyles: function (styles) {
-        var _this = this;
-
-        this.initPromise.then(function() {
-            _this._gmx.styleManager.clearStyles();
+        this._initPromise.then(function() {
+            this._gmx.styleManager.clearStyles();
             if (styles) {
                 styles.forEach(function(it, i) {
-                    _this.setStyle(it, i, true);
-                });
+                    this.setStyle(it, i, true);
+                }.bind(this));
             } else {
-                _this.fire('stylechange');
+                this.fire('stylechange');
             }
-        });
+        }.bind(this));
         return this;
     },
 
@@ -7367,13 +7355,11 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     setStyle: function (style, num, createFlag) {
-        var _this = this,
-            gmx = this._gmx;
-        this.initPromise.then(function() {
-            gmx.styleManager.setStyle(style, num, createFlag).then(function () {
-                _this.fire('stylechange', {num: num || 0});
-            });
-        });
+        this._initPromise.then(function() {
+            this._gmx.styleManager.setStyle(style, num, createFlag).then(function () {
+                this.fire('stylechange', {num: num || 0});
+            }.bind(this));
+        }.bind(this));
         return this;
     },
 
@@ -7917,10 +7903,10 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     _updateProperties: function (prop) {
-        var gmx = this._gmx,
-            apikeyRequestHost = this.options.apikeyRequestHost || gmx.hostName;
+        var gmx = this._gmx;
+            // apikeyRequestHost = this.options.apikeyRequestHost || gmx.hostName;
 
-        gmx.sessionKey = prop.sessionKey = this.options.sessionKey || gmxSessionManager.getSessionKey(apikeyRequestHost); //should be already received
+        //gmx.sessionKey = prop.sessionKey = this.options.sessionKey || gmxSessionManager.getSessionKey(apikeyRequestHost); //should be already received
 
         if (this.options.parentOptions) {
 			prop = this.options.parentOptions;
@@ -9183,7 +9169,6 @@ StyleManager.prototype = {
                 style = this._prepareItem({});
                 this._styles[num] = style;
             }
-            // this.deferred = new L.gmx.Deferred();
             style.version = ++this._maxVersion;
             if ('Filter' in st) {
                 style.Filter = st.Filter;
@@ -9930,7 +9915,6 @@ L.gmx.VectorLayer.include({
     },
 
 	openPopup: function (latlng, options) {
-
 		if (this._popup) {
 			// open the popup from one of the path's points if not specified
 			latlng = latlng || this._latlng ||
@@ -9944,10 +9928,12 @@ L.gmx.VectorLayer.include({
 		return this;
 	},
 
-	closePopup: function () {
+	closePopup: function (type) {
 		if (this._popup) {
 			this._popup._close();
+			if (type !== 'mouseout') {
 			this.getPopups().forEach(this._clearPopup.bind(this));
+			}
             this.fire('popupclose', {popup: this._popup});
 		}
 		return this;
@@ -9980,7 +9966,7 @@ L.gmx.VectorLayer.include({
 
     _outPopup: function (ev) {
         if (this._popup._state === 'mouseover' && !ev.gmx.prevId) {
-            this.closePopup();
+            this.closePopup(ev.type);
         }
     },
 
@@ -10045,7 +10031,9 @@ L.gmx.VectorLayer.include({
         if (offset) {
             var protoOffset = L.Popup.prototype.options.offset;
             _popup.options.offset = [-protoOffset[0] - offset[0], protoOffset[1] - offset[1]];
-        }
+        } else {
+			_popup.options.offset[1] = type === 'mouseover' ? -7 : 7;
+		}
 
         if (this._popupopen) {
             this._popupopen({
@@ -12910,7 +12898,10 @@ L.gmx.addLayerClassLoader = function(layerClassLoader) {
 
 L.gmx._loadLayerClass = function(type) {
     if (!L.gmx._loadingLayerClasses[type]) {
-        var promise = new L.gmx.Deferred();
+		// var promise = new Promise(function(resolve, reject) {
+		// }).
+
+		var promise = new L.gmx.Deferred();
         promise.resolve();
 
         L.gmx._layerClassLoaders.forEach(function(loader) {
@@ -12943,72 +12934,73 @@ L.gmx._loadLayerClass = function(type) {
 };
 
 L.gmx.loadLayer = function(mapID, layerID, options) {
-
-    var promise = new L.gmx.Deferred(),
-        layerParams = {
+    return new Promise(function(resolve, reject) {
+        var layerParams = {
             mapID: mapID,
             layerID: layerID
         };
 
-    options = options || {};
-	if (!options.skipTiles) { options.skipTiles = 'All'; }
+		options = options || {};
+		if (!options.skipTiles) { options.skipTiles = 'All'; }
 
-    for (var p in options) {
-        layerParams[p] = options[p];
-    }
+		for (var p in options) {
+			layerParams[p] = options[p];
+		}
 
-    var hostName = gmxAPIutils.normalizeHostname(options.hostName || DEFAULT_HOSTNAME);
-    layerParams.hostName = hostName;
+		var hostName = gmxAPIutils.normalizeHostname(options.hostName || DEFAULT_HOSTNAME);
+		layerParams.hostName = hostName;
 
-    gmxMapManager.loadMapProperties({
-			srs: options.srs,
-			hostName: hostName,
-			apiKey: options.apiKey,
-			mapName: mapID,
-			skipTiles: options.skipTiles
-		}).then(function() {
-            var layerInfo = gmxMapManager.findLayerInfo(hostName, mapID, layerID);
+		gmxMapManager.loadMapProperties({
+				srs: options.srs,
+				hostName: hostName,
+				apiKey: options.apiKey,
+				mapName: mapID,
+				skipTiles: options.skipTiles
+			}).then(function() {
+				var layerInfo = gmxMapManager.findLayerInfo(hostName, mapID, layerID);
 
-            if (!layerInfo) {
-                promise.reject('There is no layer ' + layerID + ' in map ' + mapID);
-                return;
-            }
+				if (!layerInfo) {
+					reject('There is no layer ' + layerID + ' in map ' + mapID);
+					return;
+				}
 
-            //to know from what host the layer was loaded
-            layerInfo.properties.hostName = hostName;
+				//to know from what host the layer was loaded
+				layerInfo.properties.hostName = hostName;
 
-            var type = layerInfo.properties.ContentID || layerInfo.properties.type;
+				var type = layerInfo.properties.ContentID || layerInfo.properties.type;
 
-            var doCreateLayer = function() {
-                var layer = L.gmx.createLayer(layerInfo, layerParams);
-                if (layer) {
-                    promise.resolve(layer);
-                } else {
-                    promise.reject('Unknown type of layer ' + layerID);
-                }
-            };
+				var doCreateLayer = function() {
+					var layer = L.gmx.createLayer(layerInfo, layerParams);
+					if (layer) {
+						resolve(layer);
+					} else {
+						reject('Unknown type of layer ' + layerID);
+					}
+				};
 
-            if (type in L.gmx._layerClasses) {
-                doCreateLayer();
-            } else {
-                L.gmx._loadLayerClass(type).then(doCreateLayer);
-            }
-        },
-        function(response) {
-            promise.reject('Can\'t load layer ' + layerID + ' from map ' + mapID + ': ' + response.error);
-        }
-    );
-
-    return promise;
+				if (type in L.gmx._layerClasses) {
+					doCreateLayer();
+				} else {
+					L.gmx._loadLayerClass(type).then(doCreateLayer);
+				}
+			},
+			function(response) {
+				reject('Can\'t load layer ' + layerID + ' from map ' + mapID + ': ' + response.error);
+			}
+		);
+	});
 };
 
 L.gmx.loadLayers = function(layers, globalOptions) {
-    var defs = layers.map(function(layerInfo) {
-        var options = L.extend({}, globalOptions, layerInfo.options);
-        return L.gmx.loadLayer(layerInfo.mapID, layerInfo.layerID, options);
-    });
-
-    return L.gmx.Deferred.all.apply(null, defs);
+	return new Promise(function(resolve) {
+		Promise.all(layers.map(function(layerInfo) {
+			var options = L.extend({}, globalOptions, layerInfo.options);
+			return L.gmx.loadLayer(layerInfo.mapID, layerInfo.layerID, options);
+		}))
+		.then(function(res) {
+			resolve(res);
+		})
+	});
 };
 
 L.gmx.loadMap = function(mapID, options) {
@@ -13018,39 +13010,38 @@ L.gmx.loadMap = function(mapID, options) {
 
 	if (!options.skipTiles) { options.skipTiles = 'All'; }
 
-    var def = new L.gmx.Deferred();
+    return new Promise(function(resolve, reject) {
+		gmxMapManager.loadMapProperties(options).then(function(mapInfo) {
+			var loadedMap = new L.gmx.gmxMap(mapInfo, options);
 
-    gmxMapManager.loadMapProperties(options).then(function(mapInfo) {
-        var loadedMap = new L.gmx.gmxMap(mapInfo, options);
+			loadedMap.layersCreated.then(function() {
+				if (options.leafletMap || options.setZIndex) {
+					var curZIndex = 0,
+						layer, rawProperties;
 
-        loadedMap.layersCreated.then(function() {
-            if (options.leafletMap || options.setZIndex) {
-                var curZIndex = 0,
-                    layer, rawProperties;
+					for (var l = loadedMap.layers.length - 1; l >= 0; l--) {
+						layer = loadedMap.layers[l];
+						rawProperties = layer.getGmxProperties();
+						if (mapInfo.properties.LayerOrder === 'VectorOnTop' && layer.setZIndexOffset && rawProperties.type !== 'Raster') {
+							layer.setZIndexOffset(DEFAULT_VECTOR_LAYER_ZINDEXOFFSET);
+						}
+						if (options.setZIndex && layer.setZIndex) {
+							layer.setZIndex(++curZIndex);
+						}
 
-                for (var l = loadedMap.layers.length - 1; l >= 0; l--) {
-                    layer = loadedMap.layers[l];
-					rawProperties = layer.getGmxProperties();
-					if (mapInfo.properties.LayerOrder === 'VectorOnTop' && layer.setZIndexOffset && rawProperties.type !== 'Raster') {
-                        layer.setZIndexOffset(DEFAULT_VECTOR_LAYER_ZINDEXOFFSET);
-                    }
-                    if (options.setZIndex && layer.setZIndex) {
-                        layer.setZIndex(++curZIndex);
-                    }
-
-                    if (options.leafletMap && rawProperties.visible) {
-                        layer.addTo(options.leafletMap);
-                    }
-                }
-            }
-            def.resolve(loadedMap);
-        });
-    },
-    function(response) {
-        var errorMessage = (response && response.ErrorInfo && response.ErrorInfo.ErrorMessage) || 'Server error';
-        def.reject('Can\'t load map ' + mapID + ' from ' + options.hostName + ': ' + errorMessage);
+						if (options.leafletMap && rawProperties.visible) {
+							layer.addTo(options.leafletMap);
+						}
+					}
+				}
+				resolve(loadedMap);
+			});
+		},
+		function(response) {
+			var errorMessage = (response && response.ErrorInfo && response.ErrorInfo.ErrorMessage) || 'Server error';
+			reject('Can\'t load map ' + mapID + ' from ' + options.hostName + ': ' + errorMessage);
+		});
     });
-    return def;
 };
 
 L.gmx.DummyLayer = function(props) {

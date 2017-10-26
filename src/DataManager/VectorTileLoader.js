@@ -64,5 +64,10 @@ window.gmxAPI._vectorTileReceiver = window.gmxAPI._vectorTileReceiver || functio
         v: data.v
     });
 
-    gmxVectorTileLoader._loadedTiles[key] && gmxVectorTileLoader._loadedTiles[key].resolve(data.values, data.bbox, data.srs, data.isGeneralized);
+    gmxVectorTileLoader._loadedTiles[key] && gmxVectorTileLoader._loadedTiles[key].resolve({
+		bbox: data.bbox,
+		srs: data.srs,
+		isGeneralized: data.isGeneralized,
+		values: data.values
+	});
 };

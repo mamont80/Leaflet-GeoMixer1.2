@@ -78,7 +78,7 @@ var ObserverTileLoader = L.Class.extend({
         this._dataManager._getActiveTileKeys();
 
         var obsData = this._observerData[observer.id];
-        if (obsData.leftToLoad === 0) {
+        if (obsData.leftToLoad < 1) {
             this.fire('observertileload', {observer: observer});
             return this;
         }
@@ -148,7 +148,7 @@ var ObserverTileLoader = L.Class.extend({
             var obsData = this._observerData[id];
             obsData.leftToLoad--;
 
-            if (obsData.leftToLoad === 0) {
+            if (obsData.leftToLoad < 1) {
                 if (obsData.loadingState) {
                     obsData.loadingState = false;
                     obsData.observer.fire('stopLoadingTiles');

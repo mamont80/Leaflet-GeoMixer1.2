@@ -4985,7 +4985,12 @@ window.gmxAPI._vectorTileReceiver = window.gmxAPI._vectorTileReceiver || functio
         v: data.v
     });
 
-    gmxVectorTileLoader._loadedTiles[key] && gmxVectorTileLoader._loadedTiles[key].resolve(data.values, data.bbox, data.srs, data.isGeneralized);
+    gmxVectorTileLoader._loadedTiles[key] && gmxVectorTileLoader._loadedTiles[key].resolve({
+		bbox: data.bbox,
+		srs: data.srs,
+		isGeneralized: data.isGeneralized,
+		values: data.values
+	});
 };
 
 
@@ -5044,9 +5049,7 @@ VectorTile.prototype = {
             this.dataOptions = this.dataOptions.concat(dataOptions);
         }
 
-        this.state = 'loaded';
-
-        this._resolve(this.data);
+        this.loaded(data);
         return dataBounds;
     },
 
@@ -5057,6 +5060,11 @@ VectorTile.prototype = {
                 if (this.dataOptions) { this.dataOptions.splice(i, 1); }
             }
         }
+    },
+
+    loaded: function(data) {
+        this.state = 'loaded';
+        this._resolve(data);
     },
 
     load: function() {
@@ -5828,7 +5836,7 @@ var ObserverTileLoader = L.Class.extend({
         this._dataManager._getActiveTileKeys();
 
         var obsData = this._observerData[observer.id];
-        if (obsData.leftToLoad === 0) {
+        if (obsData.leftToLoad < 1) {
             this.fire('observertileload', {observer: observer});
             return this;
         }
@@ -5898,7 +5906,7 @@ var ObserverTileLoader = L.Class.extend({
             var obsData = this._observerData[id];
             obsData.leftToLoad--;
 
-            if (obsData.leftToLoad === 0) {
+            if (obsData.leftToLoad < 1) {
                 if (obsData.loadingState) {
                     obsData.loadingState = false;
                     obsData.observer.fire('stopLoadingTiles');
@@ -10677,7 +10685,7 @@ var chkVersion = function (layer, callback) {
 				var params = 'WrapStyle=None&ftc=osm';
 				if (layersVersion.needBbox) {
 					var crs = L.Projection.Mercator;
-					if (map.options.srs === '3857') {
+					if (map.options.srs == 3857) {
 						params += '&srs=3857';
 						crs = L.CRS.EPSG3857;
 					}
@@ -10874,7 +10882,6 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
         //clickable: false
     },
     initFromDescription: function(ph) {
-// ph.properties.RasterSRS = '3857';
         var props = ph.properties,
             styles = props.styles[0] || {MinZoom: props.MinZoom || 0, MaxZoom: props.MaxZoom || 21},
             vectorProperties = {
@@ -10923,54 +10930,56 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
 			return url;
 		};
 
-		var vectorDataProvider = {load: function(x, y, z, v, s, d, callback) {
-            var objects = [[777, ph.geometry]],
-                itemBounds = gmxAPIutils.geoItemBounds(ph.geometry),
-                bounds = itemBounds.bounds;
+		gmx.dataManager._rasterVectorTile = new VectorTile({
+			load: function(x, y, z, v, s, d, callback) {
+					var objects = [[777, ph.geometry]],
+						itemBounds = gmxAPIutils.geoItemBounds(ph.geometry),
+						bounds = itemBounds.bounds;
 
-            if (bounds.max.x > worldSize) {
-                // for old layers geometry
-                var ww2 = 2 * worldSize,
-                    id = 777,
-                    coords = ph.geometry.coordinates,
-                    bboxArr = itemBounds.boundsArr;
+					if (bounds.max.x > worldSize) {
+						// for old layers geometry
+						var ww2 = 2 * worldSize,
+							id = 777,
+							coords = ph.geometry.coordinates,
+							bboxArr = itemBounds.boundsArr;
 
-                objects = [];
-                if (ph.geometry.type === 'POLYGON') {
-                    coords = [coords];
-                    bboxArr = [bboxArr];
-                }
+						objects = [];
+						if (ph.geometry.type === 'POLYGON') {
+							coords = [coords];
+							bboxArr = [bboxArr];
+						}
 
-                for (var i = 0, len = coords.length; i < len; i++) {
-                    var it = coords[i],
-                        bbox = bboxArr[i][0],
-                        arr = it;
-                    objects.push([id++, {type: 'POLYGON', coordinates: arr}]);
-                    if (bbox.max.x > worldSize) {
-                        arr = [];
-                        for (var j = 0, len1 = it.length; j < len1; j++) {
-                            var it1 = it[j];
-                            for (var j1 = 0, arr1 = [], len2 = it1.length; j1 < len2; j1++) {
-                                var it2 = it1[j1];
-                                arr1.push([it2[0] - ww2, it2[1]]);
-                            }
-                            arr.push(arr1);
-                        }
-                        objects.push([id++, {type: 'POLYGON', coordinates: arr}]);
-                    }
-                }
-            }
-			// callback(objects, [bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y], gmx.srs);
-			callback({
-                bbox: [bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y],
-                srs: gmx.srs,
-                isGeneralized: false,
-                values: objects
-			});
-		}};
-		// var tHash = {x: -0.5, y: -0.5, z: 0, v: 0, s: -2, d: -2};
-		var tHash = {x: 0, y: 0, z: 0, v: 0, s: -2, d: -2};
-		gmx.dataManager._rasterVectorTile = new VectorTile(vectorDataProvider, tHash);
+						for (var i = 0, len = coords.length; i < len; i++) {
+							var it = coords[i],
+								bbox = bboxArr[i][0],
+								arr = it;
+							objects.push([id++, {type: 'POLYGON', coordinates: arr}]);
+							if (bbox.max.x > worldSize) {
+								arr = [];
+								for (var j = 0, len1 = it.length; j < len1; j++) {
+									var it1 = it[j];
+									for (var j1 = 0, arr1 = [], len2 = it1.length; j1 < len2; j1++) {
+										var it2 = it1[j1];
+										arr1.push([it2[0] - ww2, it2[1]]);
+									}
+									arr.push(arr1);
+								}
+								objects.push([id++, {type: 'POLYGON', coordinates: arr}]);
+							}
+						}
+					}
+					callback({
+						bbox: [bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y],
+						srs: gmx.srs,
+						isGeneralized: false,
+						changeState: true,
+						values: objects
+					});
+					gmx.dataManager._updateItemsFromTile(gmx.dataManager._rasterVectorTile);
+				}
+			},
+			{x: 0, y: 0, z: 0, v: 0, s: -2, d: -2}
+		);
 		gmx.dataManager.addTile(gmx.dataManager._rasterVectorTile);
 
         return this;

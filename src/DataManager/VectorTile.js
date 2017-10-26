@@ -53,9 +53,7 @@ VectorTile.prototype = {
             this.dataOptions = this.dataOptions.concat(dataOptions);
         }
 
-        this.state = 'loaded';
-
-        this._resolve(this.data);
+        this.loaded(data);
         return dataBounds;
     },
 
@@ -66,6 +64,11 @@ VectorTile.prototype = {
                 if (this.dataOptions) { this.dataOptions.splice(i, 1); }
             }
         }
+    },
+
+    loaded: function(data) {
+        this.state = 'loaded';
+        this._resolve(data);
     },
 
     load: function() {

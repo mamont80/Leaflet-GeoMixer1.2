@@ -132,7 +132,7 @@ var chkVersion = function (layer, callback) {
 				var params = 'WrapStyle=None&ftc=osm';
 				if (layersVersion.needBbox) {
 					var crs = L.Projection.Mercator;
-					if (map.options.srs === '3857') {
+					if (map.options.srs == 3857) {
 						params += '&srs=3857';
 						crs = L.CRS.EPSG3857;
 					}

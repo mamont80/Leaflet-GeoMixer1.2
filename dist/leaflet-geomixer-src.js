@@ -7832,8 +7832,10 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 				c = tileLink.coords;
 			if (c.z !== this._tileZoom || !noPruneRange.contains(new L.Point(c.x, c.y))) {
 				tileLink.current = false;
-				tileLink.observer.deactivate();
-				this.removeObserver(tileLink.observer);
+				if (tileLink.observer) {
+					tileLink.observer.deactivate();
+					this.removeObserver(tileLink.observer);
+				}
 			}
 			L.DomUtil.setPosition(tileLink.el, this._getTilePos(c), L.Browser.chrome || L.Browser.android23);
 		}

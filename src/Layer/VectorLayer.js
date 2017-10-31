@@ -252,6 +252,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         }
         if (this._gmx._tilesToLoad === 0) {
             this.fire('load');
+            this.fire('doneDraw');
 
             if (this._animated) {
                 // clear scaled tiles after all new tiles are loaded (for performance)
@@ -601,7 +602,15 @@ L.gmx.VectorLayer = L.TileLayer.extend({
                 zKeys = {};
                 for (var key in this._tiles) { zKeys[key] = true; }
                 L.extend(zKeys, this.repaintObservers);
-            }
+            } else if (L.Util.isArray(zKeys)) {
+				var arr = zKeys;
+				zKeys = {};
+				arr.forEach(function (it) { zKeys[it] = true; } );
+            } else if (typeof zKeys === 'string') {
+				var it = zKeys;
+				zKeys = {};
+				zKeys[it] = true;
+			}
             this._gmx.dataManager._triggerObservers(zKeys);
         }
     },

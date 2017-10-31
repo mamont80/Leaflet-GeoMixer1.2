@@ -138,6 +138,7 @@ L.gmx.loadMap = function(mapID, options) {
     options.mapName = mapID;
 
 	if (!options.skipTiles) { options.skipTiles = 'All'; }
+	if (!options.srs) { options.srs = '3857'; }
 
     return new Promise(function(resolve, reject) {
 		gmxMapManager.loadMapProperties(options).then(function(mapInfo) {

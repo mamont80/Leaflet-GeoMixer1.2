@@ -451,7 +451,7 @@ var gmxAPIutils = {
         }
 
         if (!gmx.quicklookPlatform) {
-			var crs = gmx.srs === '3857' ? L.CRS.EPSG3857 : L.Projection.Mercator;
+			var crs = gmx.srs == 3857 ? L.CRS.EPSG3857 : L.Projection.Mercator;
             var merc = crs.project(L.latLng(points.y1, points.x1));
             points.x1 = merc.x; points.y1 = merc.y;
             merc = crs.project(L.latLng(points.y2, points.x2));
@@ -1081,7 +1081,7 @@ var gmxAPIutils = {
                 cntHide++;
             }
             var c = vectorSize === 1 ? coords[i] : [coords[i], coords[i + 1]],
-                x1 = c[0] * mInPixel, y1 = c[1] * mInPixel,
+                x1 = Math.round(c[0] * mInPixel), y1 = Math.round(c[1] * mInPixel),
                 x2 = Math.round(x1 - px), y2 = Math.round(py - y1);
 
             if (lastX !== x2 || lastY !== y2) {
@@ -1370,7 +1370,7 @@ var gmxAPIutils = {
         }
 
         var pos;
-        if (crs === '3857') {
+        if (crs == 3857) {
             pos = L.Projection.SphericalMercator.unproject(new L.Point(y, x)._divideBy(gmxAPIutils.rMajor));
             x = pos.lng;
             y = pos.lat;
@@ -2157,7 +2157,7 @@ var gmxAPIutils = {
             arr.forEach(function(geom) {
                 if (geom) {
                     type = geom.type.toUpperCase();
-					var latLngGeometry = L.gmxUtil.geometryToGeoJSON(geom, true, unitOptions.srs === '3857');
+					var latLngGeometry = L.gmxUtil.geometryToGeoJSON(geom, true, unitOptions.srs == 3857);
                     if (type.indexOf('POINT') !== -1) {
                         var latlng = L.latLng(latLngGeometry.coordinates.reverse());
                         out = '<b>' + L.gmxLocale.getText('Coordinates') + '</b>: '

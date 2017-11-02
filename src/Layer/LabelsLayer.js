@@ -270,7 +270,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
             screenBounds = _map.getBounds(),
             southWest = screenBounds.getSouthWest(),
             northEast = screenBounds.getNorthEast(),
-			crs = _map.options.srs === '3857' ? L.CRS.EPSG3857 : L.Projection.Mercator,
+			crs = _map.options.srs == 3857 ? L.CRS.EPSG3857 : L.Projection.Mercator,
             m1 = crs.project(southWest),	// предполагаем что все слои в одной проекции
             m2 = crs.project(northEast),
 			_zoom = _map.getZoom();

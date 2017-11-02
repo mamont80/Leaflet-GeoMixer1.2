@@ -15,7 +15,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
                 identityField: 'ogc_fid',
                 GeometryType: 'POLYGON',
                 IsRasterCatalog: true,
-				RasterSRS: props.RasterSRS || '3857',
+				RasterSRS: props.RasterSRS || 3857,
                 Copyright: props.Copyright || '',
                 RCMinZoomForRasters: styles.MinZoom,
                 visible: props.visible,

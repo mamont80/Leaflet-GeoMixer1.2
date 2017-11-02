@@ -47,7 +47,7 @@ ScreenVectorTile.prototype = {
         var gmx = this.gmx,
             _this = this,
             requestPromise = null;
-
+//gmx.RasterSRS
 		for (var key in this.rasterRequests) {
 			this.rasterRequests[key].reject();
 		}

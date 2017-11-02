@@ -1396,7 +1396,7 @@ var gmxAPIutils = {
         }
 
         if (!gmx.quicklookPlatform) {
-			var crs = gmx.srs === '3857' ? L.CRS.EPSG3857 : L.Projection.Mercator;
+			var crs = gmx.srs == 3857 ? L.CRS.EPSG3857 : L.Projection.Mercator;
             var merc = crs.project(L.latLng(points.y1, points.x1));
             points.x1 = merc.x; points.y1 = merc.y;
             merc = crs.project(L.latLng(points.y2, points.x2));
@@ -2026,7 +2026,7 @@ var gmxAPIutils = {
                 cntHide++;
             }
             var c = vectorSize === 1 ? coords[i] : [coords[i], coords[i + 1]],
-                x1 = c[0] * mInPixel, y1 = c[1] * mInPixel,
+                x1 = Math.round(c[0] * mInPixel), y1 = Math.round(c[1] * mInPixel),
                 x2 = Math.round(x1 - px), y2 = Math.round(py - y1);
 
             if (lastX !== x2 || lastY !== y2) {
@@ -2315,7 +2315,7 @@ var gmxAPIutils = {
         }
 
         var pos;
-        if (crs === '3857') {
+        if (crs == 3857) {
             pos = L.Projection.SphericalMercator.unproject(new L.Point(y, x)._divideBy(gmxAPIutils.rMajor));
             x = pos.lng;
             y = pos.lat;
@@ -3102,7 +3102,7 @@ var gmxAPIutils = {
             arr.forEach(function(geom) {
                 if (geom) {
                     type = geom.type.toUpperCase();
-					var latLngGeometry = L.gmxUtil.geometryToGeoJSON(geom, true, unitOptions.srs === '3857');
+					var latLngGeometry = L.gmxUtil.geometryToGeoJSON(geom, true, unitOptions.srs == 3857);
                     if (type.indexOf('POINT') !== -1) {
                         var latlng = L.latLng(latLngGeometry.coordinates.reverse());
                         out = '<b>' + L.gmxLocale.getText('Coordinates') + '</b>: '
@@ -4585,7 +4585,7 @@ var gmxMap = L.Class.extend({
 				}));
 			}
 			Promise.all(loaders).then(resolve);
-		});
+		}.bind(this));
 	},
 
 	addDataManager: function(it) {
@@ -5234,7 +5234,7 @@ var Observer = L.Class.extend({
         this.filters = options.filters || [];
         this.targetZoom = options.targetZoom || null;
         this.active = 'active' in options ? options.active : true;
-        this.srs = options.srs || '3857';	// '3857' '3395'
+        this.srs = options.srs || 3857;	// 3857, 3395
 
         if (options.bounds) {   // set bbox by LatLngBounds
             this.setBounds(options.bounds);
@@ -5418,7 +5418,7 @@ var Observer = L.Class.extend({
                 minX1 = -180; maxX1 = maxX - 360; maxX = 180;
             }
         }
-		var crs = this.srs === '3857' ? L.CRS.EPSG3857 : L.Projection.Mercator,
+		var crs = this.srs == 3857 ? L.CRS.EPSG3857 : L.Projection.Mercator,
 			m1 = crs.project(L.latLng(minY, minX)),
 			m2 = crs.project(L.latLng(maxY, maxX));
 
@@ -7008,9 +7008,9 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
         var gmx = this._gmx;
 
-		this.options.tilesCRS = gmx.srs === '3857' ? L.CRS.EPSG3857 : L.CRS.EPSG3395;
+		this.options.tilesCRS = gmx.srs == 3857 ? L.CRS.EPSG3857 : L.CRS.EPSG3395;
         gmx.shiftY = 0;
-        gmx.applyShift = map.options.crs === L.CRS.EPSG3857 && gmx.srs !== '3857';
+        gmx.applyShift = map.options.crs === L.CRS.EPSG3857 && gmx.srs != 3857;
         gmx.currentZoom = map.getZoom();
 // console.log('onAdd', gmx.applyShift, gmx.srs);
 
@@ -7248,7 +7248,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 			// ph.properties.srs = gmx.srs = gmx.rawProperties.RasterSRS;
 		// }
         if (gmx.rawProperties.type === 'Vector') {
-			ph.properties.srs = gmx.srs = '3857';
+			ph.properties.srs = gmx.srs = 3857;
+			gmx.RasterSRS = gmx.rawProperties.RasterSRS || 3857;
         } else if (gmx.rawProperties.RasterSRS) {
 			ph.properties.srs = gmx.srs = gmx.rawProperties.RasterSRS;
 		}
@@ -7695,7 +7696,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         var gmxBounds = this._gmx.layerID ? gmxAPIutils.geoItemBounds(this._gmx.geometry).bounds : this._gmx.dataManager.getItemsBounds();
 
         if (gmxBounds) {
-			return gmxBounds.toLatLngBounds(this._gmx.srs === '3857');
+			return gmxBounds.toLatLngBounds(this._gmx.srs == 3857);
         } else {
             return new L.LatLngBounds();
         }
@@ -7703,7 +7704,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
     getGeometry: function() {
         if (!this._gmx.latLngGeometry) {
-            this._gmx.latLngGeometry = L.gmxUtil.geometryToGeoJSON(this._gmx.geometry, true, this._gmx.srs === '3857');
+            this._gmx.latLngGeometry = L.gmxUtil.geometryToGeoJSON(this._gmx.geometry, true, this._gmx.srs == 3857);
         }
 
         return this._gmx.latLngGeometry;
@@ -7875,7 +7876,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             zoom = this._map._zoom,
             shiftX = gmx.shiftX || 0,   // Сдвиг слоя
             shiftY = gmx.shiftY || 0,   // Сдвиг слоя + OSM
-			latLngBounds = bounds.toLatLngBounds(gmx.srs === '3857'),
+			latLngBounds = bounds.toLatLngBounds(gmx.srs == 3857),
             minLatLng = latLngBounds.getSouthWest(),
             maxLatLng = latLngBounds.getNorthEast(),
             screenBounds = this._map.getBounds(),
@@ -8195,7 +8196,7 @@ ScreenVectorTile.prototype = {
         var gmx = this.gmx,
             _this = this,
             requestPromise = null;
-
+//gmx.RasterSRS
 		for (var key in this.rasterRequests) {
 			this.rasterRequests[key].reject();
 		}
@@ -10033,7 +10034,7 @@ L.gmx.VectorLayer.include({
             };
 
         if (geometry.type === 'POINT') {
-			var geoJson = L.gmxUtil.geometryToGeoJSON(geometry, true, gmx.srs === '3857');
+			var geoJson = L.gmxUtil.geometryToGeoJSON(geometry, true, gmx.srs == 3857);
             outItem.latlng = L.latLng(geoJson.coordinates.reverse());
         }
         if (offset) {
@@ -10120,7 +10121,7 @@ L.gmx.VectorLayer.include({
                 }.bind(this));
             } else {
 				if (item.type.indexOf('POINT') !== -1) {
-					options.latlng = L.latLng(L.gmxUtil.geometryToGeoJSON(item.properties[item.properties.length - 1], true, this._gmx.srs === '3857').coordinates.reverse());
+					options.latlng = L.latLng(L.gmxUtil.geometryToGeoJSON(item.properties[item.properties.length - 1], true, this._gmx.srs == 3857).coordinates.reverse());
                 }
 				this._openPopup(options);
             }
@@ -10248,7 +10249,7 @@ L.gmx.VectorLayer.include({
             gmx._needPopups[id] = false;
         } else {
             var center = item.bounds.getCenter(),
-                latlng = L.latLng(L.gmxUtil.coordsFromMercator('Point', center, gmx.srs === '3857').reverse());
+                latlng = L.latLng(L.gmxUtil.coordsFromMercator('Point', center, gmx.srs == 3857).reverse());
             this._openPopup({
                 type: 'click',
                 latlng: latlng,
@@ -10468,7 +10469,7 @@ L.gmx.VectorLayer.include({
 
             var lng = ev.latlng.lng % 360,
                 latlng = new L.LatLng(ev.latlng.lat, lng + (lng < -180 ? 360 : (lng > 180 ? -360 : 0))),
-				crs = gmx.srs === '3857' ? L.CRS.EPSG3857 : L.Projection.Mercator,
+				crs = gmx.srs == 3857 ? L.CRS.EPSG3857 : L.Projection.Mercator,
                 point = crs.project(latlng)._subtract(
                     {x: gmx.shiftXlayer || 0, y: gmx.shiftYlayer || 0}
                 ),
@@ -10890,7 +10891,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
                 identityField: 'ogc_fid',
                 GeometryType: 'POLYGON',
                 IsRasterCatalog: true,
-				RasterSRS: props.RasterSRS || '3857',
+				RasterSRS: props.RasterSRS || 3857,
                 Copyright: props.Copyright || '',
                 RCMinZoomForRasters: styles.MinZoom,
                 visible: props.visible,
@@ -11267,7 +11268,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
             screenBounds = _map.getBounds(),
             southWest = screenBounds.getSouthWest(),
             northEast = screenBounds.getNorthEast(),
-			crs = _map.options.srs === '3857' ? L.CRS.EPSG3857 : L.Projection.Mercator,
+			crs = _map.options.srs == 3857 ? L.CRS.EPSG3857 : L.Projection.Mercator,
             m1 = crs.project(southWest),	// предполагаем что все слои в одной проекции
             m2 = crs.project(northEast),
 			_zoom = _map.getZoom();
@@ -13018,7 +13019,7 @@ L.gmx.loadMap = function(mapID, options) {
     options.mapName = mapID;
 
 	if (!options.skipTiles) { options.skipTiles = 'All'; }
-	if (!options.srs) { options.srs = '3857'; }
+	if (!options.srs) { options.srs = 3857; }
 
     return new Promise(function(resolve, reject) {
 		gmxMapManager.loadMapProperties(options).then(function(mapInfo) {

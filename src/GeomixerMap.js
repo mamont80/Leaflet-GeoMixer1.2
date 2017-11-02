@@ -129,7 +129,7 @@ var gmxMap = L.Class.extend({
 				}));
 			}
 			Promise.all(loaders).then(resolve);
-		});
+		}.bind(this));
 	},
 
 	addDataManager: function(it) {

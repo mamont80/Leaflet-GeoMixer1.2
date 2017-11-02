@@ -27,7 +27,7 @@ var Observer = L.Class.extend({
         this.filters = options.filters || [];
         this.targetZoom = options.targetZoom || null;
         this.active = 'active' in options ? options.active : true;
-        this.srs = options.srs || '3857';	// '3857' '3395'
+        this.srs = options.srs || 3857;	// 3857, 3395
 
         if (options.bounds) {   // set bbox by LatLngBounds
             this.setBounds(options.bounds);
@@ -211,7 +211,7 @@ var Observer = L.Class.extend({
                 minX1 = -180; maxX1 = maxX - 360; maxX = 180;
             }
         }
-		var crs = this.srs === '3857' ? L.CRS.EPSG3857 : L.Projection.Mercator,
+		var crs = this.srs == 3857 ? L.CRS.EPSG3857 : L.Projection.Mercator,
 			m1 = crs.project(L.latLng(minY, minX)),
 			m2 = crs.project(L.latLng(maxY, maxX));
 

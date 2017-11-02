@@ -81,9 +81,9 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
         var gmx = this._gmx;
 
-		this.options.tilesCRS = gmx.srs === '3857' ? L.CRS.EPSG3857 : L.CRS.EPSG3395;
+		this.options.tilesCRS = gmx.srs == 3857 ? L.CRS.EPSG3857 : L.CRS.EPSG3395;
         gmx.shiftY = 0;
-        gmx.applyShift = map.options.crs === L.CRS.EPSG3857 && gmx.srs !== '3857';
+        gmx.applyShift = map.options.crs === L.CRS.EPSG3857 && gmx.srs != 3857;
         gmx.currentZoom = map.getZoom();
 // console.log('onAdd', gmx.applyShift, gmx.srs);
 
@@ -321,7 +321,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 			// ph.properties.srs = gmx.srs = gmx.rawProperties.RasterSRS;
 		// }
         if (gmx.rawProperties.type === 'Vector') {
-			ph.properties.srs = gmx.srs = '3857';
+			ph.properties.srs = gmx.srs = 3857;
+			gmx.RasterSRS = gmx.rawProperties.RasterSRS || 3857;
         } else if (gmx.rawProperties.RasterSRS) {
 			ph.properties.srs = gmx.srs = gmx.rawProperties.RasterSRS;
 		}
@@ -768,7 +769,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         var gmxBounds = this._gmx.layerID ? gmxAPIutils.geoItemBounds(this._gmx.geometry).bounds : this._gmx.dataManager.getItemsBounds();
 
         if (gmxBounds) {
-			return gmxBounds.toLatLngBounds(this._gmx.srs === '3857');
+			return gmxBounds.toLatLngBounds(this._gmx.srs == 3857);
         } else {
             return new L.LatLngBounds();
         }
@@ -776,7 +777,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
     getGeometry: function() {
         if (!this._gmx.latLngGeometry) {
-            this._gmx.latLngGeometry = L.gmxUtil.geometryToGeoJSON(this._gmx.geometry, true, this._gmx.srs === '3857');
+            this._gmx.latLngGeometry = L.gmxUtil.geometryToGeoJSON(this._gmx.geometry, true, this._gmx.srs == 3857);
         }
 
         return this._gmx.latLngGeometry;
@@ -948,7 +949,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             zoom = this._map._zoom,
             shiftX = gmx.shiftX || 0,   // Сдвиг слоя
             shiftY = gmx.shiftY || 0,   // Сдвиг слоя + OSM
-			latLngBounds = bounds.toLatLngBounds(gmx.srs === '3857'),
+			latLngBounds = bounds.toLatLngBounds(gmx.srs == 3857),
             minLatLng = latLngBounds.getSouthWest(),
             maxLatLng = latLngBounds.getNorthEast(),
             screenBounds = this._map.getBounds(),

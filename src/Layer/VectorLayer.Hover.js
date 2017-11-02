@@ -186,7 +186,7 @@ L.gmx.VectorLayer.include({
 
             var lng = ev.latlng.lng % 360,
                 latlng = new L.LatLng(ev.latlng.lat, lng + (lng < -180 ? 360 : (lng > 180 ? -360 : 0))),
-				crs = gmx.srs === '3857' ? L.CRS.EPSG3857 : L.Projection.Mercator,
+				crs = gmx.srs == 3857 ? L.CRS.EPSG3857 : L.Projection.Mercator,
                 point = crs.project(latlng)._subtract(
                     {x: gmx.shiftXlayer || 0, y: gmx.shiftYlayer || 0}
                 ),

@@ -180,7 +180,7 @@ L.gmx.VectorLayer.include({
             };
 
         if (geometry.type === 'POINT') {
-			var geoJson = L.gmxUtil.geometryToGeoJSON(geometry, true, gmx.srs === '3857');
+			var geoJson = L.gmxUtil.geometryToGeoJSON(geometry, true, gmx.srs == 3857);
             outItem.latlng = L.latLng(geoJson.coordinates.reverse());
         }
         if (offset) {
@@ -267,7 +267,7 @@ L.gmx.VectorLayer.include({
                 }.bind(this));
             } else {
 				if (item.type.indexOf('POINT') !== -1) {
-					options.latlng = L.latLng(L.gmxUtil.geometryToGeoJSON(item.properties[item.properties.length - 1], true, this._gmx.srs === '3857').coordinates.reverse());
+					options.latlng = L.latLng(L.gmxUtil.geometryToGeoJSON(item.properties[item.properties.length - 1], true, this._gmx.srs == 3857).coordinates.reverse());
                 }
 				this._openPopup(options);
             }
@@ -395,7 +395,7 @@ L.gmx.VectorLayer.include({
             gmx._needPopups[id] = false;
         } else {
             var center = item.bounds.getCenter(),
-                latlng = L.latLng(L.gmxUtil.coordsFromMercator('Point', center, gmx.srs === '3857').reverse());
+                latlng = L.latLng(L.gmxUtil.coordsFromMercator('Point', center, gmx.srs == 3857).reverse());
             this._openPopup({
                 type: 'click',
                 latlng: latlng,

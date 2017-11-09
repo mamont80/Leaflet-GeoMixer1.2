@@ -11010,6 +11010,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
         this._observers = {};
         this._styleManagers = {};
         this._labels = {};
+        this._labelsIndex = {};
         var _this = this;
 
         this.bbox = gmxAPIutils.bounds();
@@ -11125,6 +11126,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
                     labels[id] = item;
                 }
             }
+            _this._labelsIndex[layerId] = layer.options.zIndex;
             _this._labels[layerId] = labels;
         };
 
@@ -11169,6 +11171,8 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
                     _this._styleManagers[id] = gmx.styleManager;
 
                     _this._labels['_' + id] = {};
+					_this._labelsIndex['_' + id] = {};
+
                     _this._updateBbox();
                 });
             }
@@ -11182,6 +11186,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
                 delete _this._observers[id];
                 delete _this._styleManagers[id];
                 delete _this._labels['_' + id];
+                delete _this._labelsIndex['_' + id];
                 _this.redraw();
             }
         };
@@ -11312,9 +11317,11 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
         var w2 = 2 * this.mInPixel * gmxAPIutils.worldWidthMerc,
             start = w2 * Math.floor(_map.getPixelBounds().min.x / w2),
             ctx = _canvas.getContext('2d'),
+			arr = Object.keys(this._labels).sort(function(a ,b) { return this._labelsIndex[b] - this._labelsIndex[a]; }.bind(this)),
             i, len, it;
 
-        for (var layerId in this._labels) {
+        // for (var layerId in this._labels) {
+        arr.forEach(function(layerId) {
             var labels = this._labels[layerId];
             for (var id in labels) {
                 it = labels[id];
@@ -11386,7 +11393,9 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
                     });
                 }
             }
-        }
+        //}
+		}.bind(this));
+
         if (out.length) {
             ctx.clearRect(0, 0, _canvas.width, _canvas.height);
             for (i = 0, len = out.length; i < len; i++) {

@@ -989,7 +989,7 @@ var DataManager = L.Class.extend({
         var x = -0.5, y = -0.5, z = 0, v = 0, s = -1, d = -1, isFlatten = this.options.isFlatten;
 
             this.processingTile = new VectorTile({load: function(x, y, z, v, s, d, callback) {
-                            callback([]);
+                            callback({values: []});
             }}, {x: x, y: y, z: z, v: v, s: s, d: d, isFlatten: isFlatten});
 
             this.addTile(this.processingTile);

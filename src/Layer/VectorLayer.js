@@ -315,16 +315,11 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         gmx.rawProperties = ph.rawProperties || ph.properties;
 
         this._updateProperties(ph.properties);
-        // if (gmx.srs) {
-			// ph.properties.srs = gmx.srs;
-		// } else if (gmx.rawProperties.RasterSRS) {
-			// ph.properties.srs = gmx.srs = gmx.rawProperties.RasterSRS;
-		// }
         if (gmx.rawProperties.type === 'Vector') {
 			ph.properties.srs = gmx.srs = 3857;
-			gmx.RasterSRS = gmx.rawProperties.RasterSRS || 3857;
+			gmx.RasterSRS = Number(gmx.rawProperties.RasterSRS) || 3857;
         } else if (gmx.rawProperties.RasterSRS) {
-			ph.properties.srs = gmx.srs = gmx.rawProperties.RasterSRS;
+			ph.properties.srs = gmx.srs = Number(gmx.rawProperties.RasterSRS);
 		}
 
         ph.properties.needBbox = gmx.needBbox;
@@ -1092,14 +1087,14 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             gmx.IsRasterCatalog = prop.IsRasterCatalog;
             var layerLink = gmx.tileAttributeIndexes.GMX_RasterCatalogID;
             if (layerLink) {
-                gmx.rasterBGfunc = function(x, y, z, item) {
+                gmx.rasterBGfunc = function(x, y, z, item, srs) {
                     var properties = item.properties,
 						url = L.gmxUtil.protocol + '//' + gmx.hostName
 							+ '/TileSender.ashx?ModeKey=tile&ftc=osm'
 							+ '&x=' + x
 							+ '&y=' + y
 							+ '&z=' + z;
-					if (gmx.srs) { url += '&srs=' + gmx.srs; }
+					if (srs || gmx.srs) { url += '&srs=' + (srs || gmx.srs); }
 					if (gmx.crossOrigin) { url += '&cross=' + gmx.crossOrigin; }
 					url += '&LayerName=' + properties[layerLink];
 					if (gmx.sessionKey) { url += '&key=' + encodeURIComponent(gmx.sessionKey); }
@@ -1197,6 +1192,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 		gmx.currentZoom = this._tileZoom;
 		gmx.tileSize = gmxAPIutils.tileSizes[gmx.currentZoom];
 		gmx.mInPixel = 256 / gmx.tileSize;
+		gmx.rastersDeltaY = gmx.RasterSRS === 3857 ? 0 : this._getShiftY(gmx.currentZoom, L.CRS.EPSG3395);
         if (gmx.applyShift && this._map) {
 			gmx.deltaY = this._getShiftY(gmx.currentZoom);
 			gmx.shiftX = Math.floor(gmx.mInPixel * (gmx.shiftXlayer || 0));
@@ -1205,10 +1201,10 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         }
     },
 
-	_getShiftY: function(zoom) {		// Layer shift
+	_getShiftY: function(zoom, crs) {		// Layer shift
 		var map = this._map,
 			pos = map.getCenter(),
-			shift = (map.options.crs.project(pos).y - this.options.tilesCRS.project(pos).y);
+			shift = (map.options.crs.project(pos).y - (crs || this.options.tilesCRS).project(pos).y);
 
 		return Math.floor(L.CRS.scale(zoom) * shift / 40075016.685578496);
 	}

@@ -269,6 +269,23 @@ var gmxAPIutils = {
 		};
     },
 
+    isItemIntersectBounds: function(geo, bounds) {
+        var type = geo.type,
+            coords = geo.coordinates;
+        if (type === 'POLYGON' || type === 'Polygon') {
+			coords = [coords];
+		}
+
+		for (var j = 0, len1 = coords.length; j < len1; j++) {
+			for (var i = 0, len = coords[j].length; i < len; i++) {
+				if (bounds.clipPolygon(coords[j][i]).length) {
+					return true;
+				}
+			}
+		}
+		return false;
+    },
+
     geoItemBounds: function(geo) {  // get item bounds array by geometry
         if (!geo) {
             return {

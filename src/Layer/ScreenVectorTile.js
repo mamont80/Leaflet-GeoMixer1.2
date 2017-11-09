@@ -17,6 +17,8 @@ function ScreenVectorTile(layer, tileElem) {
     this.tpy = 256 * (1 + gmxTilePoint.y);
 
 	var tileSize = utils.tileSizes[tilePoint.z];
+
+    this.tbounds = utils.getBoundsByTilePoint(tilePoint);
     this.topLeft = {
 		pix: {
 			px: 256 * tilePoint.x,
@@ -47,7 +49,7 @@ ScreenVectorTile.prototype = {
         var gmx = this.gmx,
             _this = this,
             requestPromise = null;
-//gmx.RasterSRS
+
 		for (var key in this.rasterRequests) {
 			this.rasterRequests[key].reject();
 		}
@@ -200,6 +202,18 @@ ScreenVectorTile.prototype = {
         return arr;
     },
 
+    _chkRastersByItemIntersect: function (arr, item) {
+		var geo = item.properties[item.properties.length - 1],
+			out = [];
+		arr.forEach(function(it) {
+			var bounds = gmxAPIutils.getBoundsByTilePoint(it);
+			if (gmxAPIutils.isItemIntersectBounds(geo, bounds)) {
+				out.push(it);
+			}
+		});
+		return out;
+    },
+
     // Loads missing rasters for single item and combines them in canvas.
     // Stores resulting canvas in this.rasters
     _getItemRasters: function (geo) {
@@ -209,8 +223,6 @@ ScreenVectorTile.prototype = {
             gmx = this.gmx,
             indexes = gmx.tileAttributeIndexes,
             rasters = this.rasters,
-            // mainRasterLoader = null,
-            // recursiveLoaders,
             shiftX = Number(gmx.shiftXfield ? gmxAPIutils.getPropItem(gmx.shiftXfield, properties, indexes) : 0) % this.worldWidthMerc,
             shiftY = Number(gmx.shiftYfield ? gmxAPIutils.getPropItem(gmx.shiftYfield, properties, indexes) : 0),
             isShift = shiftX || shiftY,
@@ -224,8 +236,6 @@ ScreenVectorTile.prototype = {
             resCanvas = null;
 
 		var itemRasterPromise = new Promise(function(resolve) {
-			//Promise.all(this._getNeedRasterItems(geoItems).map(this._getItemRasters.bind(this))).then(resolve);
-
 			if (gmx.IsRasterCatalog && (gmx.rawProperties.type === 'Raster' || gmxAPIutils.getPropItem('GMX_RasterCatalogID', properties, indexes))) {
 				isTiles = true;                     // Raster Layer
 			} else if (gmx.quicklookBGfunc) {
@@ -237,16 +247,10 @@ ScreenVectorTile.prototype = {
 			}
 			new Promise(function(resolve1, reject1) {
 				if (isTiles) {
-					// mainRasterLoader = new L.gmx.Deferred(function() {
-						// recursiveLoaders.forEach(function(it) {
-							// it.cancel();
-						// });
-						// recursiveLoaders = null;
-					// });
 					var dataOption = geo.dataOption || {},
-						tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint],
-						// tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [gmxTilePoint],
-						cnt = tileToLoadPoints.length,
+						tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint], geo);
+
+					var cnt = tileToLoadPoints.length,
 						chkReadyRasters = function() {
 							if (cnt < 1) { resolve1(); }
 						},
@@ -346,11 +350,6 @@ ScreenVectorTile.prototype = {
 						}, skipRasterFunc);
 						return loader;
 					});
-
-					// mainRasterLoader.then(function() {
-						// rasters[idr] = resCanvas;
-						// resolve();
-					// });
 				} else {
 					url += (url.indexOf('?') === -1 ? '?' : '&') + gmx.sessionKey;  //  for browser cache from another tabs
 					var request = this.rasterRequests[url];
@@ -366,65 +365,49 @@ ScreenVectorTile.prototype = {
 
 					// in fact, we want to return request.def, but need to do additional action during cancellation.
 					// so, we consctruct new promise and add pipe it with request.def
-					// mainRasterLoader = new L.gmx.Deferred(function() { //don't cache cancelled requests
-						// delete _this.rasterRequests[url];
-						// request.reject();
-					// });
 					request.promise.then(resolve1, reject1);
-				// }
-
-				// if (isTiles) {
-				// } else {
-					// for quicklook
 					item.skipRasters = false;
-					// if (imageItem) {
-						// imageLoaded(imageItem);
-					// } else {
-						// mainRasterLoader.then(imageLoaded.bind(this), resolve);
-					// }
 				}
 			}.bind(this)).then(function(img) {
 				if (isTiles) {
 					rasters[idr] = resCanvas;
 					resolve();
 				} else {
-					// var imageLoaded = function(img) {
-						var imgAttr = {
-							gmx: gmx,
-							geoItem: geo,
-							item: item,
-							gmxTilePoint: gmxTilePoint
-						};
-						if (!resCanvas) {
-							resCanvas = document.createElement('canvas');
-							resCanvas.width = resCanvas.height = 256;
-						}
-						var prepareItem = function(imageElement) {
-							var promise = _this._rasterHook({
-									geoItem: geo,
-									res: resCanvas,
-									image: itemImageProcessingHook ? itemImageProcessingHook(imageElement, imgAttr) : imageElement,
-									destinationTilePoint: gmxTilePoint,
-									url: url
-								}),
-								then = function() {
-									rasters[idr] = resCanvas;
-									resolve();
-								};
-							if (promise) {
-								if (promise.then) {
-									promise.then(then);
-								}
-							} else if (promise === null) {
-								item.skipRasters = true;
+					var imgAttr = {
+						gmx: gmx,
+						geoItem: geo,
+						item: item,
+						gmxTilePoint: gmxTilePoint
+					};
+					if (!resCanvas) {
+						resCanvas = document.createElement('canvas');
+						resCanvas.width = resCanvas.height = 256;
+					}
+					var prepareItem = function(imageElement) {
+						var promise = _this._rasterHook({
+								geoItem: geo,
+								res: resCanvas,
+								image: itemImageProcessingHook ? itemImageProcessingHook(imageElement, imgAttr) : imageElement,
+								destinationTilePoint: gmxTilePoint,
+								url: url
+							}),
+							then = function() {
+								rasters[idr] = resCanvas;
 								resolve();
-							} else {
-								then();
+							};
+						if (promise) {
+							if (promise.then) {
+								promise.then(then);
 							}
-						};
-						prepareItem(img);
-						delete _this.rasterRequests[url];
-					// };
+						} else if (promise === null) {
+							item.skipRasters = true;
+							resolve();
+						} else {
+							then();
+						}
+					};
+					prepareItem(img);
+					delete _this.rasterRequests[url];
 				}
 			}.bind(this));
 		}.bind(this));

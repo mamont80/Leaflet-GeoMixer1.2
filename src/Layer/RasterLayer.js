@@ -15,7 +15,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
                 identityField: 'ogc_fid',
                 GeometryType: 'POLYGON',
                 IsRasterCatalog: true,
-				RasterSRS: props.RasterSRS || 3857,
+				RasterSRS: Number(props.RasterSRS) || 3857,
                 Copyright: props.Copyright || '',
                 RCMinZoomForRasters: styles.MinZoom,
                 visible: props.visible,
@@ -38,7 +38,9 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
                 type: 'POLYGON',
                 coordinates: [[[-worldSize, -worldSize], [-worldSize, worldSize], [worldSize, worldSize], [worldSize, -worldSize], [-worldSize, -worldSize]]]
             };
-        }
+        } else if (gmx.srs == 3857 && gmx.srs !== vectorProperties.RasterSRS) {
+			ph.geometry = gmxAPIutils.convertGeometry(gmxAPIutils.convertGeometry(ph.geometry, true, true));
+		}
 
 		L.gmx.VectorLayer.prototype.initFromDescription.call(this, {geometry: ph.geometry, properties: vectorProperties, rawProperties: ph.properties});
 

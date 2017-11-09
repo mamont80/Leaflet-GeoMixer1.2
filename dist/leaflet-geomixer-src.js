@@ -12323,6 +12323,7 @@ L.gmx.ExternalLayer = L.Class.extend({
     initialize: function (options, layer) {
         L.setOptions(this, options);
         this.parentLayer = layer;
+
         layer
             .on('add', this._addEvent, this)
             .on('dateIntervalChanged', this.setDateInterval, this);
@@ -12361,13 +12362,15 @@ L.gmx.ExternalLayer = L.Class.extend({
     },
 
     _addMapHandlers: function (map) {
-        this._map = map;
-        this._map.on({
-            moveend: this._updateBbox,
-            zoomend: this._chkZoom,
-            layeradd: this._layeradd,
-            layerremove: this._layerremove
-        }, this);
+        if (map) {
+			this._map = map;
+			this._map.on({
+				moveend: this._updateBbox,
+				zoomend: this._chkZoom,
+				layeradd: this._layeradd,
+				layerremove: this._layerremove
+			}, this);
+		}
     },
 
     _removeMapHandlers: function () {
@@ -12383,7 +12386,7 @@ L.gmx.ExternalLayer = L.Class.extend({
     },
 
     _addEvent: function (ev) {
-        this._addMapHandlers(ev.target._map);
+		this._addMapHandlers(ev.target._map);
         this._updateBbox();
         this._chkZoom();
     },
@@ -12430,7 +12433,7 @@ L.gmx.ExternalLayer = L.Class.extend({
             map = this._map,
             isExtLayerOnMap = map.hasLayer(this.externalLayer);
 
-        layer.setCurrentZoom(map);
+        if (layer.setCurrentZoom) { layer.setCurrentZoom(map); }
         if (!this.isExternalVisible(map.getZoom())) {
             if (observer) { observer.deactivate(); }
             if (!layer._map) {

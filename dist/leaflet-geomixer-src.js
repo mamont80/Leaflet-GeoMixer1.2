@@ -8209,15 +8209,14 @@ ScreenVectorTile.prototype = {
     //return promise, which resolves with object {gtp, image}
     _loadTileRecursive: function (gtp, urlFunction) {
         var gmx = this.gmx,
-            _this = this,
-            requestPromise = null;
+            _this = this;
 
-		for (var key in this.rasterRequests) {
-			this.rasterRequests[key].reject();
-		}
+		// for (var key in this.rasterRequests) {
+			// this.rasterRequests[key].reject();
+		// }
 		this.rasterRequests = {};
 
-		return new Promise(function(resolve, reject) {
+		return new Promise(function(resolve) {
 			var tryLoad = function(gtp, crossOrigin) {
 				var rUrl = urlFunction(gtp);
 
@@ -8229,7 +8228,7 @@ ScreenVectorTile.prototype = {
 							z: gtp.z - 1
 						}, ''); // 'anonymous' 'use-credentials'
 					} else {
-						reject();
+						resolve({gtp: gtp});
 					}
 				};
 
@@ -8252,10 +8251,7 @@ ScreenVectorTile.prototype = {
 				} else {
 					request.options.tileRastersId = _this._uniqueID;
 				}
-				// currentUrl = rUrl;
-				requestPromise = request.def;
-
-				requestPromise.then(
+				request.promise.then(
 					function(imageObj) {
 						resolve({gtp: gtp, image: imageObj});
 					},

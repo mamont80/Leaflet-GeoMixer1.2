@@ -4371,7 +4371,7 @@ var gmxMapManager = {
 				srs: options.srs || '',
 				ModeKey: 'map'
 			};
-			if (options.srs === 3857) { opt.cs = 'wm'; }
+			if (options.srs == 3857) { opt.ftc = 'osm'; }
 			var promise = new Promise(function(resolve, reject) {
 				gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
 					opt.key = sessionKey;
@@ -8406,7 +8406,8 @@ ScreenVectorTile.prototype = {
 			new Promise(function(resolve1, reject1) {
 				if (isTiles) {
 					var dataOption = geo.dataOption || {},
-						tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint], geo);
+						tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint];
+						// tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint], geo);
 
 					var cnt = tileToLoadPoints.length,
 						chkReadyRasters = function() {
@@ -13026,6 +13027,7 @@ L.gmx.loadMap = function(mapID, options) {
 
 	if (!options.skipTiles) { options.skipTiles = 'All'; }
 	if (!options.srs) { options.srs = 3857; }
+	if (!options.ftc) { options.ftc = 'osm'; }
 
     return new Promise(function(resolve, reject) {
 		gmxMapManager.loadMapProperties(options).then(function(mapInfo) {

@@ -244,7 +244,8 @@ ScreenVectorTile.prototype = {
 			new Promise(function(resolve1, reject1) {
 				if (isTiles) {
 					var dataOption = geo.dataOption || {},
-						tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint], geo);
+						tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint];
+						// tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint], geo);
 
 					var cnt = tileToLoadPoints.length,
 						chkReadyRasters = function() {

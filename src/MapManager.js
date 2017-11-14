@@ -25,7 +25,7 @@ var gmxMapManager = {
 				srs: options.srs || '',
 				ModeKey: 'map'
 			};
-			if (options.srs === 3857) { opt.cs = 'wm'; }
+			if (options.srs == 3857) { opt.ftc = 'osm'; }
 			var promise = new Promise(function(resolve, reject) {
 				gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
 					opt.key = sessionKey;

@@ -139,6 +139,7 @@ L.gmx.loadMap = function(mapID, options) {
 
 	if (!options.skipTiles) { options.skipTiles = 'All'; }
 	if (!options.srs) { options.srs = 3857; }
+	if (!options.ftc) { options.ftc = 'osm'; }
 
     return new Promise(function(resolve, reject) {
 		gmxMapManager.loadMapProperties(options).then(function(mapInfo) {

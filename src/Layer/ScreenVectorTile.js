@@ -2,23 +2,29 @@
 function ScreenVectorTile(layer, tileElem) {
     this.layer = layer;
 	var tilePoint = tileElem.coords,
-		zoom = tilePoint.z;
+		zoom = tilePoint.z,
+		pz = Math.pow(2, zoom),
+		x = tilePoint.x % pz,
+		y = tilePoint.y % pz,
+		utils = gmxAPIutils;
 
-    this.tilePoint = tilePoint;
+    if (x < 0) { x += pz; }
+    if (y < 0) { y += pz; }
+    this.ntp = {z: zoom, x: x, y: y};
+
+	this.tilePoint = tilePoint;
     this.zoom = zoom;
     this.gmx = layer._gmx;
     this.zKey = this.layer._tileCoordsToKey(tilePoint, zoom);
-    var utils = gmxAPIutils;
     this.worldWidthMerc = utils.worldWidthMerc;
 
     var gmxTilePoint = utils.getTileNumFromLeaflet(tilePoint, zoom);
-    this.tbounds = utils.getTileBounds(gmxTilePoint.x, gmxTilePoint.y, gmxTilePoint.z);
     this.tpx = 256 * gmxTilePoint.x;
     this.tpy = 256 * (1 + gmxTilePoint.y);
 
 	var tileSize = utils.tileSizes[tilePoint.z];
 
-    this.tbounds = utils.getBoundsByTilePoint(tilePoint);
+    this.tbounds = utils.getBoundsByTilePoint(this.ntp);
     this.topLeft = {
 		pix: {
 			px: 256 * tilePoint.x,
@@ -44,9 +50,13 @@ function ScreenVectorTile(layer, tileElem) {
 }
 
 ScreenVectorTile.prototype = {
-    //return promise, which resolves with object {gtp, image}
-    _loadTileRecursive: function (gtp, urlFunction) {
+    _getUrlFunction: function (gtp, item) {
+		return this.gmx.rasterBGfunc(gtp.x, gtp.y, gtp.z, item);
+    },
+
+    _loadTileRecursive: function (tilePoint, item) {    //return promise, which resolves with object {gtp, image}
         var gmx = this.gmx,
+			gtp = {z: tilePoint.z, x: this.ntp.x, y: this.ntp.y},
             _this = this;
 
 		// for (var key in this.rasterRequests) {
@@ -56,7 +66,7 @@ ScreenVectorTile.prototype = {
 
 		return new Promise(function(resolve) {
 			var tryLoad = function(gtp, crossOrigin) {
-				var rUrl = urlFunction(gtp);
+				var rUrl = _this._getUrlFunction(gtp, item);
 
 				var tryHigherLevelTile = function() {
 					if (gtp.z > 1) {
@@ -229,6 +239,7 @@ ScreenVectorTile.prototype = {
             item = gmx.dataManager.getItem(idr),
             gmxTilePoint = this.gmxTilePoint,
             tilePoint = this.tilePoint,
+            ntp = this.ntp,
             resCanvas = null;
 
 		var itemRasterPromise = new Promise(function(resolve) {
@@ -244,7 +255,7 @@ ScreenVectorTile.prototype = {
 			new Promise(function(resolve1, reject1) {
 				if (isTiles) {
 					var dataOption = geo.dataOption || {},
-						tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint];
+						tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp];
 						// tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint], geo);
 
 					var cnt = tileToLoadPoints.length,
@@ -254,9 +265,6 @@ ScreenVectorTile.prototype = {
 						skipRasterFunc = function() {
 							cnt--;
 							chkReadyRasters();
-						},
-						urlFunction = function(gtp) {
-							return gmx.rasterBGfunc(gtp.x, gtp.y, gtp.z, item);
 						},
 						onLoadFunction = function(gtp, p, img) {
 							item.skipRasters = false;
@@ -341,7 +349,7 @@ ScreenVectorTile.prototype = {
 							}
 						};
 					tileToLoadPoints.map(function(it) {
-						var loader = _this._loadTileRecursive(it, urlFunction);
+						var loader = _this._loadTileRecursive(it, item);
 						loader.then(function(loadResult) {
 							onLoadFunction(loadResult.gtp, it, loadResult.image);
 						}, skipRasterFunc);
@@ -586,7 +594,6 @@ ScreenVectorTile.prototype = {
 L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 
 				var doDraw = function() {
-		// console.log('doDraw', _this.zKey);
 					ctx.clearRect(0, 0, 256, 256);
 					var hookInfo = {
 							zKey: _this.zKey,
@@ -598,9 +605,7 @@ L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 							z: _this.zoom
 						},
 						bgImage;
-						// bgImage = bgImage = document.createElement('canvas');
 
-					// bgImage.width = bgImage.height = 256;
 					var fArr = [];
 					gmx.preRenderHooks.forEach(function (f) {
 						if (!bgImage) {

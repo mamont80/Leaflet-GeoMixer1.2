@@ -1957,7 +1957,7 @@ var gmxAPIutils = {
         if (fromMerc) {
             coords = gmxAPIutils.coordsFromMercator(type, coords, webmercFlag);
         } else {
-            coords = gmxAPIutils.coordsToMercator(type, coords);
+            coords = gmxAPIutils.coordsToMercator(type, coords, webmercFlag);
         }
         return {
             type: geom.type,
@@ -2002,7 +2002,7 @@ var gmxAPIutils = {
             resCoords = [];
         if (type === 'Point') {
             if (toMerc) {
-                p = L.Projection.Mercator.project({lat: coords[1], lng: coords[0]});
+                p = (webmercFlag ? L.CRS.EPSG3857 : L.Projection.Mercator).project({lat: coords[1], lng: coords[0]});
                 resCoords = [p.x, p.y];
             } else {
                 p = L.Projection.Mercator.unproject({y: coords[1], x: coords[0]});
@@ -2031,8 +2031,8 @@ var gmxAPIutils = {
         return gmxAPIutils._coordsConvert(type, coords, false, webmercFlag);
     },
 
-    coordsToMercator: function(type, coords) {
-        return gmxAPIutils._coordsConvert(type, coords, true);
+    coordsToMercator: function(type, coords, webmercFlag) {
+        return gmxAPIutils._coordsConvert(type, coords, true, webmercFlag);
     },
 
     transformGeometry: function(geom, callback) {

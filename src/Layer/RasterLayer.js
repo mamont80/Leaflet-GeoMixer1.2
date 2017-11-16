@@ -38,8 +38,8 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
                 type: 'POLYGON',
                 coordinates: [[[-worldSize, -worldSize], [-worldSize, worldSize], [worldSize, worldSize], [worldSize, -worldSize], [-worldSize, -worldSize]]]
             };
-        } else if (gmx.srs == 3857 && gmx.srs !== vectorProperties.RasterSRS) {
-			ph.geometry = gmxAPIutils.convertGeometry(gmxAPIutils.convertGeometry(ph.geometry, true, true));
+        } else if (gmx.srs == 3857 && gmx.srs != vectorProperties.RasterSRS) {
+			ph.geometry = gmxAPIutils.convertGeometry(gmxAPIutils.convertGeometry(ph.geometry, true, true), false, true);
 		}
 
 		L.gmx.VectorLayer.prototype.initFromDescription.call(this, {geometry: ph.geometry, properties: vectorProperties, rawProperties: ph.properties});

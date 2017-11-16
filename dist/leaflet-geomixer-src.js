@@ -2902,7 +2902,7 @@ var gmxAPIutils = {
         if (fromMerc) {
             coords = gmxAPIutils.coordsFromMercator(type, coords, webmercFlag);
         } else {
-            coords = gmxAPIutils.coordsToMercator(type, coords);
+            coords = gmxAPIutils.coordsToMercator(type, coords, webmercFlag);
         }
         return {
             type: geom.type,
@@ -2947,7 +2947,7 @@ var gmxAPIutils = {
             resCoords = [];
         if (type === 'Point') {
             if (toMerc) {
-                p = L.Projection.Mercator.project({lat: coords[1], lng: coords[0]});
+                p = (webmercFlag ? L.CRS.EPSG3857 : L.Projection.Mercator).project({lat: coords[1], lng: coords[0]});
                 resCoords = [p.x, p.y];
             } else {
                 p = L.Projection.Mercator.unproject({y: coords[1], x: coords[0]});
@@ -2976,8 +2976,8 @@ var gmxAPIutils = {
         return gmxAPIutils._coordsConvert(type, coords, false, webmercFlag);
     },
 
-    coordsToMercator: function(type, coords) {
-        return gmxAPIutils._coordsConvert(type, coords, true);
+    coordsToMercator: function(type, coords, webmercFlag) {
+        return gmxAPIutils._coordsConvert(type, coords, true, webmercFlag);
     },
 
     transformGeometry: function(geom, callback) {
@@ -7281,8 +7281,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         if (gmx.rawProperties.type === 'Vector') {
 			ph.properties.srs = gmx.srs = 3857;
 			gmx.RasterSRS = Number(gmx.rawProperties.RasterSRS) || 3857;
-        } else if (gmx.rawProperties.RasterSRS) {
-			ph.properties.srs = gmx.srs = Number(gmx.rawProperties.RasterSRS);
+        // } else if (gmx.rawProperties.RasterSRS) {
+			// ph.properties.srs = gmx.srs = Number(gmx.rawProperties.RasterSRS);
 		}
 
         ph.properties.needBbox = gmx.needBbox;
@@ -7519,8 +7519,10 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
 		keys.forEach(function(zKey) {
 			var it = this._tiles[zKey];
-			it.observer.deactivate();
-            this.removeObserver(it.observer);
+			if (it.observer) {
+				it.observer.deactivate();
+				this.removeObserver(it.observer);
+			}
             delete this._tiles[zKey];
 		}.bind(this));
         this._gmx._tilesToLoad = 0;
@@ -10934,8 +10936,8 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
                 type: 'POLYGON',
                 coordinates: [[[-worldSize, -worldSize], [-worldSize, worldSize], [worldSize, worldSize], [worldSize, -worldSize], [-worldSize, -worldSize]]]
             };
-        } else if (gmx.srs == 3857 && gmx.srs !== vectorProperties.RasterSRS) {
-			ph.geometry = gmxAPIutils.convertGeometry(gmxAPIutils.convertGeometry(ph.geometry, true, true));
+        } else if (gmx.srs == 3857 && gmx.srs != vectorProperties.RasterSRS) {
+			ph.geometry = gmxAPIutils.convertGeometry(gmxAPIutils.convertGeometry(ph.geometry, true, true), false, true);
 		}
 
 		L.gmx.VectorLayer.prototype.initFromDescription.call(this, {geometry: ph.geometry, properties: vectorProperties, rawProperties: ph.properties});

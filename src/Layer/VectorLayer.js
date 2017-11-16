@@ -1098,6 +1098,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 					if (gmx.crossOrigin) { url += '&cross=' + gmx.crossOrigin; }
 					url += '&LayerName=' + properties[layerLink];
 					if (gmx.sessionKey) { url += '&key=' + encodeURIComponent(gmx.sessionKey); }
+					if (L.gmx._sw && item.v) { url += '&sw=' + L.gmx._sw + '&v=' + item.v; }
                     return url;
                 };
             }

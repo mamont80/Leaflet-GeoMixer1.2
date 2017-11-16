@@ -423,6 +423,7 @@ var DataManager = L.Class.extend({
                             properties: it,
                             item: item,
                             dataOption: dataOption,
+                            v: tile.v,
                             tileKey: tile.vectorTileKey
                         };
 						if (observer.itemHook) {

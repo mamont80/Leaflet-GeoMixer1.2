@@ -25,6 +25,9 @@ var gmxVectorTileLoader = {
                 requestParams.Level = tileInfo.d;
                 requestParams.Span = tileInfo.s;
             }
+            if (L.gmx._sw) {
+                requestParams.sw = L.gmx._sw;
+            }
 
 			var promise = new Promise(function(resolve, reject) {
 				var query = tileSenderPrefix + '&' + Object.keys(requestParams).map(function(name) {

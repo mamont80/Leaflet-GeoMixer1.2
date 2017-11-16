@@ -242,6 +242,8 @@ ScreenVectorTile.prototype = {
             ntp = this.ntp,
             resCanvas = null;
 
+		item.v = geo.v;
+
 		var itemRasterPromise = new Promise(function(resolve) {
 			if (gmx.IsRasterCatalog && (gmx.rawProperties.type === 'Raster' || gmxAPIutils.getPropItem('GMX_RasterCatalogID', properties, indexes))) {
 				isTiles = true;                     // Raster Layer

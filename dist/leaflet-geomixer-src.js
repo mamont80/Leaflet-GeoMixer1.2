@@ -11004,6 +11004,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
 L.LabelsLayer = (L.Layer || L.Class).extend({
 
     options: {
+		labels: 'default',
         pane: 'overlayPane'
     },
 
@@ -11220,6 +11221,11 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
         if (!this._canvas) {
             this._initCanvas();
         }
+		var arr = window.location.search.match('labels=([^&]+)');
+		if (arr) {
+			this.options.labels = arr[1];
+		}
+
         // this._addToPane();
 
         map.on('moveend', this._reset, this);
@@ -11310,6 +11316,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
             _map = this._map,
             mapSize = _map.getSize(),
             _canvas = this._canvas,
+            chkIntersects = this.options.labels,
             offset = _map.latLngToContainerPoint(_map.getBounds().getNorthWest()),
             topLeft = _map.containerPointToLayerPoint(offset);
 
@@ -11322,7 +11329,6 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
 			arr = Object.keys(this._labels).sort(function(a ,b) { return this._labelsIndex[b] - this._labelsIndex[a]; }.bind(this)),
             i, len, it;
 
-        // for (var layerId in this._labels) {
         arr.forEach(function(layerId) {
             var labels = this._labels[layerId];
             for (var id in labels) {
@@ -11360,16 +11366,18 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
                 for (var tx = pos[0] + start; tx < mapSize.x; tx += w2) {
                     var coord = [Math.floor(tx), Math.floor(pos[1])],
                         bbox = gmxAPIutils.bounds([
-                            [coord[0] - width2, coord[1] - size2],
-                            [coord[0] + width2, coord[1] + size2]
+                            [coord[0], coord[1] - size2],
+                            [coord[0] + width, coord[1] + size2]
                         ]);
-                    for (i = 0, len = out.length; i < len; i++) {
-                        if (bbox.intersects(out[i].bbox)) {
-                            isFiltered = true;
-                            break;
-                        }
-                    }
-                    if (isFiltered) { continue; }
+					if (chkIntersects !== 'All') {
+						for (i = 0, len = out.length; i < len; i++) {
+							if (bbox.intersects(out[i].bbox)) {
+								isFiltered = true;
+								break;
+							}
+						}
+						if (isFiltered) { continue; }
+					}
 
                     if (!options.labelStyle) {
                         options.labelStyle = {
@@ -11395,7 +11403,6 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
                     });
                 }
             }
-        //}
 		}.bind(this));
 
         if (out.length) {
@@ -11403,7 +11410,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
             for (i = 0, len = out.length; i < len; i++) {
                 it = out[i];
 				it.arrTxtWidth.forEach(function(pt, nm) {
-					var coord = [it.coord[0] + it.width2 - pt[1]/2, it.coord[1] + (nm + 1) * it.size];
+					var coord = [it.coord[0], it.coord[1] + (nm + 1) * it.size];
 					gmxAPIutils.setLabel(ctx, pt[0], coord, it.style);
 				});
             }
@@ -11436,7 +11443,7 @@ L.labelsLayer = function (map, options) {
 L.Map.addInitHook(function () {
 	// Check to see if Labels has already been initialized.
     if (!this._labelsLayer) {
-        this._labelsLayer = new L.LabelsLayer(this);
+        this._labelsLayer = new L.LabelsLayer(this, this.options);
         this._labelsLayer.addTo(this);
     }
 });

@@ -318,8 +318,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         if (gmx.rawProperties.type === 'Vector') {
 			ph.properties.srs = gmx.srs = 3857;
 			gmx.RasterSRS = Number(gmx.rawProperties.RasterSRS) || 3857;
-        } else if (gmx.rawProperties.RasterSRS) {
-			ph.properties.srs = gmx.srs = Number(gmx.rawProperties.RasterSRS);
+        // } else if (gmx.rawProperties.RasterSRS) {
+			// ph.properties.srs = gmx.srs = Number(gmx.rawProperties.RasterSRS);
 		}
 
         ph.properties.needBbox = gmx.needBbox;
@@ -556,8 +556,10 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
 		keys.forEach(function(zKey) {
 			var it = this._tiles[zKey];
-			it.observer.deactivate();
-            this.removeObserver(it.observer);
+			if (it.observer) {
+				it.observer.deactivate();
+				this.removeObserver(it.observer);
+			}
             delete this._tiles[zKey];
 		}.bind(this));
         this._gmx._tilesToLoad = 0;

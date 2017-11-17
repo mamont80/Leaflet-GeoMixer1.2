@@ -522,7 +522,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             var observer = null,
 				dataManager = gmx.dataManager;
             for (var key in this._tiles) {
-                observer = dataManager.getObserver(key);
+				observer = this._tiles[key].observer;
                 observer.setDateInterval(beginDate, endDate);
             }
             observer = dataManager.getObserver('_Labels');

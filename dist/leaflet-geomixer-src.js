@@ -4739,7 +4739,7 @@ var GmxEventsManager = L.Handler.extend({
                 map = _this._map;
                 // skipNode = false;
             if (ev.originalEvent) {
-                map.gmxMouseDown = L.Browser.webkit ? ev.originalEvent.which : ev.originalEvent.buttons;
+                map.gmxMouseDown = L.Browser.webkit && !L.gmxUtil.isIEOrEdge ? ev.originalEvent.which : ev.originalEvent.buttons;
                 // var target = ev.originalEvent.target;
                 // skipNode = skipNodeName[target.nodeName] && !L.DomUtil.hasClass(target, 'leaflet-tile') && !L.DomUtil.hasClass(target, 'leaflet-popup-tip-container');
             }

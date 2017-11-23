@@ -225,14 +225,14 @@ StyleManager.prototype = {
     _getImageSize: function(pt) {     // check image size
         var url = pt.iconUrl || pt.fillIconUrl || '',
             opt = {crossOrigin: 'anonymous'},
-			isIE11 = L.gmxUtil.isIE11 && /\.svg$/.test(url),
+			isIE11 = L.gmxUtil.isIE11 && /\.svg/.test(url),
             _this = this;
 
         if (self.location.protocol !== 'file:') {
             url = url.replace(/http(s*):/, '');	// remove protocol from icon URL
         }
         if (isIE11) {
-			url += '?crossOrigin=' + opt.crossOrigin;
+			url += (url.indexOf('?') === -1 ? '?' : '&') + 'crossOrigin=' + opt.crossOrigin;
         }
         opt.layerID = this.gmx.layerID;
         ++this._needLoadIcons;

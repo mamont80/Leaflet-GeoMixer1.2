@@ -55,7 +55,7 @@ var GmxImageLoader = L.Class.extend({
                 if (!cacheItem) { cacheItem = this.requestsCache[url] = {image: image, requests:{}}; }
                 if (!cacheItem.requests[cacheKey]) { cacheItem.requests[cacheKey] = request; }
             }
-			if (L.gmxUtil.isIE11 && /\.svg[\?$]/.test(request.url)) {   // skip bug in IE11
+			if (L.gmxUtil.isIE11 && /\.svg/.test(request.url)) {   // skip bug in IE11
 				this._checkIE11bugFix(request, image);
 			} else {
 				request.resolve(image);

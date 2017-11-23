@@ -780,7 +780,7 @@ var GmxImageLoader = L.Class.extend({
                 if (!cacheItem) { cacheItem = this.requestsCache[url] = {image: image, requests:{}}; }
                 if (!cacheItem.requests[cacheKey]) { cacheItem.requests[cacheKey] = request; }
             }
-			if (L.gmxUtil.isIE11 && /\.svg[\?$]/.test(request.url)) {   // skip bug in IE11
+			if (L.gmxUtil.isIE11 && /\.svg/.test(request.url)) {   // skip bug in IE11
 				this._checkIE11bugFix(request, image);
 			} else {
 				request.resolve(image);
@@ -9270,14 +9270,14 @@ StyleManager.prototype = {
     _getImageSize: function(pt) {     // check image size
         var url = pt.iconUrl || pt.fillIconUrl || '',
             opt = {crossOrigin: 'anonymous'},
-			isIE11 = L.gmxUtil.isIE11 && /\.svg$/.test(url),
+			isIE11 = L.gmxUtil.isIE11 && /\.svg/.test(url),
             _this = this;
 
         if (self.location.protocol !== 'file:') {
             url = url.replace(/http(s*):/, '');	// remove protocol from icon URL
         }
         if (isIE11) {
-			url += '?crossOrigin=' + opt.crossOrigin;
+			url += (url.indexOf('?') === -1 ? '?' : '&') + 'crossOrigin=' + opt.crossOrigin;
         }
         opt.layerID = this.gmx.layerID;
         ++this._needLoadIcons;

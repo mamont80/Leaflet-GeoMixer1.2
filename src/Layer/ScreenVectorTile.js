@@ -257,8 +257,8 @@ ScreenVectorTile.prototype = {
 			new Promise(function(resolve1, reject1) {
 				if (isTiles) {
 					var dataOption = geo.dataOption || {},
-						tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp];
-						// tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint], geo);
+						// tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp];
+						tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp], geo);
 
 					var cnt = tileToLoadPoints.length,
 						chkReadyRasters = function() {
@@ -350,13 +350,18 @@ ScreenVectorTile.prototype = {
 								}
 							}
 						};
-					tileToLoadPoints.map(function(it) {
-						var loader = _this._loadTileRecursive(it, item);
-						loader.then(function(loadResult) {
-							onLoadFunction(loadResult.gtp, it, loadResult.image);
-						}, skipRasterFunc);
-						return loader;
-					});
+					if (cnt) {
+						tileToLoadPoints.map(function(it) {
+							var loader = _this._loadTileRecursive(it, item);
+							loader.then(function(loadResult) {
+								onLoadFunction(loadResult.gtp, it, loadResult.image);
+							}, skipRasterFunc);
+							return loader;
+						});
+					} else {
+						item.skipRasters = true;
+						skipRasterFunc();
+					}
 				} else {
 					url += (url.indexOf('?') === -1 ? '?' : '&') + gmx.sessionKey;  //  for browser cache from another tabs
 					var request = this.rasterRequests[url];
@@ -597,6 +602,10 @@ L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 
 				var doDraw = function() {
 					ctx.clearRect(0, 0, 256, 256);
+					if (gmx.showScreenTiles) {
+						ctx.strokeRect(0, 0, 255, 255);
+						ctx.strokeText(_this.zKey, 50, 50);
+					}
 					var hookInfo = {
 							zKey: _this.zKey,
 							topLeft: _this.topLeft,

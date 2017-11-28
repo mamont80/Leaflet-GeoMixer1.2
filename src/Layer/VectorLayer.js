@@ -9,6 +9,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         useWebGL: false,
 		skipTiles: 'All', // All, NotVisible, None
         iconsUrlReplace: [],
+        showScreenTiles: false,
         clickable: true
     },
 
@@ -35,6 +36,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             mapName: options.mapID,
 			sessionKey: this.options.sessionKey,
 			iconsUrlReplace: this.options.iconsUrlReplace,
+			showScreenTiles: this.options.showScreenTiles,
             skipTiles: options.skipTiles,
             needBbox: options.skipTiles === 'All',
             useWebGL: options.useWebGL,
@@ -69,7 +71,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             if (tile && tile.parentNode) {
                 tile.parentNode.removeChild(tile);
             }
-
             delete this._tiles[zKey];
         }
     },
@@ -85,7 +86,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         gmx.shiftY = 0;
         gmx.applyShift = map.options.crs === L.CRS.EPSG3857 && gmx.srs != 3857;
         gmx.currentZoom = map.getZoom();
-// console.log('onAdd', gmx.applyShift, gmx.srs);
 
         gmx.styleManager.initStyles();
 
@@ -170,7 +170,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     _addTile: function (coords) {
         var zoom = this._tileZoom || this._map._zoom,
             gmx = this._gmx;
-// console.log('_addTile', zoom, this._tileZoom, this._map._zoom, coords);
 
         if (!gmx.layerType || !gmx.styleManager.isVisibleAtZoom(zoom)) {
             this._tileLoaded();
@@ -253,7 +252,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         if (this._gmx._tilesToLoad === 0) {
             this.fire('load');
             this.fire('doneDraw');
-
             if (this._animated) {
                 // clear scaled tiles after all new tiles are loaded (for performance)
                 // this._setClearBgBuffer(0);
@@ -267,6 +265,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     _tileOnError: function () {
+		//console.log('_tileOnError ', arguments);
     },
 
     tileDrawn: function (tile) {
@@ -653,14 +652,16 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     appendTileToContainer: function (tileLink) {
-        var tilePos = this._getTilePos(tileLink.coords),
-			tile = tileLink.el,
-			cont = this._level ? this._level.el : this._tileContainer;
+		if (this._tileZoom === tileLink.coords.z) {
+			var tilePos = this._getTilePos(tileLink.coords),
+				tile = tileLink.el,
+				cont = this._level ? this._level.el : this._tileContainer;
 
-		cont.appendChild(tile);
-        L.DomUtil.setPosition(tile, tilePos, L.Browser.chrome || L.Browser.android23);
-		// tile.style.left = tilePos.x + 'px';
-		// tile.style.top = tilePos.y + 'px';
+			cont.appendChild(tile);
+			L.DomUtil.setPosition(tile, tilePos, L.Browser.chrome || L.Browser.android23);
+			// tile.style.left = tilePos.x + 'px';
+			// tile.style.top = tilePos.y + 'px';
+		}
     },
 
     addData: function(data, options) {
@@ -884,8 +885,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     __update: function () {
         var map = this._map;
         if (!map) { return; }
-        var zoom = this._tileZoom || map.getZoom(),
-            center = map.getCenter();
+        var zoom = this._tileZoom || map.getZoom();
 
         // if (this._gmx.applyShift) {
             this._updateShiftY();
@@ -896,7 +896,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             this.options.openPopups = [];
         }
 
-        var pixelBounds = this._getTiledPixelBounds(center),
+        var center = map.getCenter(),
+			pixelBounds = this._getTiledPixelBounds(center),
             tileRange = this._pxBoundsToTileRange(pixelBounds),
 		    margin = this.options.keepBuffer || 2,
 		    noPruneRange = new L.Bounds(tileRange.getBottomLeft().subtract([margin, -margin]),
@@ -920,7 +921,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 			L.DomUtil.setPosition(tileLink.el, this._getTilePos(c), L.Browser.chrome || L.Browser.android23);
 		}
 
-        if (zoom > this.options.maxZoom || zoom < this.options.minZoom) {
+        if (zoom === 0 || zoom > this.options.maxZoom || zoom < this.options.minZoom) {
             // this._setClearBgBuffer(500);
             return;
         }
@@ -932,10 +933,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
                 coords.z = this._tileZoom;
                 var zKey = this._tileCoordsToKey(coords);
 
-//console.log('_addTile', zKey, this._tiles[zKey]);
                 if (!this._tiles[zKey]) {
                     this._addTile(coords);
-                    // this._addTile(zKey, coords);
                 }
             }
         }
@@ -1187,7 +1186,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         if (this._gmx.applyShift) {
 			tilePos.y -= this._gmx.deltaY;
 		}
-// console.log('_getTilePos', coords, this._shiftY, this._level.origin);
 		return tilePos;
 	},
     _updateShiftY: function() {

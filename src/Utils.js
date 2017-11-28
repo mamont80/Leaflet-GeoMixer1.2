@@ -202,7 +202,7 @@ var gmxAPIutils = {
                     xhr.setRequestHeader(key, ph.headers[key]);
                 }
             }
-            var reqId = L.gmxUtil.loaderStatus();
+            var reqId = L.gmxUtil.loaderStatus(ph.url);
             if (ph.async) {
                 if (ph.withCredentials) {
                     xhr.withCredentials = true;
@@ -2686,45 +2686,105 @@ gmxAPIutils.Bounds.prototype = {
         }
         return null;
     },
-    clipPolygon: function (coords) { // (coords) -> clip coords
-        var min = this.min,
-            max = this.max,
-            clip = [[min.x, min.y], [max.x, min.y], [max.x, max.y], [min.x, max.y]],
-            cp1, cp2, s, e,
-            inside = function (p) {
-                return (cp2[0] - cp1[0]) * (p[1] - cp1[1]) > (cp2[1] - cp1[1]) * (p[0] - cp1[0]);
-            },
-            intersection = function () {
-                var dc = [cp1[0] - cp2[0], cp1[1] - cp2[1]],
-                    dp = [s[0] - e[0], s[1] - e[1]],
-                    n1 = cp1[0] * cp2[1] - cp1[1] * cp2[0],
-                    n2 = s[0] * e[1] - s[1] * e[0],
-                    n3 = 1.0 / (dc[0] * dp[1] - dc[1] * dp[0]);
-                return [(n1 * dp[0] - n2 * dc[0]) * n3, (n1 * dp[1] - n2 * dc[1]) * n3];
-            };
 
-        var outputList = coords;
-        cp1 = clip[3];
-        for (var j = 0; j < 4; j++) {
-            cp2 = clip[j];
-            var inputList = outputList,
-                len = inputList.length;
-            outputList = [];
-            s = inputList[len - 1]; //last on the input list
-            for (var i = 0; i < len; i++) {
-                e = inputList[i];
-                if (inside(e)) {
-                    if (!inside(s)) { outputList.push(intersection()); }
-                    outputList.push(e);
-                } else if (inside(s)) {
-                    outputList.push(intersection());
-                }
-                s = e;
-            }
-            cp1 = cp2;
-        }
-        return outputList;
-    },
+	clipPolygon: function (points, round) {
+		if (points.length) {
+			var clippedPoints,
+				edges = [1, 4, 2, 8],
+				i, j, k,
+				a, b,
+				len, edge, p;
+
+			if (L.LineUtil.isFlat(points)) {
+				var coords = points;
+				points = coords.map(function(it) {
+					return new L.Point(it[0], it[1], round);
+				});
+			}
+			for (i = 0, len = points.length; i < len; i++) {
+				points[i]._code = this._getBitCode(points[i]);
+			}
+
+			// for each edge (left, bottom, right, top)
+			for (k = 0; k < 4; k++) {
+				edge = edges[k];
+				clippedPoints = [];
+
+				for (i = 0, len = points.length, j = len - 1; i < len; j = i++) {
+					a = points[i];
+					b = points[j];
+
+					// if a is inside the clip window
+					if (!(a._code & edge)) {
+						// if b is outside the clip window (a->b goes out of screen)
+						if (b._code & edge) {
+							p = this._getEdgeIntersection(b, a, edge, round);
+							p._code = this._getBitCode(p);
+							clippedPoints.push(p);
+						}
+						clippedPoints.push(a);
+
+					// else if b is inside the clip window (a->b enters the screen)
+					} else if (!(b._code & edge)) {
+						p = this._getEdgeIntersection(b, a, edge, round);
+						p._code = this._getBitCode(p);
+						clippedPoints.push(p);
+					}
+				}
+				points = clippedPoints;
+			}
+		}
+
+		return points.map(function(it) {
+			return [it.x, it.y];
+		});
+	},
+
+	_getBitCode: function (p) {
+		var code = 0;
+
+		if (p.x < this.min.x) { // left
+			code |= 1;
+		} else if (p.x > this.max.x) { // right
+			code |= 2;
+		}
+
+		if (p.y < this.min.y) { // bottom
+			code |= 4;
+		} else if (p.y > this.max.y) { // top
+			code |= 8;
+		}
+
+		return code;
+	},
+
+	_getEdgeIntersection: function (a, b, code, round) {
+		var dx = b.x - a.x,
+			dy = b.y - a.y,
+			min = this.min,
+			max = this.max,
+			x, y;
+
+		if (code & 8) { // top
+			x = a.x + dx * (max.y - a.y) / dy;
+			y = max.y;
+
+		} else if (code & 4) { // bottom
+			x = a.x + dx * (min.y - a.y) / dy;
+			y = min.y;
+
+		} else if (code & 2) { // right
+			x = max.x;
+			y = a.y + dy * (max.x - a.x) / dx;
+
+		} else if (code & 1) { // left
+			x = min.x;
+			y = a.y + dy * (min.x - a.x) / dx;
+		}
+
+		return new L.Point(x, y, round);
+	},
+
     clipPolyLine: function (coords, angleFlag, delta) { // (coords) -> clip coords
         delta = delta || 0;
         var min = this.min,

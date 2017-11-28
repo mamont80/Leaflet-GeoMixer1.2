@@ -1147,7 +1147,7 @@ var gmxAPIutils = {
                     xhr.setRequestHeader(key, ph.headers[key]);
                 }
             }
-            var reqId = L.gmxUtil.loaderStatus();
+            var reqId = L.gmxUtil.loaderStatus(ph.url);
             if (ph.async) {
                 if (ph.withCredentials) {
                     xhr.withCredentials = true;
@@ -3631,45 +3631,105 @@ gmxAPIutils.Bounds.prototype = {
         }
         return null;
     },
-    clipPolygon: function (coords) { // (coords) -> clip coords
-        var min = this.min,
-            max = this.max,
-            clip = [[min.x, min.y], [max.x, min.y], [max.x, max.y], [min.x, max.y]],
-            cp1, cp2, s, e,
-            inside = function (p) {
-                return (cp2[0] - cp1[0]) * (p[1] - cp1[1]) > (cp2[1] - cp1[1]) * (p[0] - cp1[0]);
-            },
-            intersection = function () {
-                var dc = [cp1[0] - cp2[0], cp1[1] - cp2[1]],
-                    dp = [s[0] - e[0], s[1] - e[1]],
-                    n1 = cp1[0] * cp2[1] - cp1[1] * cp2[0],
-                    n2 = s[0] * e[1] - s[1] * e[0],
-                    n3 = 1.0 / (dc[0] * dp[1] - dc[1] * dp[0]);
-                return [(n1 * dp[0] - n2 * dc[0]) * n3, (n1 * dp[1] - n2 * dc[1]) * n3];
-            };
 
-        var outputList = coords;
-        cp1 = clip[3];
-        for (var j = 0; j < 4; j++) {
-            cp2 = clip[j];
-            var inputList = outputList,
-                len = inputList.length;
-            outputList = [];
-            s = inputList[len - 1]; //last on the input list
-            for (var i = 0; i < len; i++) {
-                e = inputList[i];
-                if (inside(e)) {
-                    if (!inside(s)) { outputList.push(intersection()); }
-                    outputList.push(e);
-                } else if (inside(s)) {
-                    outputList.push(intersection());
-                }
-                s = e;
-            }
-            cp1 = cp2;
-        }
-        return outputList;
-    },
+	clipPolygon: function (points, round) {
+		if (points.length) {
+			var clippedPoints,
+				edges = [1, 4, 2, 8],
+				i, j, k,
+				a, b,
+				len, edge, p;
+
+			if (L.LineUtil.isFlat(points)) {
+				var coords = points;
+				points = coords.map(function(it) {
+					return new L.Point(it[0], it[1], round);
+				});
+			}
+			for (i = 0, len = points.length; i < len; i++) {
+				points[i]._code = this._getBitCode(points[i]);
+			}
+
+			// for each edge (left, bottom, right, top)
+			for (k = 0; k < 4; k++) {
+				edge = edges[k];
+				clippedPoints = [];
+
+				for (i = 0, len = points.length, j = len - 1; i < len; j = i++) {
+					a = points[i];
+					b = points[j];
+
+					// if a is inside the clip window
+					if (!(a._code & edge)) {
+						// if b is outside the clip window (a->b goes out of screen)
+						if (b._code & edge) {
+							p = this._getEdgeIntersection(b, a, edge, round);
+							p._code = this._getBitCode(p);
+							clippedPoints.push(p);
+						}
+						clippedPoints.push(a);
+
+					// else if b is inside the clip window (a->b enters the screen)
+					} else if (!(b._code & edge)) {
+						p = this._getEdgeIntersection(b, a, edge, round);
+						p._code = this._getBitCode(p);
+						clippedPoints.push(p);
+					}
+				}
+				points = clippedPoints;
+			}
+		}
+
+		return points.map(function(it) {
+			return [it.x, it.y];
+		});
+	},
+
+	_getBitCode: function (p) {
+		var code = 0;
+
+		if (p.x < this.min.x) { // left
+			code |= 1;
+		} else if (p.x > this.max.x) { // right
+			code |= 2;
+		}
+
+		if (p.y < this.min.y) { // bottom
+			code |= 4;
+		} else if (p.y > this.max.y) { // top
+			code |= 8;
+		}
+
+		return code;
+	},
+
+	_getEdgeIntersection: function (a, b, code, round) {
+		var dx = b.x - a.x,
+			dy = b.y - a.y,
+			min = this.min,
+			max = this.max,
+			x, y;
+
+		if (code & 8) { // top
+			x = a.x + dx * (max.y - a.y) / dy;
+			y = max.y;
+
+		} else if (code & 4) { // bottom
+			x = a.x + dx * (min.y - a.y) / dy;
+			y = min.y;
+
+		} else if (code & 2) { // right
+			x = max.x;
+			y = a.y + dy * (max.x - a.x) / dx;
+
+		} else if (code & 1) { // left
+			x = min.x;
+			y = a.y + dy * (min.x - a.x) / dx;
+		}
+
+		return new L.Point(x, y, round);
+	},
+
     clipPolyLine: function (coords, angleFlag, delta) { // (coords) -> clip coords
         delta = delta || 0;
         var min = this.min,
@@ -6972,6 +7032,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         useWebGL: false,
 		skipTiles: 'All', // All, NotVisible, None
         iconsUrlReplace: [],
+        showScreenTiles: false,
         clickable: true
     },
 
@@ -6998,6 +7059,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             mapName: options.mapID,
 			sessionKey: this.options.sessionKey,
 			iconsUrlReplace: this.options.iconsUrlReplace,
+			showScreenTiles: this.options.showScreenTiles,
             skipTiles: options.skipTiles,
             needBbox: options.skipTiles === 'All',
             useWebGL: options.useWebGL,
@@ -7032,7 +7094,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             if (tile && tile.parentNode) {
                 tile.parentNode.removeChild(tile);
             }
-
             delete this._tiles[zKey];
         }
     },
@@ -7048,7 +7109,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         gmx.shiftY = 0;
         gmx.applyShift = map.options.crs === L.CRS.EPSG3857 && gmx.srs != 3857;
         gmx.currentZoom = map.getZoom();
-// console.log('onAdd', gmx.applyShift, gmx.srs);
 
         gmx.styleManager.initStyles();
 
@@ -7133,7 +7193,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     _addTile: function (coords) {
         var zoom = this._tileZoom || this._map._zoom,
             gmx = this._gmx;
-// console.log('_addTile', zoom, this._tileZoom, this._map._zoom, coords);
 
         if (!gmx.layerType || !gmx.styleManager.isVisibleAtZoom(zoom)) {
             this._tileLoaded();
@@ -7216,7 +7275,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         if (this._gmx._tilesToLoad === 0) {
             this.fire('load');
             this.fire('doneDraw');
-
             if (this._animated) {
                 // clear scaled tiles after all new tiles are loaded (for performance)
                 // this._setClearBgBuffer(0);
@@ -7230,6 +7288,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     _tileOnError: function () {
+		//console.log('_tileOnError ', arguments);
     },
 
     tileDrawn: function (tile) {
@@ -7616,14 +7675,16 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     appendTileToContainer: function (tileLink) {
-        var tilePos = this._getTilePos(tileLink.coords),
-			tile = tileLink.el,
-			cont = this._level ? this._level.el : this._tileContainer;
+		if (this._tileZoom === tileLink.coords.z) {
+			var tilePos = this._getTilePos(tileLink.coords),
+				tile = tileLink.el,
+				cont = this._level ? this._level.el : this._tileContainer;
 
-		cont.appendChild(tile);
-        L.DomUtil.setPosition(tile, tilePos, L.Browser.chrome || L.Browser.android23);
-		// tile.style.left = tilePos.x + 'px';
-		// tile.style.top = tilePos.y + 'px';
+			cont.appendChild(tile);
+			L.DomUtil.setPosition(tile, tilePos, L.Browser.chrome || L.Browser.android23);
+			// tile.style.left = tilePos.x + 'px';
+			// tile.style.top = tilePos.y + 'px';
+		}
     },
 
     addData: function(data, options) {
@@ -7847,8 +7908,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     __update: function () {
         var map = this._map;
         if (!map) { return; }
-        var zoom = this._tileZoom || map.getZoom(),
-            center = map.getCenter();
+        var zoom = this._tileZoom || map.getZoom();
 
         // if (this._gmx.applyShift) {
             this._updateShiftY();
@@ -7859,7 +7919,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             this.options.openPopups = [];
         }
 
-        var pixelBounds = this._getTiledPixelBounds(center),
+        var center = map.getCenter(),
+			pixelBounds = this._getTiledPixelBounds(center),
             tileRange = this._pxBoundsToTileRange(pixelBounds),
 		    margin = this.options.keepBuffer || 2,
 		    noPruneRange = new L.Bounds(tileRange.getBottomLeft().subtract([margin, -margin]),
@@ -7883,7 +7944,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 			L.DomUtil.setPosition(tileLink.el, this._getTilePos(c), L.Browser.chrome || L.Browser.android23);
 		}
 
-        if (zoom > this.options.maxZoom || zoom < this.options.minZoom) {
+        if (zoom === 0 || zoom > this.options.maxZoom || zoom < this.options.minZoom) {
             // this._setClearBgBuffer(500);
             return;
         }
@@ -7895,10 +7956,8 @@ L.gmx.VectorLayer = L.TileLayer.extend({
                 coords.z = this._tileZoom;
                 var zKey = this._tileCoordsToKey(coords);
 
-//console.log('_addTile', zKey, this._tiles[zKey]);
                 if (!this._tiles[zKey]) {
                     this._addTile(coords);
-                    // this._addTile(zKey, coords);
                 }
             }
         }
@@ -8150,7 +8209,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         if (this._gmx.applyShift) {
 			tilePos.y -= this._gmx.deltaY;
 		}
-// console.log('_getTilePos', coords, this._shiftY, this._level.origin);
 		return tilePos;
 	},
     _updateShiftY: function() {
@@ -8441,8 +8499,8 @@ ScreenVectorTile.prototype = {
 			new Promise(function(resolve1, reject1) {
 				if (isTiles) {
 					var dataOption = geo.dataOption || {},
-						tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp];
-						// tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [tilePoint], geo);
+						// tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp];
+						tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp], geo);
 
 					var cnt = tileToLoadPoints.length,
 						chkReadyRasters = function() {
@@ -8534,13 +8592,18 @@ ScreenVectorTile.prototype = {
 								}
 							}
 						};
-					tileToLoadPoints.map(function(it) {
-						var loader = _this._loadTileRecursive(it, item);
-						loader.then(function(loadResult) {
-							onLoadFunction(loadResult.gtp, it, loadResult.image);
-						}, skipRasterFunc);
-						return loader;
-					});
+					if (cnt) {
+						tileToLoadPoints.map(function(it) {
+							var loader = _this._loadTileRecursive(it, item);
+							loader.then(function(loadResult) {
+								onLoadFunction(loadResult.gtp, it, loadResult.image);
+							}, skipRasterFunc);
+							return loader;
+						});
+					} else {
+						item.skipRasters = true;
+						skipRasterFunc();
+					}
 				} else {
 					url += (url.indexOf('?') === -1 ? '?' : '&') + gmx.sessionKey;  //  for browser cache from another tabs
 					var request = this.rasterRequests[url];
@@ -8781,6 +8844,10 @@ L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 
 				var doDraw = function() {
 					ctx.clearRect(0, 0, 256, 256);
+					if (gmx.showScreenTiles) {
+						ctx.strokeRect(0, 0, 255, 255);
+						ctx.strokeText(_this.zKey, 50, 50);
+					}
 					var hookInfo = {
 							zKey: _this.zKey,
 							topLeft: _this.topLeft,

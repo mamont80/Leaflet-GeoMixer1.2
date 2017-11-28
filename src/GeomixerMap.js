@@ -14,6 +14,9 @@ var gmxMap = L.Class.extend({
 		this.properties = L.extend({}, mapInfo.properties);
 		this.properties.BaseLayers = this.properties.BaseLayers ? JSON.parse(this.properties.BaseLayers) : [];
 		this.rawTree = mapInfo;
+		var _skipTiles = commonLayerOptions.skipTiles || 'All',
+			_ftc = commonLayerOptions.ftc || 'osm',
+			_srs = commonLayerOptions.srs || 3857;
 
 		// var hostName = this.properties.hostName,
 		var mapID = this.properties.name;
@@ -96,6 +99,9 @@ var gmxMap = L.Class.extend({
 				loaders.push(L.gmxUtil.requestJSONP(prefix + '/Layer/GetLayerJson.ashx',
 					{
 						WrapStyle: 'func',
+						skipTiles: _skipTiles,
+						srs: _srs,
+						ftc: _ftc,
 						Layers: JSON.stringify(arr)
 					},
 					{
@@ -104,14 +110,21 @@ var gmxMap = L.Class.extend({
 				).then(function(json, opt) {
 					if (json && json.Status === 'ok' && json.Result) {
 						json.Result.forEach(function(it) {
-							var dataManager = _this.addDataManager(it),
-								props = it.properties,
+							var props = it.properties,
 								pId = props.name;
+
+							props.tiles = [];
+							props.srs = _srs;
+							props.ftc = _ftc;
+							var dataManager = _this.addDataManager(it);
 							if (opt && opt.ids && opt.ids[pId]) {
 								opt.ids[pId].forEach(function(id) {
 									var pt = dataSources[id];
 									pt.options.parentOptions = it.properties;
 									pt.options.dataManager = dataManager;
+									pt.info.properties.tiles = [];	// Шумилов должен убрать
+									pt.info.properties.srs = _srs;
+									pt.info.properties.ftc = _ftc;
 									_this.addLayer(L.gmx.createLayer(pt.info, pt.options));
 								});
 							}

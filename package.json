@@ -4,15 +4,19 @@
 	"description": "GeoMixer layers visualization as plugin for Leaflet",
 	"dependencies": {
 		"leaflet": "^1.2",
-		"uglify-js": "~2.3.6",
+		"uglify-js": "~>2.6.0",
 		"jake": "~0.5.16",
-		"eslint": "^2.7.0"
+		"eslint": "^4.13.1"
 	},
 	"repository": {
 		"type": "git",
 		"url": "git://github.com/ScanEx/Leaflet-GeoMixer.git"
 	},
-	"keywords": ["gis", "leaflet", "geomixer"],
+	"keywords": [
+		"gis",
+		"leaflet",
+		"geomixer"
+	],
 	"scripts": {
 		"build": "jake",
 		"postinstall": "jake"

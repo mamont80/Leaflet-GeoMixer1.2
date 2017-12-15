@@ -5,13 +5,13 @@ L.gmx.gmxImageTransform = function(img, hash) {
         geoItem = hash.geoItem,
         properties = geoItem.properties,
         dataOption = geoItem.dataOption || {},
-        geom = properties[properties.length - 1],
-        coord = geom.coordinates[0],
+        // geom = properties[properties.length - 1],
+        // coord = geom.coordinates[0],
         indexes = gmx.tileAttributeIndexes,
         quicklookPlatform = properties[indexes[gmx.quicklookPlatform]] || gmx.quicklookPlatform || '',
         points = {};
 
-    if (geom.type === 'MULTIPOLYGON') { coord = coord[0]; }
+    // if (geom.type === 'MULTIPOLYGON') { coord = coord[0]; }
     if (quicklookPlatform === 'LANDSAT8') {
         points.x1 = dataOption.bounds.min.x; points.y1 = dataOption.bounds.max.y;
         points.x2 = dataOption.bounds.max.x; points.y2 = dataOption.bounds.max.y;

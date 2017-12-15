@@ -1356,7 +1356,9 @@ var gmxAPIutils = {
             text = text.replace(/,/g, '.');
         }
         var results = [];
+/*eslint-disable no-useless-escape */
         regex = /(-?\d+(\.\d+)?)([^\d\-]*)/g;
+/*eslint-enable */
         t = regex.exec(text);
         while (t) {
             results.push(t[1]);
@@ -2460,7 +2462,9 @@ var gmxAPIutils = {
                             zn = st[key1];
                         if (typeof (zn) === 'string') {
                             if (gmxAPIutils.styleFuncKeys[newKey]) {
+/*eslint-disable no-useless-escape */
                                 if (zn.match(/[^\d\.]/) === null) {
+/*eslint-enable */
                                     zn = Number(zn);
                                 } else {
                                     var func = L.gmx.Parsers.parseExpression(zn);
@@ -2912,10 +2916,12 @@ gmxAPIutils.parseUri.options = {
         name:   'queryKey',
         parser: /(?:^|&)([^&=]*)=?([^&]*)/g
     },
+/*eslint-disable no-useless-escape */
     parser: {
         strict: /^(?:([^:\/?#]+):)?(?:\/\/((?:(([^:@]*):?([^:@]*))?@)?([^:\/?#]*)(?::(\d*))?))?((((?:[^?#\/]*\/)*)([^?#]*))(?:\?([^#]*))?(?:#(.*))?)/,
         loose:  /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*):?([^:@]*))?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/
     }
+/*eslint-enable */
 };
 
 if (!L.gmxUtil) { L.gmxUtil = {}; }

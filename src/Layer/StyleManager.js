@@ -159,8 +159,10 @@ StyleManager.prototype = {
             if ('Filter' in st) {
                 style.Filter = st.Filter;
                 var type = typeof (st.Filter);
+/*eslint-disable no-useless-escape */
                 style.filterFunction = type === 'string' ? L.gmx.Parsers.parseSQL(style.Filter.replace(/[\[\]]/g, '"'))
                     : type === 'function' ? style.Filter : null;
+/*eslint-enable */
 
                 this._changeStylesVersion();
             }
@@ -515,7 +517,9 @@ StyleManager.prototype = {
         }
 
         if ('Filter' in style) {
+/*eslint-disable no-useless-escape */
             var ph = L.gmx.Parsers.parseSQL(style.Filter.replace(/[\[\]]/g, '"'));
+/*eslint-enable */
             if (ph) { pt.filterFunction = ph; }
         }
         return pt;

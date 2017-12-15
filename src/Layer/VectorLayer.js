@@ -355,7 +355,9 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             this.bindClusters(JSON.parse(gmx.clusters));
         }
         if (gmx.filter) {
+/*eslint-disable no-useless-escape */
             var func = L.gmx.Parsers.parseSQL(gmx.filter.replace(/[\[\]]/g, '"'));
+/*eslint-enable */
             if (func) {
 				gmx.dataManager.addFilter('userFilter_' + gmx.layerID, function(item) {
 					return gmx.layerID !== this._gmx.layerID || !func || func(item.properties, gmx.tileAttributeIndexes, gmx.tileAttributeTypes) ? item.properties : null;

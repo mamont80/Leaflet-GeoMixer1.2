@@ -2301,7 +2301,9 @@ var gmxAPIutils = {
             text = text.replace(/,/g, '.');
         }
         var results = [];
+/*eslint-disable no-useless-escape */
         regex = /(-?\d+(\.\d+)?)([^\d\-]*)/g;
+/*eslint-enable */
         t = regex.exec(text);
         while (t) {
             results.push(t[1]);
@@ -3405,7 +3407,9 @@ var gmxAPIutils = {
                             zn = st[key1];
                         if (typeof (zn) === 'string') {
                             if (gmxAPIutils.styleFuncKeys[newKey]) {
+/*eslint-disable no-useless-escape */
                                 if (zn.match(/[^\d\.]/) === null) {
+/*eslint-enable */
                                     zn = Number(zn);
                                 } else {
                                     var func = L.gmx.Parsers.parseExpression(zn);
@@ -3857,10 +3861,12 @@ gmxAPIutils.parseUri.options = {
         name:   'queryKey',
         parser: /(?:^|&)([^&=]*)=?([^&]*)/g
     },
+/*eslint-disable no-useless-escape */
     parser: {
         strict: /^(?:([^:\/?#]+):)?(?:\/\/((?:(([^:@]*):?([^:@]*))?@)?([^:\/?#]*)(?::(\d*))?))?((((?:[^?#\/]*\/)*)([^?#]*))(?:\?([^#]*))?(?:#(.*))?)/,
         loose:  /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*):?([^:@]*))?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/
     }
+/*eslint-enable */
 };
 
 if (!L.gmxUtil) { L.gmxUtil = {}; }
@@ -5122,7 +5128,7 @@ var VectorTile = function(dataProvider, options) {
     this.attributes = options.attributes;
     this.isGeneralized = options.isGeneralized;
     this.isFlatten = options.isFlatten;
-    this.bounds = gmxAPIutils.getBoundsByTilePoint(options);
+    this.bounds = gmxAPIutils.getBoundsByTilePoint(this.z ? options : {z:0, x:0, y:0});
     this.gmxTilePoint = {x: this.x, y: this.y, z: this.z, s: this.s, d: this.d};
     this.vectorTileKey = VectorTile.makeTileKey(this.x, this.y, this.z, this.v, this.s, this.d);
 
@@ -7391,7 +7397,9 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             this.bindClusters(JSON.parse(gmx.clusters));
         }
         if (gmx.filter) {
+/*eslint-disable no-useless-escape */
             var func = L.gmx.Parsers.parseSQL(gmx.filter.replace(/[\[\]]/g, '"'));
+/*eslint-enable */
             if (func) {
 				gmx.dataManager.addFilter('userFilter_' + gmx.layerID, function(item) {
 					return gmx.layerID !== this._gmx.layerID || !func || func(item.properties, gmx.tileAttributeIndexes, gmx.tileAttributeTypes) ? item.properties : null;
@@ -9284,8 +9292,10 @@ StyleManager.prototype = {
             if ('Filter' in st) {
                 style.Filter = st.Filter;
                 var type = typeof (st.Filter);
+/*eslint-disable no-useless-escape */
                 style.filterFunction = type === 'string' ? L.gmx.Parsers.parseSQL(style.Filter.replace(/[\[\]]/g, '"'))
                     : type === 'function' ? style.Filter : null;
+/*eslint-enable */
 
                 this._changeStylesVersion();
             }
@@ -9640,7 +9650,9 @@ StyleManager.prototype = {
         }
 
         if ('Filter' in style) {
+/*eslint-disable no-useless-escape */
             var ph = L.gmx.Parsers.parseSQL(style.Filter.replace(/[\[\]]/g, '"'));
+/*eslint-enable */
             if (ph) { pt.filterFunction = ph; }
         }
         return pt;
@@ -11754,13 +11766,13 @@ L.gmx.gmxImageTransform = function(img, hash) {
         geoItem = hash.geoItem,
         properties = geoItem.properties,
         dataOption = geoItem.dataOption || {},
-        geom = properties[properties.length - 1],
-        coord = geom.coordinates[0],
+        // geom = properties[properties.length - 1],
+        // coord = geom.coordinates[0],
         indexes = gmx.tileAttributeIndexes,
         quicklookPlatform = properties[indexes[gmx.quicklookPlatform]] || gmx.quicklookPlatform || '',
         points = {};
 
-    if (geom.type === 'MULTIPOLYGON') { coord = coord[0]; }
+    // if (geom.type === 'MULTIPOLYGON') { coord = coord[0]; }
     if (quicklookPlatform === 'LANDSAT8') {
         points.x1 = dataOption.bounds.min.x; points.y1 = dataOption.bounds.max.y;
         points.x2 = dataOption.bounds.max.x; points.y2 = dataOption.bounds.max.y;

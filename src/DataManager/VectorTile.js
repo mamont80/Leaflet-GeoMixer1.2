@@ -18,7 +18,7 @@ var VectorTile = function(dataProvider, options) {
     this.attributes = options.attributes;
     this.isGeneralized = options.isGeneralized;
     this.isFlatten = options.isFlatten;
-    this.bounds = gmxAPIutils.getBoundsByTilePoint(options);
+    this.bounds = gmxAPIutils.getBoundsByTilePoint(this.z ? options : {z:0, x:0, y:0});
     this.gmxTilePoint = {x: this.x, y: this.y, z: this.z, s: this.s, d: this.d};
     this.vectorTileKey = VectorTile.makeTileKey(this.x, this.y, this.z, this.v, this.s, this.d);
 

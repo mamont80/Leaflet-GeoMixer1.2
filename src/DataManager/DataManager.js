@@ -1018,17 +1018,12 @@ var DataManager = L.Class.extend({
         this._itemsBounds = null;
         var vTile = this.processingTile;
         if (vTile) {
-            var chkKeys = {};
-
-            if (!data || !data.length) {
-                return vTile;
-            }
-
-            for (var i = 0, len = data.length; i < len; i++) {
-                var id = data[i];
-                chkKeys[id] = true;
-                delete this._items[id];
-            }
+			var chkKeys = (data || vTile.data).reduce(function(a,item) {
+				var id = item[0];
+				a[id] = true;
+				delete this._items[id];
+				return a;
+			}.bind(this), {});
             this._removeDataFromObservers(chkKeys);
             vTile.removeData(chkKeys, true);
             this._updateItemsFromTile(vTile);

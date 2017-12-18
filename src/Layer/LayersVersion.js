@@ -146,7 +146,7 @@ var chkVersion = function (layer, callback) {
 				}
 				params += '&layers=' + encodeURIComponent(layersStr);
 
-                if (!lastParams[hostName] || lastParams[hostName] !== params) {
+                if (layer || !lastParams[hostName] || lastParams[hostName] !== params) {
                     // lastLayersStr = layersStr;
 					lastParams[hostName] = params;
                     if ('FormData' in window) {

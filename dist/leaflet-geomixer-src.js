@@ -8621,7 +8621,8 @@ ScreenVectorTile.prototype = {
 						skipRasterFunc();
 					}
 				} else {
-					url += (url.indexOf('?') === -1 ? '?' : '&') + gmx.sessionKey;  //  for browser cache from another tabs
+					if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
+
 					var request = this.rasterRequests[url];
 					if (!request) {
 						request = L.gmx.imageLoader.push(url, {

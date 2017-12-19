@@ -4181,6 +4181,12 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
                 geoItem.styleExtend = gmx.styleHook(item, gmx.lastHover && idr === gmx.lastHover.id);
             }
             if (geoItem.styleExtend) {
+				if (typeof(geoItem.styleExtend.strokeStyle) === 'number') {
+					geoItem.styleExtend.strokeStyle = gmxAPIutils.dec2color(geoItem.styleExtend.strokeStyle, 1);
+				}
+				if (typeof(geoItem.styleExtend.fillStyle) === 'number') {
+					geoItem.styleExtend.fillStyle = gmxAPIutils.dec2color(geoItem.styleExtend.fillStyle, 1);
+				}
                 item.currentStyle = L.extend(item.currentStyle, geoItem.styleExtend);
             } else {
                 return false;

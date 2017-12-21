@@ -106,7 +106,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
         style = {};
     }
 
-    var geoType = geom.type,
+    var geoType = geom.type.toUpperCase(),
         dattr = {
             gmx: gmx,
             item: item,

@@ -733,10 +733,12 @@ var ImageRequest = function(id, url, options) {
     this.promise = this.def = new Promise(function(resolve, reject) {
 		this.resolve = resolve;
 		this.reject = function() {
-			reject();
+			reject(this.url);
 			L.gmx.imageLoader._cancelRequest(this);
 		};
-	}.bind(this));
+	}.bind(this)).catch(function(e) {
+		console.warn('Warning: skip url ', e);
+	});
 };
 
 var GmxImageLoader = L.Class.extend({
@@ -2393,6 +2395,17 @@ var gmxAPIutils = {
 		return  gmxAPIutils.formatDegrees(Math.abs(y)) + (y > 0 ? ' N, ' : ' S, ') +
 			gmxAPIutils.formatDegrees(Math.abs(x)) + (x > 0 ? ' E' : ' W');
 	},
+	latLonToString: function(x, y, prec) {
+        x %= 360;
+        if (x > 180) { x -= 360; }
+        else if (x < -180) { x += 360; }
+		if (prec) {
+			x = gmxAPIutils.toPrecision(x, prec);
+			y = gmxAPIutils.toPrecision(y, prec);
+		}
+		return  y + (y > 0 ? ' N, ' : ' S, ') +
+			x + (x > 0 ? ' E' : ' W');
+	},
 
 	formatCoordinates: function(x, y) {
 		return  gmxAPIutils.latLonFormatCoordinates(x, y);
@@ -3911,6 +3924,8 @@ L.extend(L.gmxUtil, {
     trunc: gmxAPIutils.trunc,
     latLonFormatCoordinates: gmxAPIutils.latLonFormatCoordinates,
     latLonFormatCoordinates2: gmxAPIutils.latLonFormatCoordinates2,
+    latLonToString: gmxAPIutils.latLonToString,
+    toPrecision: gmxAPIutils.toPrecision,
     getLength: gmxAPIutils.getLength,
     geoLength: gmxAPIutils.geoLength,
     prettifyDistance: gmxAPIutils.prettifyDistance,
@@ -4197,7 +4212,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
         style = {};
     }
 
-    var geoType = geom.type,
+    var geoType = geom.type.toUpperCase(),
         dattr = {
             gmx: gmx,
             item: item,
@@ -8518,7 +8533,7 @@ ScreenVectorTile.prototype = {
 				url = urlBG;                        // Image urlBG from properties
 				itemImageProcessingHook = gmx.imageQuicklookProcessingHook;
 			}
-			new Promise(function(resolve1, reject1) {
+			new Promise(function(resolve1) {
 				if (isTiles) {
 					var dataOption = geo.dataOption || {},
 						// tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp];
@@ -8642,7 +8657,7 @@ ScreenVectorTile.prototype = {
 
 					// in fact, we want to return request.def, but need to do additional action during cancellation.
 					// so, we consctruct new promise and add pipe it with request.def
-					request.promise.then(resolve1, reject1);
+					request.promise.then(resolve1, resolve1);
 					item.skipRasters = false;
 				}
 			}.bind(this)).then(function(img) {
@@ -8650,40 +8665,45 @@ ScreenVectorTile.prototype = {
 					rasters[idr] = resCanvas;
 					resolve();
 				} else {
-					var imgAttr = {
-						gmx: gmx,
-						geoItem: geo,
-						item: item,
-						gmxTilePoint: gmxTilePoint
-					};
-					if (!resCanvas) {
-						resCanvas = document.createElement('canvas');
-						resCanvas.width = resCanvas.height = 256;
-					}
-					var prepareItem = function(imageElement) {
-						var promise = _this._rasterHook({
-								geoItem: geo,
-								res: resCanvas,
-								image: itemImageProcessingHook ? itemImageProcessingHook(imageElement, imgAttr) : imageElement,
-								destinationTilePoint: gmxTilePoint,
-								url: url
-							}),
-							then = function() {
-								rasters[idr] = resCanvas;
+					if (img) {
+						var imgAttr = {
+							gmx: gmx,
+							geoItem: geo,
+							item: item,
+							gmxTilePoint: gmxTilePoint
+						};
+						if (!resCanvas) {
+							resCanvas = document.createElement('canvas');
+							resCanvas.width = resCanvas.height = 256;
+						}
+						var prepareItem = function(imageElement) {
+							var promise = _this._rasterHook({
+									geoItem: geo,
+									res: resCanvas,
+									image: itemImageProcessingHook ? itemImageProcessingHook(imageElement, imgAttr) : imageElement,
+									destinationTilePoint: gmxTilePoint,
+									url: url
+								}),
+								then = function() {
+									rasters[idr] = resCanvas;
+									resolve();
+								};
+							if (promise) {
+								if (promise.then) {
+									promise.then(then);
+								}
+							} else if (promise === null) {
+								item.skipRasters = true;
 								resolve();
-							};
-						if (promise) {
-							if (promise.then) {
-								promise.then(then);
+							} else {
+								then();
 							}
-						} else if (promise === null) {
+						};
+						prepareItem(img);
+					} else {
 							item.skipRasters = true;
 							resolve();
-						} else {
-							then();
-						}
-					};
-					prepareItem(img);
+					}
 					delete _this.rasterRequests[url];
 				}
 			}.bind(this));

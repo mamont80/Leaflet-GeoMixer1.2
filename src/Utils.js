@@ -1448,6 +1448,17 @@ var gmxAPIutils = {
 		return  gmxAPIutils.formatDegrees(Math.abs(y)) + (y > 0 ? ' N, ' : ' S, ') +
 			gmxAPIutils.formatDegrees(Math.abs(x)) + (x > 0 ? ' E' : ' W');
 	},
+	latLonToString: function(x, y, prec) {
+        x %= 360;
+        if (x > 180) { x -= 360; }
+        else if (x < -180) { x += 360; }
+		if (prec) {
+			x = gmxAPIutils.toPrecision(x, prec);
+			y = gmxAPIutils.toPrecision(y, prec);
+		}
+		return  y + (y > 0 ? ' N, ' : ' S, ') +
+			x + (x > 0 ? ' E' : ' W');
+	},
 
 	formatCoordinates: function(x, y) {
 		return  gmxAPIutils.latLonFormatCoordinates(x, y);
@@ -2966,6 +2977,8 @@ L.extend(L.gmxUtil, {
     trunc: gmxAPIutils.trunc,
     latLonFormatCoordinates: gmxAPIutils.latLonFormatCoordinates,
     latLonFormatCoordinates2: gmxAPIutils.latLonFormatCoordinates2,
+    latLonToString: gmxAPIutils.latLonToString,
+    toPrecision: gmxAPIutils.toPrecision,
     getLength: gmxAPIutils.getLength,
     geoLength: gmxAPIutils.geoLength,
     prettifyDistance: gmxAPIutils.prettifyDistance,

@@ -8,10 +8,12 @@ var ImageRequest = function(id, url, options) {
     this.promise = this.def = new Promise(function(resolve, reject) {
 		this.resolve = resolve;
 		this.reject = function() {
-			reject();
+			reject(this.url);
 			L.gmx.imageLoader._cancelRequest(this);
 		};
-	}.bind(this));
+	}.bind(this)).catch(function(e) {
+		console.warn('Warning: skip url ', e);
+	});
 };
 
 var GmxImageLoader = L.Class.extend({

@@ -7116,21 +7116,11 @@ L.gmx.VectorLayer = L.TileLayer.extend({
             this._gmx.crossOrigin = options.crossOrigin;
         }
 
-        // this.on('tileunload', function(e) {
-            // this._clearTiles([e.tile.zKey]);
-        // }.bind(this));
-    },
-
-    // extended from L.TileLayer.Canvas
-    _removeTile: function (zKey) {
-        var tileLink = this._tiles[zKey];
-        if (tileLink) {
-            var tile = tileLink.el;
-            if (tile && tile.parentNode) {
-                tile.parentNode.removeChild(tile);
-            }
-            delete this._tiles[zKey];
-        }
+        this.on('tileunload', function(e) {
+			if (this._gmx.dataManager) {
+				this._gmx.dataManager.removeObserver(this._tileCoordsToKey(e.coords));
+			}
+        }.bind(this));
     },
 
     onAdd: function(map) {
@@ -7266,8 +7256,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
                     bbox: gmx.styleManager.getStyleBounds(gmxTilePoint),
                     filters: ['clipFilter', 'userFilter_' + gmx.layerID, 'styleFilter', 'userFilter'].concat(filters),
                     callback: function(data) {
-                        // myLayer._drawTileAsync(coords, zoom, data).always(done);
-                        myLayer._drawTileAsync(tileElem, data).then(done);
+                        myLayer._drawTileAsync(tileElem, data).then(done, done);
                     }
 				}, zKey)
 					.on('activate', function() {
@@ -7310,12 +7299,23 @@ L.gmx.VectorLayer = L.TileLayer.extend({
         if (this._gmx._tilesToLoad === 0) {
             this.fire('load');
             this.fire('doneDraw');
+			this._clearOtherZoomLevels();
             if (this._animated) {
                 // clear scaled tiles after all new tiles are loaded (for performance)
                 // this._setClearBgBuffer(0);
             }
         }
     },
+	_clearOtherZoomLevels: function (zoom) {
+		zoom = zoom || this._tileZoom;
+		for (var z in this._levels) {
+			if (z != zoom) {
+				L.DomUtil.remove(this._levels[z].el);
+				this._onRemoveLevel(z);
+				delete this._levels[z];
+			}
+		}
+	},
 
     _tileOnLoad: function (tile) {
         if (tile) { L.DomUtil.addClass(tile, 'leaflet-tile-loaded'); }
@@ -8642,22 +8642,26 @@ ScreenVectorTile.prototype = {
 						skipRasterFunc();
 					}
 				} else {
-					if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
+					if (url) {
+						if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
 
-					var request = this.rasterRequests[url];
-					if (!request) {
-						request = L.gmx.imageLoader.push(url, {
-							tileRastersId: _this._uniqueID,
-							crossOrigin: gmx.crossOrigin || 'anonymous'
-						});
-						this.rasterRequests[url] = request;
+						var request = this.rasterRequests[url];
+						if (!request) {
+							request = L.gmx.imageLoader.push(url, {
+								tileRastersId: _this._uniqueID,
+								crossOrigin: gmx.crossOrigin || 'anonymous'
+							});
+							this.rasterRequests[url] = request;
+						} else {
+							request.options.tileRastersId = this._uniqueID;
+						}
+
+						// in fact, we want to return request.def, but need to do additional action during cancellation.
+						// so, we consctruct new promise and add pipe it with request.def
+						request.promise.then(resolve1, resolve1);
 					} else {
-						request.options.tileRastersId = this._uniqueID;
+						resolve1();
 					}
-
-					// in fact, we want to return request.def, but need to do additional action during cancellation.
-					// so, we consctruct new promise and add pipe it with request.def
-					request.promise.then(resolve1, resolve1);
 					item.skipRasters = false;
 				}
 			}.bind(this)).then(function(img) {

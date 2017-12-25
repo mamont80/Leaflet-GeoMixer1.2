@@ -363,22 +363,26 @@ ScreenVectorTile.prototype = {
 						skipRasterFunc();
 					}
 				} else {
-					if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
+					if (url) {
+						if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
 
-					var request = this.rasterRequests[url];
-					if (!request) {
-						request = L.gmx.imageLoader.push(url, {
-							tileRastersId: _this._uniqueID,
-							crossOrigin: gmx.crossOrigin || 'anonymous'
-						});
-						this.rasterRequests[url] = request;
+						var request = this.rasterRequests[url];
+						if (!request) {
+							request = L.gmx.imageLoader.push(url, {
+								tileRastersId: _this._uniqueID,
+								crossOrigin: gmx.crossOrigin || 'anonymous'
+							});
+							this.rasterRequests[url] = request;
+						} else {
+							request.options.tileRastersId = this._uniqueID;
+						}
+
+						// in fact, we want to return request.def, but need to do additional action during cancellation.
+						// so, we consctruct new promise and add pipe it with request.def
+						request.promise.then(resolve1, resolve1);
 					} else {
-						request.options.tileRastersId = this._uniqueID;
+						resolve1();
 					}
-
-					// in fact, we want to return request.def, but need to do additional action during cancellation.
-					// so, we consctruct new promise and add pipe it with request.def
-					request.promise.then(resolve1, resolve1);
 					item.skipRasters = false;
 				}
 			}.bind(this)).then(function(img) {

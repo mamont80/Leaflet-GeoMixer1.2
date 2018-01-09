@@ -68,7 +68,10 @@ ScreenVectorTile.prototype = {
 			var tryLoad = function(gtp, crossOrigin) {
 				var rUrl = _this._getUrlFunction(gtp, item);
 
-				var tryHigherLevelTile = function() {
+				var tryHigherLevelTile = function(url) {
+					if (url) {
+						gmx.badTiles[url] = true;
+					}
 					if (gtp.z > 1) {
 						tryLoad({
 							x: Math.floor(gtp.x / 2),
@@ -101,11 +104,14 @@ ScreenVectorTile.prototype = {
 				}
 				request.promise.then(
 					function(imageObj) {
+						if (imageObj) {
 						resolve({gtp: gtp, image: imageObj});
+						} else {
+							tryHigherLevelTile(rUrl);
+						}
 					},
 					function() {
-						gmx.badTiles[rUrl] = true;
-						tryHigherLevelTile();
+						tryHigherLevelTile(rUrl);
 					}
 				);
 			};

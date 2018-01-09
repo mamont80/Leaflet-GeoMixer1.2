@@ -7157,7 +7157,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     onRemove: function(map) {
-        if (this._container) {
+        if (this._container && this._container.parentNode) {
             this._container.parentNode.removeChild(this._container);
         }
 
@@ -7270,25 +7270,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 					.activate();
 			});
 		}
-    },
-
-    _getLoadedTilesPercentage: function (container) {
-        if (!container) { return 0; }
-        var len = 0, count = 0;
-        var arr = ['img', 'canvas'];
-        for (var key in arr) {
-            var tiles = container.getElementsByTagName(arr[key]);
-            if (tiles && tiles.length > 0) {
-                len += tiles.length;
-                for (var i = 0, len1 = tiles.length; i < len1; i++) {
-                    if (tiles[i]._tileComplete) {
-                        count++;
-                    }
-                }
-            }
-        }
-        if (len < 1) { return 0; }
-        return count / len;
     },
 
     _tileLoaded: function () {
@@ -8347,7 +8328,10 @@ ScreenVectorTile.prototype = {
 			var tryLoad = function(gtp, crossOrigin) {
 				var rUrl = _this._getUrlFunction(gtp, item);
 
-				var tryHigherLevelTile = function() {
+				var tryHigherLevelTile = function(url) {
+					if (url) {
+						gmx.badTiles[url] = true;
+					}
 					if (gtp.z > 1) {
 						tryLoad({
 							x: Math.floor(gtp.x / 2),
@@ -8380,11 +8364,14 @@ ScreenVectorTile.prototype = {
 				}
 				request.promise.then(
 					function(imageObj) {
+						if (imageObj) {
 						resolve({gtp: gtp, image: imageObj});
+						} else {
+							tryHigherLevelTile(rUrl);
+						}
 					},
 					function() {
-						gmx.badTiles[rUrl] = true;
-						tryHigherLevelTile();
+						tryHigherLevelTile(rUrl);
 					}
 				);
 			};
@@ -10842,7 +10829,6 @@ var chkVersion = function (layer, callback) {
 
                 if (layer || !lastParams[hostName] || lastParams[hostName] !== params) {
                     // lastLayersStr = layersStr;
-					lastParams[hostName] = params;
                     if ('FormData' in window) {
                         L.gmxUtil.request({
                             url: url,
@@ -10854,6 +10840,7 @@ var chkVersion = function (layer, callback) {
                             params: params,
                             withCredentials: true,
                             callback: function(response) {
+								lastParams[hostName] = params;
                                 processResponse(JSON.parse(response));
                             },
                             onError: function(response) {

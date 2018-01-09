@@ -99,7 +99,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
     },
 
     onRemove: function(map) {
-        if (this._container) {
+        if (this._container && this._container.parentNode) {
             this._container.parentNode.removeChild(this._container);
         }
 
@@ -212,25 +212,6 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 					.activate();
 			});
 		}
-    },
-
-    _getLoadedTilesPercentage: function (container) {
-        if (!container) { return 0; }
-        var len = 0, count = 0;
-        var arr = ['img', 'canvas'];
-        for (var key in arr) {
-            var tiles = container.getElementsByTagName(arr[key]);
-            if (tiles && tiles.length > 0) {
-                len += tiles.length;
-                for (var i = 0, len1 = tiles.length; i < len1; i++) {
-                    if (tiles[i]._tileComplete) {
-                        count++;
-                    }
-                }
-            }
-        }
-        if (len < 1) { return 0; }
-        return count / len;
     },
 
     _tileLoaded: function () {

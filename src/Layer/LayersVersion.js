@@ -148,7 +148,6 @@ var chkVersion = function (layer, callback) {
 
                 if (layer || !lastParams[hostName] || lastParams[hostName] !== params) {
                     // lastLayersStr = layersStr;
-					lastParams[hostName] = params;
                     if ('FormData' in window) {
                         L.gmxUtil.request({
                             url: url,
@@ -160,6 +159,7 @@ var chkVersion = function (layer, callback) {
                             params: params,
                             withCredentials: true,
                             callback: function(response) {
+								lastParams[hostName] = params;
                                 processResponse(JSON.parse(response));
                             },
                             onError: function(response) {

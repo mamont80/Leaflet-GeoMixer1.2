@@ -2162,7 +2162,8 @@ var gmxAPIutils = {
 			ctx.fillText(txt, x, y);
 		}
     },
-    worldWidthMerc: 20037508,
+    worldWidthFull: 40075016.685578496,
+    // worldWidthMerc: gmxAPIutils.worldWidthFull / 2,
     rMajor: 6378137.000,
     degRad: function(ang) {
         return ang * (Math.PI / 180.0);
@@ -3553,9 +3554,10 @@ gmxAPIutils.lambertCoefY = 100 * gmxAPIutils.distVincenty(0, 0, 0, 0.01) * 180 /
 (function() {
     //pre-calculate tile sizes
     for (var z = 0; z < 30; z++) {
-        gmxAPIutils.tileSizes[z] = 40075016.685578496 / Math.pow(2, z);
+        gmxAPIutils.tileSizes[z] = gmxAPIutils.worldWidthFull / Math.pow(2, z);
     }
 })();
+gmxAPIutils.worldWidthMerc = gmxAPIutils.worldWidthFull / 2;
 
 gmxAPIutils.Bounds = function(arr) {
     this.min = {
@@ -5096,6 +5098,10 @@ var gmxVectorTileLoader = {
 						if (txt.substr(0, pref.length) === pref) {
 							txt = txt.replace(pref, '');
 							var data = JSON.parse(txt.substr(0, txt.length -1));
+							// убрать когда МишаШ поправит FTC в векторном тайле
+							data.z = tileInfo.z;
+							data.x = tileInfo.x;
+							data.y = tileInfo.y;
 							resolve(data);
 						} else {
 							reject();

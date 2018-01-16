@@ -10,11 +10,15 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 		skipTiles: 'All', // All, NotVisible, None
         iconsUrlReplace: [],
         showScreenTiles: false,
+		//updateWhenZooming: false,
+		//bubblingMouseEvents: false,
+		//updateWhenIdle: true,
         clickable: true
     },
 
     initialize: function(options) {
-        options = L.setOptions(this, options);
+        //options = L.setOptions(this, options);
+		options = L.extend({}, this.options, options);
 
         this._initPromise = new Promise(function(resolve, reject) {
 			this._resolve = resolve;

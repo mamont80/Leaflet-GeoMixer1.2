@@ -18,7 +18,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
     initialize: function(options) {
         //options = L.setOptions(this, options);
-		options = L.extend({}, this.options, options);
+		options = this.options = L.extend({}, this.options, options);
 
         this._initPromise = new Promise(function(resolve, reject) {
 			this._resolve = resolve;

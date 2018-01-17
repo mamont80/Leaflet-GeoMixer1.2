@@ -4457,10 +4457,10 @@ var gmxMapManager = {
 				WrapStyle: 'func',
 				skipTiles: options.skipTiles || 'None', // All, NotVisible, None
 				MapName: mapName,
-				srs: options.srs || '',
+				srs: options.srs || 3857,
+				ftc: options.ftc || 'osm',
 				ModeKey: 'map'
 			};
-			if (options.srs == 3857) { opt.ftc = 'osm'; }
 			var promise = new Promise(function(resolve, reject) {
 				gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
 					opt.key = sessionKey;
@@ -7082,7 +7082,7 @@ L.gmx.VectorLayer = L.TileLayer.extend({
 
     initialize: function(options) {
         //options = L.setOptions(this, options);
-		options = L.extend({}, this.options, options);
+		options = this.options = L.extend({}, this.options, options);
 
         this._initPromise = new Promise(function(resolve, reject) {
 			this._resolve = resolve;
@@ -10902,7 +10902,7 @@ var layersVersion = {
     },
 
     remove: function(layer) {
-        delete layers[layer._leaflet_id];
+        delete layers[layer._gmx.layerID];
         var _gmx = layer._gmx,
 			pOptions = layer.options.parentOptions;
 		if (pOptions) {
@@ -10920,7 +10920,7 @@ var layersVersion = {
     },
 
     add: function(layer) {
-        var id = layer._leaflet_id;
+        var id = layer._gmx.layerID;
         if (id in layers) {
             return;
 		}
@@ -13172,6 +13172,7 @@ L.gmx.loadLayers = function(layers, globalOptions) {
 };
 
 L.gmx.loadMap = function(mapID, options) {
+	if (location.search.indexOf('debug=1') !== -1) console.warn('L.gmx.loadMap:', mapID, options);
     options = L.extend({}, options);
     options.hostName = gmxAPIutils.normalizeHostname(options.hostName || DEFAULT_HOSTNAME);
     options.mapName = mapID;
@@ -13182,30 +13183,37 @@ L.gmx.loadMap = function(mapID, options) {
 
     return new Promise(function(resolve, reject) {
 		gmxMapManager.loadMapProperties(options).then(function(mapInfo) {
-			var loadedMap = new L.gmx.gmxMap(mapInfo, options);
+			var mapHash = L.gmx._maps[options.hostName][mapID];
+			if (mapHash.loaded) {
+				resolve(mapHash.loaded);
 
-			loadedMap.layersCreated.then(function() {
-				if (options.leafletMap || options.setZIndex) {
-					var curZIndex = 0,
-						layer, rawProperties;
+			} else {
+				var loadedMap = new L.gmx.gmxMap(mapInfo, options);
+				mapHash.loaded = loadedMap;
 
-					for (var l = loadedMap.layers.length - 1; l >= 0; l--) {
-						layer = loadedMap.layers[l];
-						rawProperties = layer.getGmxProperties();
-						if (mapInfo.properties.LayerOrder === 'VectorOnTop' && layer.setZIndexOffset && rawProperties.type !== 'Raster') {
-							layer.setZIndexOffset(DEFAULT_VECTOR_LAYER_ZINDEXOFFSET);
-						}
-						if (options.setZIndex && layer.setZIndex) {
-							layer.setZIndex(++curZIndex);
-						}
+				loadedMap.layersCreated.then(function() {
+					if (options.leafletMap || options.setZIndex) {
+						var curZIndex = 0,
+							layer, rawProperties;
 
-						if (options.leafletMap && rawProperties.visible) {
-							layer.addTo(options.leafletMap);
+						for (var l = loadedMap.layers.length - 1; l >= 0; l--) {
+							layer = loadedMap.layers[l];
+							rawProperties = layer.getGmxProperties();
+							if (mapInfo.properties.LayerOrder === 'VectorOnTop' && layer.setZIndexOffset && rawProperties.type !== 'Raster') {
+								layer.setZIndexOffset(DEFAULT_VECTOR_LAYER_ZINDEXOFFSET);
+							}
+							if (options.setZIndex && layer.setZIndex) {
+								layer.setZIndex(++curZIndex);
+							}
+
+							if (options.leafletMap && rawProperties.visible) {
+								layer.addTo(options.leafletMap);
+							}
 						}
 					}
-				}
-				resolve(loadedMap);
-			});
+					resolve(loadedMap);
+				});
+			}
 		},
 		function(response) {
 			var errorMessage = (response && response.ErrorInfo && response.ErrorInfo.ErrorMessage) || 'Server error';
@@ -13223,18 +13231,21 @@ L.gmx.createLayer = function(layerInfo, options) {
     if (!layerInfo) { layerInfo = {}; }
     if (!layerInfo.properties) { layerInfo.properties = {type: 'Vector'}; }
 
-    var type = layerInfo.properties.ContentID || layerInfo.properties.type || 'Vector',
+    var properties = layerInfo.properties,
+		type = properties.ContentID || properties.type || 'Vector',
         layer;
+
+    if (!options) { options = properties; }
 
 		if (type in L.gmx._layerClasses) {
         try {
-            layer = new L.gmx._layerClasses[type](options);
+            layer = new L.gmx._layerClasses[type](options || layerInfo.properties);
             layer = layer.initFromDescription(layerInfo);
         } catch (e) {
-            layer = new L.gmx.DummyLayer(layerInfo.properties);
+            layer = new L.gmx.DummyLayer(properties);
         }
     } else {
-        layer = new L.gmx.DummyLayer(layerInfo.properties);
+        layer = new L.gmx.DummyLayer(properties);
     }
 
     return layer;

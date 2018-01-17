@@ -22,10 +22,10 @@ var gmxMapManager = {
 				WrapStyle: 'func',
 				skipTiles: options.skipTiles || 'None', // All, NotVisible, None
 				MapName: mapName,
-				srs: options.srs || '',
+				srs: options.srs || 3857,
+				ftc: options.ftc || 'osm',
 				ModeKey: 'map'
 			};
-			if (options.srs == 3857) { opt.ftc = 'osm'; }
 			var promise = new Promise(function(resolve, reject) {
 				gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
 					opt.key = sessionKey;

@@ -211,7 +211,7 @@ var layersVersion = {
     },
 
     remove: function(layer) {
-        delete layers[layer._leaflet_id];
+        delete layers[layer._gmx.layerID];
         var _gmx = layer._gmx,
 			pOptions = layer.options.parentOptions;
 		if (pOptions) {
@@ -229,7 +229,7 @@ var layersVersion = {
     },
 
     add: function(layer) {
-        var id = layer._leaflet_id;
+        var id = layer._gmx.layerID;
         if (id in layers) {
             return;
 		}

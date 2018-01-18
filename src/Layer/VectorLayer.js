@@ -180,13 +180,17 @@ console.log('loading ', this._tileZoom, ev);
         }
     },
 
+/*eslint-disable no-unused-vars */
 	createTile: function(coords , done){
+		var stt = coords;
+		var st1 = done;
 		var tile = L.DomUtil.create('canvas', 'leaflet-tile');
 		var size = this.getTileSize();
 		tile.width = size.x;
 		tile.height = size.y;
 		return tile;
     },
+/*eslint-enable */
 
     //public interface
     initFromDescription: function(ph) {
@@ -971,7 +975,7 @@ console.log('loading ', this._tileZoom, ev);
                         if (myLayer._tiles[zKey]) {
 							myLayer._tiles[zKey].loaded = 0;
 							// new ScreenVectorTile(myLayer, tileElem).drawTile(data).then(function(res) {
-							tileElem.screenTile.drawTile(data).then(function(res) {
+							tileElem.screenTile.drawTile(data).then(function() {
 								// console.log('resolve', zKey, res, data);
 								done();
 							}, function(err) {

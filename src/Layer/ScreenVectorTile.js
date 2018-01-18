@@ -1,6 +1,7 @@
 // Single tile on screen with vector data
 function ScreenVectorTile(layer, tileElem) {
     this.layer = layer;
+	this.tile = tileElem.el;
 	var tilePoint = tileElem.coords,
 		zoom = tilePoint.z,
 		pz = Math.pow(2, zoom),
@@ -105,7 +106,7 @@ ScreenVectorTile.prototype = {
 				request.promise.then(
 					function(imageObj) {
 						if (imageObj) {
-						resolve({gtp: gtp, image: imageObj});
+							resolve({gtp: gtp, image: imageObj});
 						} else {
 							tryHigherLevelTile(rUrl);
 						}
@@ -557,22 +558,24 @@ ScreenVectorTile.prototype = {
     },
 
     destructor: function () {
-		if (this.currentDrawPromise) {
-			this.currentDrawPromise.reject();
+		// if (this.currentDrawPromise) {
+			// this.currentDrawPromise.reject();
 			if (this._preRenderPromise) {
 				this._preRenderPromise.reject();        // cancel preRenderHooks chain if exists
 			}
 			if (this._renderPromise) {
 				this._renderPromise.reject();           // cancel renderHooks chain if exists
 			}
-		}
+		// }
         this._cancelRastersPromise();
         this._clearCache();
     },
 
     _cancelRastersPromise: function () {
         if (this.rastersPromise) {
-            this.rastersPromise.reject();
+			if (this.rastersPromise.reject) {
+				this.rastersPromise.reject();
+			}
             this.rastersPromise = null;
         }
     },
@@ -585,26 +588,32 @@ ScreenVectorTile.prototype = {
     },
 
     drawTile: function (data) {
-        if (this.currentDrawPromise) {
+        // if (this.currentDrawPromise) {
 			this.destructor();
-		}
+		// }
 		return new Promise(function(resolve, reject) {
-			this.currentDrawPromise = {
-				resolve: resolve,
-				reject: reject
-			};
+			// this.currentDrawPromise = {
+				// resolve: resolve,
+				// reject: reject
+			// };
+			var geoItems = this._chkItems(data);
+			// var error = function() {
+				// reject({count: 0});
+			// }.bind(this);
+			var result = function() {
+				resolve({count: geoItems.length});
+			}.bind(this);
 			var _this = this;
 
 			this._uniqueID++;       // count draw attempt
 
-			var geoItems = this._chkItems(data);
 			if (geoItems) {
-				var tileLink = this.layer.gmxGetCanvasTile(this.tilePoint),
-					tile = tileLink.el,
+				// var tileLink = this.layer.gmxGetCanvasTile(this.tilePoint),
+				var tile = this.tile,
 					ctx = tile.getContext('2d'),
 					gmx = this.gmx,
 					dattr = {
-						tileLink: tileLink,
+						//tileLink: tileLink,
 						tbounds: this.tbounds,
 						rasters: this.rasters,
 						gmx: gmx,
@@ -613,7 +622,7 @@ ScreenVectorTile.prototype = {
 						tpy: this.tpy,
 						ctx: ctx
 					};
-				tile.zKey = tileLink.el._zKey = this.zKey;
+//				tile.zKey = tileLink.el._zKey = this.zKey;
 L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 
 				var doDraw = function() {
@@ -672,10 +681,10 @@ L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 						}
 						//ctx.restore();
 						_this.rasters = {}; // clear rasters
-						if (_this.layer._map && !tile.parentNode) {
-							_this.layer.appendTileToContainer(tileLink);
-						}
-						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(resolve, reject);
+						// if (_this.layer._map && !tile.parentNode) {
+							// _this.layer.appendTileToContainer(tileLink);
+						// }
+						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
 					}, reject);
 				};
 
@@ -688,7 +697,9 @@ L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 			} else {
 				resolve();
 			}
-		}.bind(this));
+		}.bind(this)).catch(function(e) {
+			console.warn('catch1:', e);
+		});
     },
 
     _getHooksPromises: function (hooks, obj, options) {

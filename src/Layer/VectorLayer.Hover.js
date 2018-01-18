@@ -228,6 +228,9 @@ L.gmx.VectorLayer.include({
                             ev.gmx = lastHover;
                             this.fire(type, ev);
                             return idr;
+                        } else {
+							ev.gmx = lastHover;
+							this.fire('mouseout', ev);
                         }
                         chkHover(item.currentFilter !== lastHover.currentFilter ? 'mouseout' : '');
                         gmx.lastHover = null;

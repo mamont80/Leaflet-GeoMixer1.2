@@ -5098,10 +5098,6 @@ var gmxVectorTileLoader = {
 						if (txt.substr(0, pref.length) === pref) {
 							txt = txt.replace(pref, '');
 							var data = JSON.parse(txt.substr(0, txt.length -1));
-							// убрать когда МишаШ поправит FTC в векторном тайле
-							data.z = tileInfo.z;
-							data.x = tileInfo.x;
-							data.y = tileInfo.y;
 							resolve(data);
 						} else {
 							reject();
@@ -10648,6 +10644,9 @@ L.gmx.VectorLayer.include({
                             ev.gmx = lastHover;
                             this.fire(type, ev);
                             return idr;
+                        } else {
+							ev.gmx = lastHover;
+							this.fire('mouseout', ev);
                         }
                         chkHover(item.currentFilter !== lastHover.currentFilter ? 'mouseout' : '');
                         gmx.lastHover = null;

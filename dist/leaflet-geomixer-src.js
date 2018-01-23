@@ -1211,8 +1211,8 @@ var gmxAPIutils = {
 		return {
 			size: size,
 			zDelta: dz,
-			x: size * (dx < 0 ? dz + dx : dx),
-			y: size * (dy < 0 ? -(1 + tilePoint.y) % dz : dz - 1 - dy)
+			x: size * dx,
+			y: size * dy
 		};
     },
 
@@ -7062,7 +7062,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
     options: {
 		tilesCRS: L.CRS.EPSG3395,
         openPopups: [],
-        // opacity: 1,
         minZoom: 1,
         zIndexOffset: 0,
         isGeneralized: true,
@@ -7071,7 +7070,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		skipTiles: 'All', // All, NotVisible, None
         iconsUrlReplace: [],
         showScreenTiles: false,
-		// updateWhenZooming: false,
+		// updateWhenZooming: true,
 		// bubblingMouseEvents: false,
         clickable: true
     },
@@ -7114,34 +7113,137 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         }
 
         this
-			.on('load', function(ev) {						// завершена загрузка тайлов (все тайлы имеют признак - loaded)
-console.log('load ', this._tileZoom, ev);
-				this._clearOtherZoomLevels();
-			}, this)
-			.on('loading', function(ev) {						// начата загрузка тайлов (если нет не отрисованных тайлов)
-console.log('loading ', this._tileZoom, ev);
-				this._updateShiftY();
-			}, this)
-			// .on('tileload', function(ev) {}, this) 		// тайл (ev.coords) загружен
-			// .on('tileerror', function(ev) {}, this) 		// тайл (ev.coords) с ошибкой
-			.on('tileunload', function(ev) {				// тайл (ev.coords) удален
-				if (this._gmx.dataManager) {
-					this._gmx.dataManager.removeObserver(this._tileCoordsToKey(ev.coords));
+			.on('load', function() {						// завершена загрузка тайлов (все тайлы имеют признак - loaded)
+				if (!this._loading) {
+					for (var z in this._levels) {
+						if (z != this._tileZoom) {
+// console.log('load ', this._loading, this._tileZoom);
+							L.DomUtil.remove(this._levels[z].el);
+							this._removeTilesAtZoom(z);
+							this._onRemoveLevel(z);
+							delete this._levels[z];
+						}
+					}
 				}
 			}, this)
+			.on('dateIntervalChanged', function() {
+// console.log('dateIntervalChanged ', this._loading, this._tileZoom, ev);
+				setTimeout(L.bind(this._repaintNotLoaded, this), 25);
+			}, this)
+			// .on('loading', function(ev) {						// начата загрузка тайлов (если нет не отрисованных тайлов)
+			// }, this)
+			// .on('tileload', function(ev) {
+// console.log('tileload ', this._loading, this._noTilesToLoad(), this._tileZoom);
+
+			// }, this) 		// тайл (ev.coords) загружен
+			// .on('tileerror', function(ev) {}, this) 		// тайл (ev.coords) с ошибкой
+			// .on('tileunload', function(ev) {				// тайл (ev.coords) удален
+				// if (this._gmx.dataManager) {
+					// this._gmx.dataManager.removeObserver(this._tileCoordsToKey(ev.coords));
+				// }
+			// }, this)
 			.on('tileloadstart', function(ev) {				// тайл (ev.coords) загружается
 				var key = this._tileCoordsToKey(ev.coords),
 					tLink = this._tiles[key];
+				// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
 
 				tLink.loaded = 0;
 				tLink.screenTile = new ScreenVectorTile(this, tLink);
-
-				setTimeout(L.bind(this.__drawTile, this, ev), 250);
-				//L.Util.requestAnimFrame(L.bind(this.__drawTile, ev));
-				// L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
-
-				// this.__drawTile(ev.coords);
+				L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
 			}, this);
+	},
+
+	_updateOpacity: function () {
+		if (!this._map) { return; }
+
+		// IE doesn't inherit filter opacity properly, so we're forced to set it on tiles
+		if (L.Browser.ielt9) { return; }
+
+		L.DomUtil.setOpacity(this._container, this.options.opacity);
+
+		var now = +new Date(),
+		    nextFrame = false,
+		    willPrune = false;
+
+		for (var key in this._tiles) {
+			var tile = this._tiles[key];
+			if (!tile.current || !tile.loaded) { continue; }
+
+			var fade = Math.min(1, (now - tile.loaded) / 200);
+fade = 1;
+			L.DomUtil.setOpacity(tile.el, fade);
+			if (fade < 1) {
+				nextFrame = true;
+			} else {
+				if (tile.active) {
+					willPrune = true;
+				} else {
+					this._onOpaqueTile(tile);
+				}
+				tile.active = true;
+			}
+		}
+
+		if (willPrune && !this._noPrune) { this._pruneTiles(); }
+
+		if (nextFrame) {
+			 L.Util.cancelAnimFrame(this._fadeFrame);
+			this._fadeFrame =  L.Util.requestAnimFrame(this._updateOpacity, this);
+		}
+	},
+
+    _zoomEnd: function() {
+/*
+        this._gmx.zoomstart = false;
+// console.log('_zoomEnd ', this._loading, this._noTilesToLoad(), this._tileZoom, this._map._zoom, this._map.getZoom());
+		if (!this._noTilesToLoad()) {
+			setTimeout(L.bind(this._repaintNotLoaded, this), 25);
+
+			//L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
+		}
+*/
+    },
+
+    _moveEnd: function() {
+        if ('dataManager' in this._gmx) {
+            this._gmx.dataManager.fire('moveend');
+        }
+		L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
+    },
+
+	_repaintNotLoaded: function () {
+		var key, tile;
+		for (key in this._tiles) {
+			tile = this._tiles[key];
+			if (!tile.loaded && tile.coords.z == this._tileZoom) {
+// console.log('_repaintNotLoaded ', key, this._loading, this._tileZoom, this._map._zoom, this._map.getZoom());
+				this.repaint(key);
+				// setTimeout(L.bind(this._repaintNotLoaded, this), 0);
+
+				L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
+		// L.Util.cancelAnimFrame(this._fadeFrame);
+		// this._fadeFrame =  L.Util.requestAnimFrame(this._updateOpacity, this);
+				break;
+			}
+		}
+		//this._pruneTiles();
+		// this._updateOpacity();
+
+    },
+	// stops loading all tiles in the background layer
+	// _abortLoading: function () {
+// console.log('_abortLoading ', this._loading, this._tileZoom, this._map._zoom, this._map.getZoom());
+		// var i, tile;
+		// for (i in this._tiles) {
+			// if (this._tiles[i].coords.z !== this._tileZoom) {
+				// tile = this._tiles[i];
+				// delete this._tiles[i];
+			// }
+		// }
+	// },
+    _onCreateLevel: function(level) {
+		this._updateShiftY(level);
+//console.log('_onCreateLevel ', level);
     },
 
     onAdd: function(map) {
@@ -7164,7 +7266,7 @@ console.log('loading ', this._tileZoom, ev);
 				L.GridLayer.prototype.onAdd.call(this);
 			}
 
-			map.on('zoomstart', this._zoomStart, this);
+			// map.on('zoomstart', this._zoomStart, this);
 			map.on('zoomend', this._zoomEnd, this);
 			if (gmx.properties.type === 'Vector') {
 				map.on('moveend', this._moveEnd, this);
@@ -7211,7 +7313,7 @@ console.log('loading ', this._tileZoom, ev);
         this._container = null;
         this._map = null;
 
-        map.off('zoomstart', this._zoomStart, this);
+        // map.off('zoomstart', this._zoomStart, this);
         map.off('zoomend', this._zoomEnd, this);
         this.off('stylechange', this._onStyleChange, this);
 
@@ -7241,13 +7343,13 @@ console.log('loading ', this._tileZoom, ev);
     },
 
 /*eslint-disable no-unused-vars */
-	createTile: function(coords , done){
-		var stt = coords;
-		var st1 = done;
+	createTile: function(coords , done) {
+		this._test = [coords, done];
 		var tile = L.DomUtil.create('canvas', 'leaflet-tile');
 		var size = this.getTileSize();
 		tile.width = size.x;
 		tile.height = size.y;
+		tile.style.opacity = this.options.opacity;
 		return tile;
     },
 /*eslint-enable */
@@ -7487,9 +7589,11 @@ console.log('loading ', this._tileZoom, ev);
             var observer = null,
 				dataManager = gmx.dataManager;
             for (var key in this._tiles) {
-				// this._tiles[key].loaded = 0;
+				this._tiles[key].loaded = 0;
 				observer = this._tiles[key].observer;
-                observer.setDateInterval(beginDate, endDate);
+				if (observer) {
+					observer.setDateInterval(beginDate, endDate);
+				}
             }
             observer = dataManager.getObserver('_Labels');
             if (observer) {
@@ -7569,6 +7673,7 @@ console.log('loading ', this._tileZoom, ev);
 				zKeys[it] = true;
 			}
             this._gmx.dataManager._triggerObservers(zKeys);
+			// L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
         }
     },
 
@@ -7717,22 +7822,6 @@ console.log('loading ', this._tileZoom, ev);
     },
 
 	// internal
-    _zoomStart: function() {
-        this._gmx.zoomstart = true;
-		delete this._tileZoom;
-    },
-
-    _zoomEnd: function() {
-        this._gmx.zoomstart = false;
-        this._updateShiftY(this._map);
-        // this.repaint();
-    },
-
-    _moveEnd: function() {
-        if ('dataManager' in this._gmx) {
-            this._gmx.dataManager.fire('moveend');
-        }
-    },
 
     _onStyleChange: function() {
         var gmx = this._gmx;
@@ -7758,7 +7847,7 @@ console.log('loading ', this._tileZoom, ev);
 
     _getTilesByBounds: function (bounds) {    // Получить список gmxTiles по bounds
         var gmx = this._gmx,
-            zoom = this._map._zoom,
+            zoom = this._tileZoom || this._map._zoom,
             shiftX = gmx.shiftX || 0,   // Сдвиг слоя
             shiftY = gmx.shiftY || 0,   // Сдвиг слоя + OSM
 			latLngBounds = bounds.toLatLngBounds(gmx.srs == 3857),
@@ -7800,7 +7889,7 @@ console.log('loading ', this._tileZoom, ev);
         var gmxTiles = {};
         for (var x = minX; x <= maxX; x++) {
             for (var y = minY; y <= maxY; y++) {
-                var zKey = this._tileCoordsToKey({x: x, y: y}, zoom);
+                var zKey = this._tileCoordsToKey({x: x, y: y, z:zoom});
                 gmxTiles[zKey] = true;
             }
         }
@@ -7965,9 +8054,9 @@ console.log('loading ', this._tileZoom, ev);
         this._updateProperties(this._gmx.rawProperties);
     },
 
-    _updateShiftY: function() {
+    _updateShiftY: function(level) {
         var gmx = this._gmx;
-		gmx.currentZoom = this._tileZoom;
+		gmx.currentZoom = level.zoom;
 // console.log('_updateShiftY ', gmx.currentZoom);
 
 		gmx.tileSize = gmxAPIutils.tileSizes[gmx.currentZoom];
@@ -7989,16 +8078,16 @@ console.log('loading ', this._tileZoom, ev);
 		return Math.floor(L.CRS.scale(zoom) * shift / 40075016.685578496);
 	},
 
-	_clearOtherZoomLevels: function (zoom) {
-		zoom = zoom || this._tileZoom;
-		for (var z in this._levels) {
-			if (z != zoom) {
-				L.DomUtil.remove(this._levels[z].el);
-				this._onRemoveLevel(z);
-				delete this._levels[z];
-			}
-		}
-	},
+	// _clearOtherZoomLevels: function (zoom) {
+		// zoom = zoom || this._tileZoom;
+		// for (var z in this._levels) {
+			// if (z != zoom) {
+				// L.DomUtil.remove(this._levels[z].el);
+				// this._onRemoveLevel(z);
+				// delete this._levels[z];
+			// }
+		// }
+	// },
 
     __drawTile: function (ev) {
 		var coords = ev.coords,
@@ -8006,10 +8095,14 @@ console.log('loading ', this._tileZoom, ev);
 			tileElem = this._tiles[zKey],
 			zoom = this._tileZoom || this._map._zoom,
             gmx = this._gmx;
+if (!tileElem) {
+	return;
+}
+
         var myLayer = this,
 			gmxTilePoint = gmxAPIutils.getTileNumFromLeaflet(coords, zoom);
 
-        if (!tileElem.promise) {
+        if (tileElem && !tileElem.promise) {
 			tileElem.loaded = 0;
 			tileElem.key = zKey;
 			tileElem.promise = new Promise(function(resolve, reject) {
@@ -8035,15 +8128,16 @@ console.log('loading ', this._tileZoom, ev);
                         if (myLayer._tiles[zKey]) {
 							myLayer._tiles[zKey].loaded = 0;
 							// new ScreenVectorTile(myLayer, tileElem).drawTile(data).then(function(res) {
-							tileElem.screenTile.drawTile(data).then(function() {
+							tileElem.screenTile.drawTile(data).then(function(res) {
 								// console.log('resolve', zKey, res, data);
-								done();
+								if (res) { tileElem.count = res.count; }
+								done(res);
 							}, function(err) {
 								// console.log('reject', zKey, err, data);
 								done(err);
 							});
 						} else {
-							console.log('bad key', zKey);
+							// console.log('bad key', zKey);
 							done();
 						}
                     }
@@ -8052,7 +8146,7 @@ console.log('loading ', this._tileZoom, ev);
 						//if observer is deactivated before drawing,
 						//we can consider corresponding tile as already drawn
 						if (!this.isActive()) {
-							console.log('isActive', zKey)
+							// console.log('isActive', zKey)
 							done();
 						}
 					})
@@ -8190,6 +8284,7 @@ ScreenVectorTile.prototype = {
 						}
 					},
 					function() {
+						// console.log('tryHigherLevelTile111 ', rUrl);
 						tryHigherLevelTile(rUrl);
 					}
 				);
@@ -8305,6 +8400,19 @@ ScreenVectorTile.prototype = {
 		return out;
     },
 
+	getTilePosZoomDelta: function(tilePoint, zoomFrom, zoomTo) {		// получить смещение тайла на меньшем zoom
+        var dz = Math.pow(2, zoomFrom - zoomTo),
+            size = 256 / dz,
+            dx = tilePoint.x % dz,
+            dy = tilePoint.y % dz;
+		return {
+			size: size,
+			zDelta: dz,
+			x: size * dx,
+			y: size * dy
+		};
+    },
+
     // Loads missing rasters for single item and combines them in canvas.
     // Stores resulting canvas in this.rasters
     _getItemRasters: function (geo) {
@@ -8386,8 +8494,8 @@ ScreenVectorTile.prototype = {
 								isImage = false;
 							}
 
-							if (gtp.z !== gmxTilePoint.z) {
-								var posInfo = gmxAPIutils.getTilePosZoomDelta(gmxTilePoint, gmxTilePoint.z, gtp.z);
+							if (gtp.z !== ntp.z) {
+								var posInfo = _this.getTilePosZoomDelta(ntp, ntp.z, gtp.z);
 								if (posInfo.size < 1 / 256) {// меньше 1px
 									chkReadyRasters();
 									return;
@@ -8700,8 +8808,7 @@ ScreenVectorTile.prototype = {
 						tpy: this.tpy,
 						ctx: ctx
 					};
-//				tile.zKey = tileLink.el._zKey = this.zKey;
-L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
+				L.DomUtil.addClass(tile, 'zKey:' + this.zKey);
 
 				var doDraw = function() {
 					ctx.clearRect(0, 0, 256, 256);
@@ -8759,9 +8866,6 @@ L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 						}
 						//ctx.restore();
 						_this.rasters = {}; // clear rasters
-						// if (_this.layer._map && !tile.parentNode) {
-							// _this.layer.appendTileToContainer(tileLink);
-						// }
 						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
 					}, reject);
 				};
@@ -8789,17 +8893,6 @@ L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 			}
 		});
 		return arr;
-    },
-
-    _drawDone: function () {
-        for (var url in this.rasterRequests) {
-            var req = this.rasterRequests[url];
-            if (this._uniqueID !== req.options.tileRastersId) {
-                req.remove();
-                delete this.rasterRequests[url];
-            }
-        }
-        // this.layer.fire('tiledrawdone', {zKey: this.zKey});
     }
 };
 

@@ -264,8 +264,8 @@ var gmxAPIutils = {
 		return {
 			size: size,
 			zDelta: dz,
-			x: size * (dx < 0 ? dz + dx : dx),
-			y: size * (dy < 0 ? -(1 + tilePoint.y) % dz : dz - 1 - dy)
+			x: size * dx,
+			y: size * dy
 		};
     },
 

@@ -112,6 +112,7 @@ ScreenVectorTile.prototype = {
 						}
 					},
 					function() {
+						// console.log('tryHigherLevelTile111 ', rUrl);
 						tryHigherLevelTile(rUrl);
 					}
 				);
@@ -227,6 +228,19 @@ ScreenVectorTile.prototype = {
 		return out;
     },
 
+	getTilePosZoomDelta: function(tilePoint, zoomFrom, zoomTo) {		// получить смещение тайла на меньшем zoom
+        var dz = Math.pow(2, zoomFrom - zoomTo),
+            size = 256 / dz,
+            dx = tilePoint.x % dz,
+            dy = tilePoint.y % dz;
+		return {
+			size: size,
+			zDelta: dz,
+			x: size * dx,
+			y: size * dy
+		};
+    },
+
     // Loads missing rasters for single item and combines them in canvas.
     // Stores resulting canvas in this.rasters
     _getItemRasters: function (geo) {
@@ -308,8 +322,8 @@ ScreenVectorTile.prototype = {
 								isImage = false;
 							}
 
-							if (gtp.z !== gmxTilePoint.z) {
-								var posInfo = gmxAPIutils.getTilePosZoomDelta(gmxTilePoint, gmxTilePoint.z, gtp.z);
+							if (gtp.z !== ntp.z) {
+								var posInfo = _this.getTilePosZoomDelta(ntp, ntp.z, gtp.z);
 								if (posInfo.size < 1 / 256) {// меньше 1px
 									chkReadyRasters();
 									return;
@@ -622,8 +636,7 @@ ScreenVectorTile.prototype = {
 						tpy: this.tpy,
 						ctx: ctx
 					};
-//				tile.zKey = tileLink.el._zKey = this.zKey;
-L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
+				L.DomUtil.addClass(tile, 'zKey:' + this.zKey);
 
 				var doDraw = function() {
 					ctx.clearRect(0, 0, 256, 256);
@@ -681,9 +694,6 @@ L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 						}
 						//ctx.restore();
 						_this.rasters = {}; // clear rasters
-						// if (_this.layer._map && !tile.parentNode) {
-							// _this.layer.appendTileToContainer(tileLink);
-						// }
 						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
 					}, reject);
 				};
@@ -711,16 +721,5 @@ L.DomUtil.addClass(tile, '__zKey:' + this.zKey);
 			}
 		});
 		return arr;
-    },
-
-    _drawDone: function () {
-        for (var url in this.rasterRequests) {
-            var req = this.rasterRequests[url];
-            if (this._uniqueID !== req.options.tileRastersId) {
-                req.remove();
-                delete this.rasterRequests[url];
-            }
-        }
-        // this.layer.fire('tiledrawdone', {zKey: this.zKey});
     }
 };

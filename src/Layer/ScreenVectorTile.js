@@ -68,54 +68,59 @@ ScreenVectorTile.prototype = {
 		return new Promise(function(resolve) {
 			var tryLoad = function(gtp, crossOrigin) {
 				var rUrl = _this._getUrlFunction(gtp, item);
-
-				var tryHigherLevelTile = function(url) {
-					if (url) {
-						gmx.badTiles[url] = true;
-					}
-					if (gtp.z > 1) {
-						tryLoad({
-							x: Math.floor(gtp.x / 2),
-							y: Math.floor(gtp.y / 2),
-							z: gtp.z - 1
-						}, ''); // 'anonymous' 'use-credentials'
-					} else {
-						resolve({gtp: gtp});
-					}
-				};
-
-				if (gmx.badTiles[rUrl] || (gmx.maxNativeZoom && gmx.maxNativeZoom < gtp.z)) {
-					tryHigherLevelTile();
-					return;
-				}
-				var request = _this.rasterRequests[rUrl];
-				if (!request) {
-					if (gmx.rasterProcessingHook) {
-						crossOrigin = 'anonymous';
-					}
-					request = L.gmx.imageLoader.push(rUrl, {
-						tileRastersId: _this._uniqueID,
-						zoom: _this.zoom,
-						cache: true,
-						crossOrigin: gmx.crossOrigin || crossOrigin || ''
-					});
-					_this.rasterRequests[rUrl] = request;
+				if (gmx.rastersCache[rUrl]) {
+					resolve({gtp: gtp, image: gmx.rastersCache[rUrl]});
 				} else {
-					request.options.tileRastersId = _this._uniqueID;
-				}
-				request.promise.then(
-					function(imageObj) {
-						if (imageObj) {
-							resolve({gtp: gtp, image: imageObj});
+					var tryHigherLevelTile = function(url) {
+						if (url) {
+							gmx.badTiles[url] = true;
+						}
+						if (gtp.z > 1) {
+							tryLoad({
+								x: Math.floor(gtp.x / 2),
+								y: Math.floor(gtp.y / 2),
+								z: gtp.z - 1
+							}, ''); // 'anonymous' 'use-credentials'
 						} else {
+							resolve({gtp: gtp});
+						}
+					};
+
+					if (gmx.badTiles[rUrl] || (gmx.maxNativeZoom && gmx.maxNativeZoom < gtp.z)) {
+						tryHigherLevelTile();
+						return;
+					}
+
+					var request = _this.rasterRequests[rUrl];
+					if (!request) {
+						if (gmx.rasterProcessingHook) {
+							crossOrigin = 'anonymous';
+						}
+						request = L.gmx.imageLoader.push(rUrl, {
+							tileRastersId: _this._uniqueID,
+							zoom: _this.zoom,
+							cache: true,
+							crossOrigin: gmx.crossOrigin || crossOrigin || ''
+						});
+						_this.rasterRequests[rUrl] = request;
+					} else {
+						request.options.tileRastersId = _this._uniqueID;
+					}
+					request.promise.then(
+						function(imageObj) {
+							if (imageObj) {
+								gmx.rastersCache[rUrl] = imageObj;
+								resolve({gtp: gtp, image: imageObj});
+							} else {
+								tryHigherLevelTile(rUrl);
+							}
+						},
+						function() {
+							// console.log('tryHigherLevelTile111 ', rUrl);
 							tryHigherLevelTile(rUrl);
 						}
-					},
-					function() {
-						// console.log('tryHigherLevelTile111 ', rUrl);
-						tryHigherLevelTile(rUrl);
-					}
-				);
+					);
+				}
 			};
 
 			tryLoad(gtp);

@@ -353,6 +353,7 @@ ScreenVectorTile.prototype = {
 							if (isImage && !gmx.rasterProcessingHook) {
 								cnt--;
 								resCanvas = img;
+								rasters[idr] = resCanvas;
 								chkReadyRasters();
 							} else {
 								if (!resCanvas) {
@@ -363,7 +364,8 @@ ScreenVectorTile.prototype = {
 								var hookResult = _this._rasterHook(info),
 									then = function() {
 										cnt--;
-										p.resImage = resCanvas;
+										//p.resImage = resCanvas;
+										rasters[idr] = resCanvas;
 										chkReadyRasters();
 									};
 
@@ -416,7 +418,7 @@ ScreenVectorTile.prototype = {
 				}
 			}.bind(this)).then(function(img) {
 				if (isTiles) {
-					rasters[idr] = resCanvas;
+					// rasters[idr] = resCanvas;
 					resolve();
 				} else {
 					if (img) {

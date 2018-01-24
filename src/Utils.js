@@ -738,8 +738,8 @@ var gmxAPIutils = {
     },
 
     getPixelPoint: function(attr, coords) {
-        var gmx = attr.gmx,
-            mInPixel = gmx.mInPixel,
+        var topLeft = attr.topLeft,
+            mInPixel = topLeft.mInPixel,
             item = attr.item,
             currentStyle = item.currentStyle || item.parsedStyleKeys || {},
             style = attr.style || {},
@@ -749,7 +749,6 @@ var gmxAPIutils = {
             sy = currentStyle.sy || style.sy || 4,
             weight = currentStyle.weight || style.weight || 0,
             iconAnchor = currentStyle.iconAnchor || style.iconAnchor || null,
-			// topLeft = attr.topLeft,
 			px = attr.tpx,
             py = attr.tpy;
 
@@ -891,6 +890,8 @@ var gmxAPIutils = {
 
     pointToCanvas: function(attr) { // Точку в canvas
         var gmx = attr.gmx,
+			topLeft = attr.topLeft,
+            mInPixel = topLeft.mInPixel,
             pointAttr = attr.pointAttr,
             style = attr.style || {},
             item = attr.item,
@@ -930,9 +931,9 @@ var gmxAPIutils = {
             if ('opacity' in style) { ctx.globalAlpha = currentStyle.opacity || style.opacity; }
             if (gmx.transformFlag) {
 //						topLeft = attr.topLeft,
-				ctx.setTransform(gmx.mInPixel, 0, 0, gmx.mInPixel, -attr.tpx, attr.tpy);
+				ctx.setTransform(mInPixel, 0, 0, mInPixel, -attr.tpx, attr.tpy);
                 ctx.drawImage(image, px1, -py1, sx, sy);
-                ctx.setTransform(gmx.mInPixel, 0, 0, -gmx.mInPixel, -attr.tpx, attr.tpy);
+                ctx.setTransform(mInPixel, 0, 0, -mInPixel, -attr.tpx, attr.tpy);
             } else {
 				if (iconScale !== 1) {
 					sx *= iconScale;
@@ -1016,7 +1017,8 @@ var gmxAPIutils = {
         }
     },
     lineToCanvas: function(attr) {  // Lines in canvas
-        var gmx = attr.gmx,
+        var topLeft = attr.topLeft,
+            mInPixel = topLeft.mInPixel,
             coords = attr.coords,
             ctx = attr.ctx,
             item = attr.item,
@@ -1026,7 +1028,7 @@ var gmxAPIutils = {
         var lastX = null, lastY = null;
         ctx.beginPath();
         for (var i = 0, len = coords.length; i < len; i++) {
-            var p = gmxAPIutils.toPixels(coords[i], attr.tpx, attr.tpy, gmx.mInPixel, attr.topLeft),
+            var p = gmxAPIutils.toPixels(coords[i], attr.tpx, attr.tpy, mInPixel, attr.topLeft),
                 x = p[0],
                 y = p[1];
             if (lastX !== x || lastY !== y) {
@@ -1075,13 +1077,13 @@ var gmxAPIutils = {
             pixels.push(pixels1);
             hidden.push(hidden1);
         }
-        return {coords: pixels, hidden: hiddenFlag ? hidden : null, z: gmx.currentZoom};
+        return {coords: pixels, hidden: hiddenFlag ? hidden : null, z: attr.topLeft.tilePoint.z};
     },
 
     getRingPixels: function(attr) {
         if (attr.coords.length === 0) { return null; }
-        var gmx = attr.gmx,
-            mInPixel = gmx.mInPixel,
+        var topLeft = attr.topLeft,
+            mInPixel = topLeft.mInPixel,
             coords = attr.coords,
             hiddenLines = attr.hiddenLines || null,
 			// topLeft = attr.topLeft,

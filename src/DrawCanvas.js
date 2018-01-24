@@ -60,7 +60,7 @@ options
      tpx: X смещение тайла
      tpy: Y смещение тайла
      gmx: ссылка на layer._gmx
-        gmx.currentZoom
+        //gmx.currentZoom
         gmx.lastHover
         gmx.tileAttributeIndexes
      bgImage: растр для background
@@ -117,6 +117,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
             tpx: options.tpx,
             tpy: options.tpy
         };
+
     if (geoType === 'POINT') {
         dattr.pointAttr = utils.getPixelPoint(dattr, geom.coordinates);
         if (!dattr.pointAttr) { return false; }   // point not in canvas tile
@@ -156,7 +157,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
                 flagPixels = true;
 
 // console.log('pixelsMap', gmx.currentZoom, pixelsMap);
-            if (!pixelsMap || pixelsMap.z !== gmx.currentZoom) {
+            if (!pixelsMap || pixelsMap.z !== options.topLeft.tilePoint.z) {
                 pixelsMap = dataOption.pixels = utils.getCoordsPixels({
                     gmx: gmx,
                     coords: coords,
@@ -218,7 +219,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
         if (geoType === 'LINESTRING') { coords = [coords]; }
         var st = item.currentStyle || item.parsedStyleKeys;
         var isIconPath = st.iconPath || st.iconPath;
-        var size = (item.currentStyle.maxSize || item.currentStyle.lineWidth) / gmx.mInPixel;
+        var size = (item.currentStyle.maxSize || item.currentStyle.lineWidth) / options.topLeft.mInPixel;
         for (i = 0, len = coords.length; i < len; i++) {
 			if (isIconPath) {
 				var arr = tbounds.clipPolyLine(coords[i], true, size);

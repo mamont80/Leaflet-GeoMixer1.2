@@ -12,6 +12,7 @@ var Observer = L.Class.extend({
             layerID: String           	// ID слоя view
 			target: String				// ключ назначения обсервера
             targetZoom: [Number]        // for zoom generalized type default(null)
+			topLeft: {}					// для screen
             needBbox: [Boolean=false]   // режим запросов списка тайлов по BBOX
         }
     */

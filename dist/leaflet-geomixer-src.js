@@ -1685,8 +1685,8 @@ var gmxAPIutils = {
     },
 
     getPixelPoint: function(attr, coords) {
-        var gmx = attr.gmx,
-            mInPixel = gmx.mInPixel,
+        var topLeft = attr.topLeft,
+            mInPixel = topLeft.mInPixel,
             item = attr.item,
             currentStyle = item.currentStyle || item.parsedStyleKeys || {},
             style = attr.style || {},
@@ -1696,7 +1696,6 @@ var gmxAPIutils = {
             sy = currentStyle.sy || style.sy || 4,
             weight = currentStyle.weight || style.weight || 0,
             iconAnchor = currentStyle.iconAnchor || style.iconAnchor || null,
-			// topLeft = attr.topLeft,
 			px = attr.tpx,
             py = attr.tpy;
 
@@ -1838,6 +1837,8 @@ var gmxAPIutils = {
 
     pointToCanvas: function(attr) { // Точку в canvas
         var gmx = attr.gmx,
+			topLeft = attr.topLeft,
+            mInPixel = topLeft.mInPixel,
             pointAttr = attr.pointAttr,
             style = attr.style || {},
             item = attr.item,
@@ -1877,9 +1878,9 @@ var gmxAPIutils = {
             if ('opacity' in style) { ctx.globalAlpha = currentStyle.opacity || style.opacity; }
             if (gmx.transformFlag) {
 //						topLeft = attr.topLeft,
-				ctx.setTransform(gmx.mInPixel, 0, 0, gmx.mInPixel, -attr.tpx, attr.tpy);
+				ctx.setTransform(mInPixel, 0, 0, mInPixel, -attr.tpx, attr.tpy);
                 ctx.drawImage(image, px1, -py1, sx, sy);
-                ctx.setTransform(gmx.mInPixel, 0, 0, -gmx.mInPixel, -attr.tpx, attr.tpy);
+                ctx.setTransform(mInPixel, 0, 0, -mInPixel, -attr.tpx, attr.tpy);
             } else {
 				if (iconScale !== 1) {
 					sx *= iconScale;
@@ -1963,7 +1964,8 @@ var gmxAPIutils = {
         }
     },
     lineToCanvas: function(attr) {  // Lines in canvas
-        var gmx = attr.gmx,
+        var topLeft = attr.topLeft,
+            mInPixel = topLeft.mInPixel,
             coords = attr.coords,
             ctx = attr.ctx,
             item = attr.item,
@@ -1973,7 +1975,7 @@ var gmxAPIutils = {
         var lastX = null, lastY = null;
         ctx.beginPath();
         for (var i = 0, len = coords.length; i < len; i++) {
-            var p = gmxAPIutils.toPixels(coords[i], attr.tpx, attr.tpy, gmx.mInPixel, attr.topLeft),
+            var p = gmxAPIutils.toPixels(coords[i], attr.tpx, attr.tpy, mInPixel, attr.topLeft),
                 x = p[0],
                 y = p[1];
             if (lastX !== x || lastY !== y) {
@@ -2022,13 +2024,13 @@ var gmxAPIutils = {
             pixels.push(pixels1);
             hidden.push(hidden1);
         }
-        return {coords: pixels, hidden: hiddenFlag ? hidden : null, z: gmx.currentZoom};
+        return {coords: pixels, hidden: hiddenFlag ? hidden : null, z: attr.topLeft.tilePoint.z};
     },
 
     getRingPixels: function(attr) {
         if (attr.coords.length === 0) { return null; }
-        var gmx = attr.gmx,
-            mInPixel = gmx.mInPixel,
+        var topLeft = attr.topLeft,
+            mInPixel = topLeft.mInPixel,
             coords = attr.coords,
             hiddenLines = attr.hiddenLines || null,
 			// topLeft = attr.topLeft,
@@ -4168,7 +4170,7 @@ options
      tpx: X смещение тайла
      tpy: Y смещение тайла
      gmx: ссылка на layer._gmx
-        gmx.currentZoom
+        //gmx.currentZoom
         gmx.lastHover
         gmx.tileAttributeIndexes
      bgImage: растр для background
@@ -4225,6 +4227,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
             tpx: options.tpx,
             tpy: options.tpy
         };
+
     if (geoType === 'POINT') {
         dattr.pointAttr = utils.getPixelPoint(dattr, geom.coordinates);
         if (!dattr.pointAttr) { return false; }   // point not in canvas tile
@@ -4264,7 +4267,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
                 flagPixels = true;
 
 // console.log('pixelsMap', gmx.currentZoom, pixelsMap);
-            if (!pixelsMap || pixelsMap.z !== gmx.currentZoom) {
+            if (!pixelsMap || pixelsMap.z !== options.topLeft.tilePoint.z) {
                 pixelsMap = dataOption.pixels = utils.getCoordsPixels({
                     gmx: gmx,
                     coords: coords,
@@ -4326,7 +4329,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
         if (geoType === 'LINESTRING') { coords = [coords]; }
         var st = item.currentStyle || item.parsedStyleKeys;
         var isIconPath = st.iconPath || st.iconPath;
-        var size = (item.currentStyle.maxSize || item.currentStyle.lineWidth) / gmx.mInPixel;
+        var size = (item.currentStyle.maxSize || item.currentStyle.lineWidth) / options.topLeft.mInPixel;
         for (i = 0, len = coords.length; i < len; i++) {
 			if (isIconPath) {
 				var arr = tbounds.clipPolyLine(coords[i], true, size);
@@ -5356,6 +5359,7 @@ var Observer = L.Class.extend({
             layerID: String           	// ID слоя view
 			target: String				// ключ назначения обсервера
             targetZoom: [Number]        // for zoom generalized type default(null)
+			topLeft: {}					// для screen
             needBbox: [Boolean=false]   // режим запросов списка тайлов по BBOX
         }
     */
@@ -7153,43 +7157,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			}, this);
 	},
 
-	_setView: function (center, zoom, noPrune, noUpdate) {
-		var tileZoom = this._clampZoom(Math.round(zoom));
-		if ((this.options.maxZoom !== undefined && tileZoom > this.options.maxZoom) ||
-		    (this.options.minZoom !== undefined && tileZoom < this.options.minZoom)) {
-			tileZoom = undefined;
-		}
- console.log('_setView ', zoom, tileZoom, this._loading, this._noTilesToLoad(), this._tileZoom, this._map._zoom, this._map.getZoom());
-
-		var tileZoomChanged = this.options.updateWhenZooming && (tileZoom !== this._tileZoom);
-
-		if (!noUpdate || tileZoomChanged) {
-
-			this._tileZoom = tileZoom;
-
-			if (this._abortLoading) {
-				this._abortLoading();
-			}
-
-			this._updateLevels();
-			this._resetGrid();
-
-			if (tileZoom !== undefined) {
-				this._update(center);
-			}
-
-			if (!noPrune) {
-				this._pruneTiles();
-			}
-
-			// Flag to prevent _updateOpacity from pruning tiles during
-			// a zoom anim or a pinch gesture
-			this._noPrune = !!noPrune;
-		}
-
-		this._setZoomTransforms(center, zoom);
-	},
-
 	_updateOpacity: function () {
 		if (!this._map) { return; }
 
@@ -7280,8 +7247,44 @@ fade = 1;
 				// to trigger a pruning.
 				setTimeout(L.bind(this._pruneTiles, this), 250);
 			}
-/**/
 		}
+	},
+/*
+	_setView: function (center, zoom, noPrune, noUpdate) {
+		var tileZoom = this._clampZoom(Math.round(zoom));
+		if ((this.options.maxZoom !== undefined && tileZoom > this.options.maxZoom) ||
+		    (this.options.minZoom !== undefined && tileZoom < this.options.minZoom)) {
+			tileZoom = undefined;
+		}
+ console.log('_setView ', zoom, tileZoom, this._loading, this._noTilesToLoad(), this._tileZoom, this._map._zoom, this._map.getZoom());
+
+		var tileZoomChanged = this.options.updateWhenZooming && (tileZoom !== this._tileZoom);
+
+		if (!noUpdate || tileZoomChanged) {
+
+			this._tileZoom = tileZoom;
+
+			if (this._abortLoading) {
+				this._abortLoading();
+			}
+
+			this._updateLevels();
+			this._resetGrid();
+
+			if (tileZoom !== undefined) {
+				this._update(center);
+			}
+
+			if (!noPrune) {
+				this._pruneTiles();
+			}
+
+			// Flag to prevent _updateOpacity from pruning tiles during
+			// a zoom anim or a pinch gesture
+			this._noPrune = !!noPrune;
+		}
+
+		this._setZoomTransforms(center, zoom);
 	},
 
 	_updateLevels: function () {
@@ -7367,10 +7370,14 @@ fade = 1;
 			}
 		}
 	},
+*/
+    _zoomStart: function() {
+        this._gmx.zoomstart = true;
+	},
 
     _zoomEnd: function() {
-/*
         this._gmx.zoomstart = false;
+/*
 // console.log('_zoomEnd ', this._loading, this._noTilesToLoad(), this._tileZoom, this._map._zoom, this._map.getZoom());
 		if (!this._noTilesToLoad()) {
 			setTimeout(L.bind(this._repaintNotLoaded, this), 25);
@@ -7451,7 +7458,7 @@ fade = 1;
 				L.GridLayer.prototype.onAdd.call(this);
 			}
 
-			// map.on('zoomstart', this._zoomStart, this);
+			map.on('zoomstart', this._zoomStart, this);
 			map.on('zoomend', this._zoomEnd, this);
 			if (gmx.properties.type === 'Vector') {
 				map.on('moveend', this._moveEnd, this);
@@ -7498,7 +7505,7 @@ fade = 1;
         this._container = null;
         this._map = null;
 
-        // map.off('zoomstart', this._zoomStart, this);
+        map.off('zoomstart', this._zoomStart, this);
         map.off('zoomend', this._zoomEnd, this);
         this.off('stylechange', this._onStyleChange, this);
 
@@ -8244,15 +8251,15 @@ fade = 1;
 		gmx.currentZoom = level.zoom;
 // console.log('_updateShiftY ', gmx.currentZoom);
 
-		gmx.tileSize = gmxAPIutils.tileSizes[gmx.currentZoom];
+		gmx.tileSize = gmxAPIutils.tileSizes[level.zoom];
 		gmx.mInPixel = 256 / gmx.tileSize;
-		gmx.rastersDeltaY = gmx.RasterSRS === 3857 ? 0 : this._getShiftY(gmx.currentZoom, L.CRS.EPSG3395);
-        if (gmx.applyShift && this._map) {
-			gmx.deltaY = this._getShiftY(gmx.currentZoom);
-			gmx.shiftX = Math.floor(gmx.mInPixel * (gmx.shiftXlayer || 0));
-			gmx.shiftY = Math.floor(gmx.deltaY + gmx.mInPixel * (gmx.shiftYlayer || 0));
-			gmx.shiftPoint = new L.Point(gmx.shiftX, -gmx.shiftY);     // Сдвиг слоя
-        }
+		// gmx.rastersDeltaY = gmx.RasterSRS === 3857 ? 0 : this._getShiftY(gmx.currentZoom, L.CRS.EPSG3395);
+        // if (gmx.applyShift && this._map) {
+			// gmx.deltaY = this._getShiftY(gmx.currentZoom);
+			// gmx.shiftX = Math.floor(gmx.mInPixel * (gmx.shiftXlayer || 0));
+			// gmx.shiftY = Math.floor(gmx.deltaY + gmx.mInPixel * (gmx.shiftYlayer || 0));
+			// gmx.shiftPoint = new L.Point(gmx.shiftX, -gmx.shiftY);     // Сдвиг слоя
+        // }
     },
 
 	_getShiftY: function(zoom, crs) {		// Layer shift
@@ -8300,6 +8307,7 @@ if (!tileElem) {
                     type: 'resend',
                     layerID: gmx.layerID,
                     needBbox: gmx.needBbox,
+					topLeft: tileElem.screenTile.topLeft,
                     srs: gmx.srs,
                     target: 'screen',
 					targetZoom: myLayer.options.isGeneralized ? zoom : null,
@@ -8383,6 +8391,9 @@ function ScreenVectorTile(layer, tileElem) {
 
     this.tbounds = utils.getBoundsByTilePoint(this.ntp);
     this.topLeft = {
+		tilePoint: tilePoint,
+		tileSize: tileSize,
+		mInPixel: 256 / tileSize,
 		pix: {
 			px: 256 * tilePoint.x,
 			py: 256 * tilePoint.y
@@ -8537,7 +8548,7 @@ ScreenVectorTile.prototype = {
 
     // get tiles parameters for shifted object
     _getShiftTilesArray: function (bounds, shiftX, shiftY) {
-        var mInPixel = this.gmx.mInPixel,
+        var mInPixel = this.topLeft.mInPixel,
             gmxTilePoint = this.gmxTilePoint,
             px = shiftX * mInPixel,
             py = shiftY * mInPixel,
@@ -9037,7 +9048,7 @@ ScreenVectorTile.prototype = {
 								id = geoItem.id,
 								item = gmx.dataManager.getItem(id);
 							if (item) {     // skip removed items   (bug with screen tile screenTileDrawPromise.cancel on hover repaint)
-								var style = gmx.styleManager.getObjStyle(item),
+								var style = gmx.styleManager.getObjStyle(item, _this.zoom),
 									hover = gmx.lastHover && gmx.lastHover.id === geoItem.id && style;
 
 								if (gmx.multiFilters) {
@@ -9310,7 +9321,7 @@ StyleManager.prototype = {
             return gmxAPIutils.bounds();
         }
 
-        this._maxStyleSize = this._getMaxStyleSize(this.gmx.currentZoom);
+        this._maxStyleSize = this._getMaxStyleSize(ntp.z);
 
         var mercSize = 2 * this._maxStyleSize * gmxAPIutils.tileSizes[ntp.z] / 256; //TODO: check formula
         return gmxAPIutils.getBoundsByTilePoint(ntp).addBuffer(mercSize);
@@ -9455,8 +9466,8 @@ StyleManager.prototype = {
         // return this._itemStyleParser(item, this.gmx.styleHook(item, hoverFlag));
     // },
 
-    getObjStyle: function(item) {
-        this._chkStyleFilter(item);
+    getObjStyle: function(item, zoom) {
+        this._chkStyleFilter(item, zoom);
         var style = this._styles[item.currentFilter],
             version;
 
@@ -9548,13 +9559,13 @@ StyleManager.prototype = {
         return out;
     },
 
-    _chkStyleFilter: function(item) {
+    _chkStyleFilter: function(item, zoom) {
         var gmx = this.gmx,
-            zoom = gmx.currentZoom,
             fnum = gmx.multiFilters ? -1 : item.currentFilter,
             curr = this._styles[fnum],
             needParse = !curr || curr.version !== item.styleVersion;
 
+		zoom = zoom || gmx.currentZoom;
         if (needParse || item._lastZoom !== zoom) {
             item.currentFilter = -1;
             item.multiFilters = [];

@@ -27,6 +27,9 @@ function ScreenVectorTile(layer, tileElem) {
 
     this.tbounds = utils.getBoundsByTilePoint(this.ntp);
     this.topLeft = {
+		tilePoint: tilePoint,
+		tileSize: tileSize,
+		mInPixel: 256 / tileSize,
 		pix: {
 			px: 256 * tilePoint.x,
 			py: 256 * tilePoint.y
@@ -181,7 +184,7 @@ ScreenVectorTile.prototype = {
 
     // get tiles parameters for shifted object
     _getShiftTilesArray: function (bounds, shiftX, shiftY) {
-        var mInPixel = this.gmx.mInPixel,
+        var mInPixel = this.topLeft.mInPixel,
             gmxTilePoint = this.gmxTilePoint,
             px = shiftX * mInPixel,
             py = shiftY * mInPixel,
@@ -681,7 +684,7 @@ ScreenVectorTile.prototype = {
 								id = geoItem.id,
 								item = gmx.dataManager.getItem(id);
 							if (item) {     // skip removed items   (bug with screen tile screenTileDrawPromise.cancel on hover repaint)
-								var style = gmx.styleManager.getObjStyle(item),
+								var style = gmx.styleManager.getObjStyle(item, _this.zoom),
 									hover = gmx.lastHover && gmx.lastHover.id === geoItem.id && style;
 
 								if (gmx.multiFilters) {

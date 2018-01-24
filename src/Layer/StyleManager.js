@@ -53,7 +53,7 @@ StyleManager.prototype = {
             return gmxAPIutils.bounds();
         }
 
-        this._maxStyleSize = this._getMaxStyleSize(this.gmx.currentZoom);
+        this._maxStyleSize = this._getMaxStyleSize(ntp.z);
 
         var mercSize = 2 * this._maxStyleSize * gmxAPIutils.tileSizes[ntp.z] / 256; //TODO: check formula
         return gmxAPIutils.getBoundsByTilePoint(ntp).addBuffer(mercSize);
@@ -198,8 +198,8 @@ StyleManager.prototype = {
         // return this._itemStyleParser(item, this.gmx.styleHook(item, hoverFlag));
     // },
 
-    getObjStyle: function(item) {
-        this._chkStyleFilter(item);
+    getObjStyle: function(item, zoom) {
+        this._chkStyleFilter(item, zoom);
         var style = this._styles[item.currentFilter],
             version;
 
@@ -291,13 +291,13 @@ StyleManager.prototype = {
         return out;
     },
 
-    _chkStyleFilter: function(item) {
+    _chkStyleFilter: function(item, zoom) {
         var gmx = this.gmx,
-            zoom = gmx.currentZoom,
             fnum = gmx.multiFilters ? -1 : item.currentFilter,
             curr = this._styles[fnum],
             needParse = !curr || curr.version !== item.styleVersion;
 
+		zoom = zoom || gmx.currentZoom;
         if (needParse || item._lastZoom !== zoom) {
             item.currentFilter = -1;
             item.multiFilters = [];

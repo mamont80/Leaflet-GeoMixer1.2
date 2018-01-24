@@ -8786,6 +8786,7 @@ ScreenVectorTile.prototype = {
 					if (img) {
 						var imgAttr = {
 							gmx: gmx,
+							topLeft: _this.topLeft,
 							geoItem: geo,
 							item: item,
 							gmxTilePoint: gmxTilePoint
@@ -8796,6 +8797,7 @@ ScreenVectorTile.prototype = {
 						}
 						var prepareItem = function(imageElement) {
 							var promise = _this._rasterHook({
+									topLeft: _this.topLeft,
 									geoItem: geo,
 									res: resCanvas,
 									image: itemImageProcessingHook ? itemImageProcessingHook(imageElement, imgAttr) : imageElement,
@@ -11899,8 +11901,9 @@ L.gmx.VectorLayer.include({
 
 L.gmx.gmxImageTransform = function(img, hash) {
     var gmx = hash.gmx,
+        topLeft = hash.topLeft,
+		mInPixel = topLeft.mInPixel,
         gmxTilePoint = hash.gmxTilePoint,
-        mInPixel = gmx.mInPixel,
         geoItem = hash.geoItem,
         properties = geoItem.properties,
         dataOption = geoItem.dataOption || {},

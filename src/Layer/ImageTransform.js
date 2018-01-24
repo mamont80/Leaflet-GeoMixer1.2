@@ -1,7 +1,8 @@
 L.gmx.gmxImageTransform = function(img, hash) {
     var gmx = hash.gmx,
+        topLeft = hash.topLeft,
+		mInPixel = topLeft.mInPixel,
         gmxTilePoint = hash.gmxTilePoint,
-        mInPixel = gmx.mInPixel,
         geoItem = hash.geoItem,
         properties = geoItem.properties,
         dataOption = geoItem.dataOption || {},

@@ -422,6 +422,7 @@ ScreenVectorTile.prototype = {
 					if (img) {
 						var imgAttr = {
 							gmx: gmx,
+							topLeft: _this.topLeft,
 							geoItem: geo,
 							item: item,
 							gmxTilePoint: gmxTilePoint
@@ -432,6 +433,7 @@ ScreenVectorTile.prototype = {
 						}
 						var prepareItem = function(imageElement) {
 							var promise = _this._rasterHook({
+									topLeft: _this.topLeft,
 									geoItem: geo,
 									res: resCanvas,
 									image: itemImageProcessingHook ? itemImageProcessingHook(imageElement, imgAttr) : imageElement,

@@ -7400,6 +7400,8 @@ fade = 1;
     },
 
 	_repaintNotLoaded: function () {
+		if (!this._map) { return; }
+
 		var arr = [], key, tile;
 		for (key in this._tiles) {
 			tile = this._tiles[key];
@@ -7434,7 +7436,7 @@ fade = 1;
 		// }
 	// },
     _onCreateLevel: function(level) {
-		this._updateShiftY(level);
+		this._updateShiftY(level.zoom);
 //console.log('_onCreateLevel ', level);
     },
 
@@ -7471,8 +7473,12 @@ fade = 1;
 			this.on('versionchange', this._onVersionChange, this);
 
 			// this._zIndexOffsetCheck();
+
 			L.gmx.layersVersion.add(this);
 			this.fire('add');
+			// this.redraw();
+// console.log('sdsd', gmx.currentZoom, map.getZoom());
+			// L.gmx.layersVersion.now();
 		}.bind(this));
         gmx.styleManager.initStyles();
     },
@@ -7520,6 +7526,7 @@ fade = 1;
     },
 
 	beforeAdd: function(map) {
+		this._updateShiftY(map.getZoom());
         L.GridLayer.prototype.beforeAdd.call(this, map);
 		this._map = map;
     },
@@ -8246,12 +8253,12 @@ fade = 1;
         this._updateProperties(this._gmx.rawProperties);
     },
 
-    _updateShiftY: function(level) {
+    _updateShiftY: function(zoom) {
         var gmx = this._gmx;
-		gmx.currentZoom = level.zoom;
+		gmx.currentZoom = zoom;
 // console.log('_updateShiftY ', gmx.currentZoom);
 
-		gmx.tileSize = gmxAPIutils.tileSizes[level.zoom];
+		gmx.tileSize = gmxAPIutils.tileSizes[zoom];
 		gmx.mInPixel = 256 / gmx.tileSize;
 		// gmx.rastersDeltaY = gmx.RasterSRS === 3857 ? 0 : this._getShiftY(gmx.currentZoom, L.CRS.EPSG3395);
         // if (gmx.applyShift && this._map) {
@@ -8312,7 +8319,7 @@ if (!tileElem) {
                     target: 'screen',
 					targetZoom: myLayer.options.isGeneralized ? zoom : null,
 					dateInterval: gmx.layerType === 'VectorTemporal' ? [gmx.beginDate, gmx.endDate] : null,
-                    active: false,
+                    active: true,
                     bbox: gmx.styleManager.getStyleBounds(coords),
                     filters: ['clipFilter', 'userFilter_' + gmx.layerID, 'styleFilter', 'userFilter'].concat(filters),
                     callback: function(data) {
@@ -8341,13 +8348,13 @@ if (!tileElem) {
 							// console.log('isActive', zKey)
 							done();
 						}
-					})
-					.activate();
+					});
+					//.activate();
 			}).catch(function(e) {
 				console.warn('catch:', e);
 			});
 		} else {
-			tileElem.observer.deactivate();
+			//tileElem.observer.deactivate();
 			tileElem.resolve();
 		}
     }

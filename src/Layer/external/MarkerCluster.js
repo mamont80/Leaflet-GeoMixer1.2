@@ -143,6 +143,7 @@
                 arr = [];
             }
             if (data.added) {
+				var tilesCRS = this.parentLayer.options.tilesCRS || L.Projection.Mercator;
                 for (i = 0, len = data.added.length; i < len; i++) {
                     vectorTileItem = data.added[i];
                     id = vectorTileItem.id;
@@ -159,7 +160,7 @@
                         var geo = item[item.length - 1],
                             parsedStyle = vectorTileItem.item.parsedStyleKeys,
                             p = geo.coordinates,
-                            latlng = L.Projection.Mercator.unproject({x: p[0], y: p[1]}),
+                            latlng = tilesCRS.unproject({x: p[0], y: p[1]}),
                             opt = {
                                 properties: vectorTileItem.properties,
                                 mPoint: p

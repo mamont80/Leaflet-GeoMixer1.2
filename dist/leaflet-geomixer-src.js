@@ -7073,6 +7073,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         useWebGL: false,
 		skipTiles: 'All', // All, NotVisible, None
         iconsUrlReplace: [],
+        cacheRasters: true,
+        cacheQuicklooks: true,
+        clearCacheOnLoad: true,
         showScreenTiles: false,
 		updateWhenZooming: false,
 		// bubblingMouseEvents: false,
@@ -7105,45 +7108,27 @@ L.gmx.VectorLayer = L.GridLayer.extend({
             endDate: options.endDate,
             sortItems: options.sortItems || null,
             styles: options.styles || [],
-            rastersCache: {},
             shiftXlayer: 0,
             shiftYlayer: 0,
             renderHooks: [],
             preRenderHooks: [],
             _needPopups: {}
         };
+        if (options.cacheQuicklooks) {			// cache quicklooks for CR
+            this._gmx.quicklooksCache = {};
+        }
+        if (options.cacheRasters) {				// cache rasters for CR
+            this._gmx.rastersCache = {};
+        }
         if (options.crossOrigin) {
             this._gmx.crossOrigin = options.crossOrigin;
         }
-
-        this
-			.on('dateIntervalChanged', function() {
-				// console.log('dateIntervalChanged ', this._loading, this._tileZoom, ev);
-				setTimeout(L.bind(this._repaintNotLoaded, this), 25);
-			}, this)
-			// .on('load', function() {						// завершена загрузка тайлов (все тайлы имеют признак - loaded)
-			// }, this)
-			// .on('loading', function(ev) {						// начата загрузка тайлов (если нет не отрисованных тайлов)
-			// }, this)
-			// .on('tileload', function(ev) {
-			// }, this) 		// тайл (ev.coords) загружен
-			// .on('tileerror', function(ev) {}, this) 		// тайл (ev.coords) с ошибкой
-			// .on('tileunload', function(ev) {				// тайл (ev.coords) удален
-				// if (this._gmx.dataManager) {
-					// this._gmx.dataManager.removeObserver(this._tileCoordsToKey(ev.coords));
-				// }
-			// }, this)
-			.on('tileloadstart', function(ev) {				// тайл (ev.coords) загружается
-				var key = this._tileCoordsToKey(ev.coords),
-					tLink = this._tiles[key];
-				// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
-
-				tLink.loaded = 0;
-				tLink.screenTile = new ScreenVectorTile(this, tLink);
-				L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
-			}, this);
 	},
 
+	_setView: function (center, zoom, noPrune, noUpdate) {
+		if (!this._map) { return; }
+		L.GridLayer.prototype._setView.call(this, center, zoom, noPrune, noUpdate);
+	},
     _zoomStart: function() {
         this._gmx.zoomstart = true;
 	},
@@ -7166,7 +7151,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		for (key in this._tiles) {
 			tile = this._tiles[key];
 			if (!tile.loaded && tile.coords.z == this._tileZoom) {
-// console.log('_repaintNotLoaded ', key, this._loading, this._tileZoom, this._map._zoom, this._map.getZoom());
 				arr.push(key);
 				break;
 			}
@@ -7174,8 +7158,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		if (arr.length) {
 			this.repaint(arr);
 			L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
-		} else {
+		} else if (this.options.clearCacheOnLoad) {
 			this._gmx.rastersCache = {};
+			this._gmx.quicklooksCache = {};
 		}
     },
 
@@ -7289,6 +7274,19 @@ fade = 1;
 		//console.log('_onCreateLevel ', level);
     },
 
+	_initContainer: function () {
+		if (this._container) { return; }
+
+		this._container = L.DomUtil.create('div', 'leaflet-layer ' + (this.options.className || ''));
+		this._updateZIndex();
+
+		// if (this.options.opacity < 1) {
+			// this._updateOpacity();
+		// }
+
+		this.getPane(this.options.pane).appendChild(this._container);
+	},
+
     onAdd: function(map) {
 		map = map || this._map;
         if (map.options.crs !== L.CRS.EPSG3857 && map.options.crs !== L.CRS.EPSG3395) {
@@ -7296,6 +7294,8 @@ fade = 1;
         }
 
         var gmx = this._gmx;
+
+		this.beforeAdd(map);
 
 		this.options.tilesCRS = gmx.srs == 3857 ? L.CRS.EPSG3857 : L.CRS.EPSG3395;
         gmx.shiftY = 0;
@@ -7306,7 +7306,7 @@ fade = 1;
 
 		gmx.styleManager.promise.then(function () {
 			if (!this._heatmap && !this._clusters) {
-				L.GridLayer.prototype.onAdd.call(this);
+				L.GridLayer.prototype.onAdd.call(this, map);
 			}
 
 			map.on('zoomstart', this._zoomStart, this);
@@ -7314,57 +7314,75 @@ fade = 1;
 			if (gmx.properties.type === 'Vector') {
 				map.on('moveend', this._moveEnd, this);
 			}
-			if (this.options.clickable === false) {
-				this._container.style.pointerEvents = 'none';
-			}
 			if (gmx.balloonEnable && !this._popup) { this.bindPopup(''); }
 			this.on('stylechange', this._onStyleChange, this);
 			this.on('versionchange', this._onVersionChange, this);
 
 			// this._zIndexOffsetCheck();
+			if (this.getEvents) {
+				var events = this.getEvents();
+				map.on(events, this);
+				this.once('remove', function () {
+					map.off(events, this);
+				}, this);
+			}
 
 			L.gmx.layersVersion.add(this);
 			this.fire('add');
 		}.bind(this));
         gmx.styleManager.initStyles();
+		this
+			.on('dateIntervalChanged', this._checkNotLoaded, this)
+			.on('tileloadstart', this._tileloadstart, this);
+		if (this.options.clickable === false) {
+			this._container.style.pointerEvents = 'none';
+		}
+		this._resetView();
+		this._update();
+   },
+
+    _checkNotLoaded: function() {
+		setTimeout(L.bind(this._repaintNotLoaded, this), 25);
+    },
+
+    _tileloadstart: function(ev) {				// тайл (ev.coords) загружается
+		var key = this._tileCoordsToKey(ev.coords),
+			tLink = this._tiles[key];
+		// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
+
+		tLink.loaded = 0;
+		tLink.screenTile = new ScreenVectorTile(this, tLink);
+		L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
     },
 
     onRemove: function(map) {
-        if (this._container && this._container.parentNode) {
-            this._container.parentNode.removeChild(this._container);
-        }
+        var gmx = this._gmx;
+		this
+			.off('stylechange', this._onStyleChange, this)
+			.off('versionchange', this._onVersionChange, this)
+			.off('dateIntervalChanged', this._checkNotLoaded, this)
+			.off('tileloadstart', this._tileloadstart, this);
+		map
+			.off('zoomstart', this._zoomStart, this)
+			.off('zoomend', this._zoomEnd, this)
+			.off('moveend', this._moveEnd, this);
 
-        map.off({
-            'viewreset': this._reset,
-            'moveend': this._update
-        }, this);
-
-        if (this._animated) {
-            map.off({
-                'zoomanim': this._animateZoom,
-                'zoomend': this._endZoomAnim
-            }, this);
-        }
+		this._removeAllTiles();
+		L.DomUtil.remove(this._container);
+		map._removeZoomLimit(this);
+		this._container = null;
+		this._tileZoom = undefined;
 
         if (!this.options.updateWhenIdle) {
-            map.off('move', this._limitedUpdate, this);
+//            map.off('move', this._limitedUpdate, this);
         }
-        var gmx = this._gmx;
 		if (gmx.labelsLayer) {	// удалить из labelsLayer
 			map._labelsLayer.remove(this);
 		}
 
-        this._container = null;
         this._map = null;
 
-        map.off('zoomstart', this._zoomStart, this);
-        map.off('zoomend', this._zoomEnd, this);
-        this.off('stylechange', this._onStyleChange, this);
-
         delete gmx.map;
-        if (gmx.properties.type === 'Vector') {
-            map.off('moveend', this._moveEnd, this);
-        }
         if (gmx.dataManager && !gmx.dataManager.getActiveObserversCount()) {
             L.gmx.layersVersion.remove(this);
         }
@@ -8256,7 +8274,7 @@ ScreenVectorTile.prototype = {
 		return new Promise(function(resolve) {
 			var tryLoad = function(gtp, crossOrigin) {
 				var rUrl = _this._getUrlFunction(gtp, item);
-				if (gmx.rastersCache[rUrl]) {
+				if (gmx.rastersCache && gmx.rastersCache[rUrl]) {
 					resolve({gtp: gtp, image: gmx.rastersCache[rUrl]});
 				} else {
 					var tryHigherLevelTile = function(url) {
@@ -8297,7 +8315,9 @@ ScreenVectorTile.prototype = {
 					request.promise.then(
 						function(imageObj) {
 							if (imageObj) {
-								gmx.rastersCache[rUrl] = imageObj;
+								if (gmx.rastersCache) {
+									gmx.rastersCache[rUrl] = imageObj;
+								}
 								resolve({gtp: gtp, image: imageObj});
 							} else {
 								tryHigherLevelTile(rUrl);
@@ -8582,20 +8602,24 @@ ScreenVectorTile.prototype = {
 					if (url) {
 						if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
 
-						var request = this.rasterRequests[url];
-						if (!request) {
-							request = L.gmx.imageLoader.push(url, {
-								tileRastersId: _this._uniqueID,
-								crossOrigin: gmx.crossOrigin || 'anonymous'
-							});
-							this.rasterRequests[url] = request;
+						if (gmx.quicklooksCache && gmx.quicklooksCache[url]) {
+							resolve1(gmx.quicklooksCache[url]);
 						} else {
-							request.options.tileRastersId = this._uniqueID;
-						}
+							var request = this.rasterRequests[url];
+							if (!request) {
+								request = L.gmx.imageLoader.push(url, {
+									tileRastersId: _this._uniqueID,
+									crossOrigin: gmx.crossOrigin || 'anonymous'
+								});
+								this.rasterRequests[url] = request;
+							} else {
+								request.options.tileRastersId = this._uniqueID;
+							}
 
-						// in fact, we want to return request.def, but need to do additional action during cancellation.
-						// so, we consctruct new promise and add pipe it with request.def
-						request.promise.then(resolve1, resolve1);
+							// in fact, we want to return request.def, but need to do additional action during cancellation.
+							// so, we consctruct new promise and add pipe it with request.def
+							request.promise.then(resolve1, resolve1);
+						}
 					} else {
 						resolve1();
 					}
@@ -8607,6 +8631,9 @@ ScreenVectorTile.prototype = {
 					resolve();
 				} else {
 					if (img) {
+						if (gmx.quicklooksCache) {
+							gmx.quicklooksCache[url] = img;
+						}
 						var imgAttr = {
 							gmx: gmx,
 							topLeft: _this.topLeft,
@@ -12864,6 +12891,7 @@ L.gmx.ExternalLayer = L.Class.extend({
                 arr = [];
             }
             if (data.added) {
+				var tilesCRS = this.parentLayer.options.tilesCRS || L.Projection.Mercator;
                 for (i = 0, len = data.added.length; i < len; i++) {
                     vectorTileItem = data.added[i];
                     id = vectorTileItem.id;
@@ -12880,7 +12908,7 @@ L.gmx.ExternalLayer = L.Class.extend({
                         var geo = item[item.length - 1],
                             parsedStyle = vectorTileItem.item.parsedStyleKeys,
                             p = geo.coordinates,
-                            latlng = L.Projection.Mercator.unproject({x: p[0], y: p[1]}),
+                            latlng = tilesCRS.unproject({x: p[0], y: p[1]}),
                             opt = {
                                 properties: vectorTileItem.properties,
                                 mPoint: p

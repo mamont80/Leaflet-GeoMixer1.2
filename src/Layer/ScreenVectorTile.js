@@ -71,7 +71,7 @@ ScreenVectorTile.prototype = {
 		return new Promise(function(resolve) {
 			var tryLoad = function(gtp, crossOrigin) {
 				var rUrl = _this._getUrlFunction(gtp, item);
-				if (gmx.rastersCache[rUrl]) {
+				if (gmx.rastersCache && gmx.rastersCache[rUrl]) {
 					resolve({gtp: gtp, image: gmx.rastersCache[rUrl]});
 				} else {
 					var tryHigherLevelTile = function(url) {
@@ -112,7 +112,9 @@ ScreenVectorTile.prototype = {
 					request.promise.then(
 						function(imageObj) {
 							if (imageObj) {
-								gmx.rastersCache[rUrl] = imageObj;
+								if (gmx.rastersCache) {
+									gmx.rastersCache[rUrl] = imageObj;
+								}
 								resolve({gtp: gtp, image: imageObj});
 							} else {
 								tryHigherLevelTile(rUrl);
@@ -397,20 +399,24 @@ ScreenVectorTile.prototype = {
 					if (url) {
 						if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
 
-						var request = this.rasterRequests[url];
-						if (!request) {
-							request = L.gmx.imageLoader.push(url, {
-								tileRastersId: _this._uniqueID,
-								crossOrigin: gmx.crossOrigin || 'anonymous'
-							});
-							this.rasterRequests[url] = request;
+						if (gmx.quicklooksCache && gmx.quicklooksCache[url]) {
+							resolve1(gmx.quicklooksCache[url]);
 						} else {
-							request.options.tileRastersId = this._uniqueID;
-						}
+							var request = this.rasterRequests[url];
+							if (!request) {
+								request = L.gmx.imageLoader.push(url, {
+									tileRastersId: _this._uniqueID,
+									crossOrigin: gmx.crossOrigin || 'anonymous'
+								});
+								this.rasterRequests[url] = request;
+							} else {
+								request.options.tileRastersId = this._uniqueID;
+							}
 
-						// in fact, we want to return request.def, but need to do additional action during cancellation.
-						// so, we consctruct new promise and add pipe it with request.def
-						request.promise.then(resolve1, resolve1);
+							// in fact, we want to return request.def, but need to do additional action during cancellation.
+							// so, we consctruct new promise and add pipe it with request.def
+							request.promise.then(resolve1, resolve1);
+						}
 					} else {
 						resolve1();
 					}
@@ -422,6 +428,9 @@ ScreenVectorTile.prototype = {
 					resolve();
 				} else {
 					if (img) {
+						if (gmx.quicklooksCache) {
+							gmx.quicklooksCache[url] = img;
+						}
 						var imgAttr = {
 							gmx: gmx,
 							topLeft: _this.topLeft,

@@ -1,0 +1,50 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+	<title>GeoMixer Vector Layer Example</title>
+	<meta charset="utf-8" />
+    <style>
+        html, body, #map {
+            height: 100%;
+            width: 100%;
+            margin: 0px;
+        }
+    </style>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<link rel="stylesheet" href="http://www.kosmosnimki.ru/lib/geomixer_1.3/geomixer.css?1509430216088"/>
+	<script src="http://www.kosmosnimki.ru/lib/geomixer_1.3/geomixer-src.js?1509430216088"></script>
+
+</head>
+<body>
+	<div id="map"></div>
+	<script>
+		var map = L.map('map').setView([45.184577, 40.869655], 10);
+
+        var osm = L.tileLayer('http://tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=4', {
+			maxZoom: 18,
+			attribution: '<a href="http://2gis.com">2gis</a>'
+		}).addTo(map);
+        var lc = L.control.layers({ OSM: osm}, {});
+
+        L.gmx.loadMap('A1A5B241B8A94503BFA9901B1C435405', {
+        }).then(function(gmxMap) {
+			//console.log('gmxMap', gmxMap);
+			var vis = true;
+			for(var i = 0, len = gmxMap.layers.length; i < len; i++) {
+				var it = gmxMap.layers[i];
+				var props = it._gmx.rawProperties;
+				if (!props.IsPhotoLayer && (vis || props.visible)) {
+					map.addLayer(it);
+					lc.addOverlay(it, props.title);
+				}
+				
+				if (props.name === '73ECEA85832F436693393E78B8353416') {
+					vis = false;
+				}
+			}
+		   lc.addTo(map);
+        })
+	</script>
+</body>
+</html>

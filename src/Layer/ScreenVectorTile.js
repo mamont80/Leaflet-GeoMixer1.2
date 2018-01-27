@@ -1,6 +1,7 @@
 // Single tile on screen with vector data
 function ScreenVectorTile(layer, tileElem) {
     this.layer = layer;
+	this.tileElem = tileElem;
 	this.tile = tileElem.el;
 	var tilePoint = tileElem.coords,
 		zoom = tilePoint.z,
@@ -288,7 +289,6 @@ ScreenVectorTile.prototype = {
 			new Promise(function(resolve1) {
 				if (isTiles) {
 					var dataOption = geo.dataOption || {},
-						// tileToLoadPoints = isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp];
 						tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp], geo);
 
 					var cnt = tileToLoadPoints.length,
@@ -424,7 +424,6 @@ ScreenVectorTile.prototype = {
 				}
 			}.bind(this)).then(function(img) {
 				if (isTiles) {
-					// rasters[idr] = resCanvas;
 					resolve();
 				} else {
 					if (img) {
@@ -444,17 +443,17 @@ ScreenVectorTile.prototype = {
 						}
 						var prepareItem = function(imageElement) {
 							var promise = _this._rasterHook({
-									topLeft: _this.topLeft,
-									geoItem: geo,
-									res: resCanvas,
-									image: itemImageProcessingHook ? itemImageProcessingHook(imageElement, imgAttr) : imageElement,
-									destinationTilePoint: gmxTilePoint,
-									url: url
-								}),
-								then = function() {
-									rasters[idr] = resCanvas;
-									resolve();
-								};
+								topLeft: _this.topLeft,
+								geoItem: geo,
+								res: resCanvas,
+								image: itemImageProcessingHook ? itemImageProcessingHook(imageElement, imgAttr) : imageElement,
+								destinationTilePoint: gmxTilePoint,
+								url: url
+							}),
+							then = function() {
+								rasters[idr] = resCanvas;
+								resolve();
+							};
 							if (promise) {
 								if (promise.then) {
 									promise.then(then);
@@ -593,15 +592,12 @@ ScreenVectorTile.prototype = {
     },
 
     destructor: function () {
-		// if (this.currentDrawPromise) {
-			// this.currentDrawPromise.reject();
-			if (this._preRenderPromise) {
-				this._preRenderPromise.reject();        // cancel preRenderHooks chain if exists
-			}
-			if (this._renderPromise) {
-				this._renderPromise.reject();           // cancel renderHooks chain if exists
-			}
-		// }
+		if (this._preRenderPromise) {
+			this._preRenderPromise.reject();        // cancel preRenderHooks chain if exists
+		}
+		if (this._renderPromise) {
+			this._renderPromise.reject();           // cancel renderHooks chain if exists
+		}
         this._cancelRastersPromise();
         this._clearCache();
     },
@@ -623,18 +619,9 @@ ScreenVectorTile.prototype = {
     },
 
     drawTile: function (data) {
-        // if (this.currentDrawPromise) {
-			this.destructor();
-		// }
+		this.destructor();
 		return new Promise(function(resolve, reject) {
-			// this.currentDrawPromise = {
-				// resolve: resolve,
-				// reject: reject
-			// };
 			var geoItems = this._chkItems(data);
-			// var error = function() {
-				// reject({count: 0});
-			// }.bind(this);
 			var result = function() {
 				resolve({count: geoItems.length});
 			}.bind(this);
@@ -643,7 +630,6 @@ ScreenVectorTile.prototype = {
 			this._uniqueID++;       // count draw attempt
 
 			if (geoItems) {
-				// var tileLink = this.layer.gmxGetCanvasTile(this.tilePoint),
 				var tile = this.tile,
 					ctx = tile.getContext('2d'),
 					gmx = this.gmx,
@@ -688,8 +674,6 @@ ScreenVectorTile.prototype = {
 						}
 					});
 					Promise.all(fArr).then(function() {
-					// Promise.all(this._getHooksPromises(gmx.preRenderHooks, bgImage, hookInfo)).then(function(hookBgImage) {
-						// bgImage = hookBgImage || bgImage;
 						if (bgImage) { dattr.bgImage = bgImage; }
 						//ctx.save();
 						for (var i = 0, len = geoItems.length; i < len; i++) {
@@ -717,6 +701,7 @@ ScreenVectorTile.prototype = {
 						_this.rasters = {}; // clear rasters
 						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
 					}, reject);
+					_this.layer.appendTileToContainer(_this.tileElem);
 				};
 
 				if (this.showRaster) {

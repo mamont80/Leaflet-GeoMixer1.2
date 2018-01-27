@@ -376,6 +376,7 @@ var DataManager = L.Class.extend({
     getItems: function(oId) {
         var resArr = [],
             observer = this._observers[oId];
+//console.log('getItems', oId, this.options.name);
 
         if (!observer) {
             return [];
@@ -713,11 +714,12 @@ var DataManager = L.Class.extend({
 
     _waitCheckObservers: function() {
         //TODO: refactor
-        if (this._checkObserversTimer) {
-            clearTimeout(this._checkObserversTimer);
-        }
+        // if (this._checkObserversTimer) {
+            // clearTimeout(this._checkObserversTimer);
+        // }
 
-        this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 0);
+        // this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 0);
+		L.Util.requestAnimFrame(this.checkObservers, this);
     },
 
     _triggerObservers: function(oKeys) {

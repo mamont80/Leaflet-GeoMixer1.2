@@ -60,20 +60,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
             this._gmx.crossOrigin = options.crossOrigin;
         }
 	},
-    _zoomStart: function() {
-        this._gmx.zoomstart = true;
-	},
-
-    _zoomEnd: function() {
-        this._gmx.zoomstart = false;
-    },
-
-    _moveEnd: function() {
-        if ('dataManager' in this._gmx) {
-            this._gmx.dataManager.fire('moveend');
-        }
-		L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
-    },
 
 	_repaintNotLoaded: function () {
 		if (!this._map) { return; }
@@ -147,12 +133,10 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 
 		tile.loaded = +new Date();
 		if (this._map._fadeAnimated) {
-			// L.DomUtil.setOpacity(tile.el, 1);
 			L.Util.cancelAnimFrame(this._fadeFrame);
 			this._fadeFrame = L.Util.requestAnimFrame(this._updateOpacity, this);
 		} else {
 			tile.active = true;
-			// this._pruneTiles();
 		}
 
 		if (!err) {
@@ -202,14 +186,85 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		if (this._container) { return; }
 
 		this._container = L.DomUtil.create('div', 'leaflet-layer ' + (this.options.className || ''));
+		if (this.options.clickable === false) {
+			this._container.style.pointerEvents = 'none';
+		}
 		this._updateZIndex();
 
 		this.getPane(this.options.pane).appendChild(this._container);
 	},
-	getEvents: function () {
+
+    _onVersionChange: function () {
+        this._updateProperties(this._gmx.rawProperties);
+    },
+
+	_getEvents: function () {
 		var events = L.GridLayer.prototype.getEvents.call(this);
-		return events;
+		// L.extend(events, {
+			// zoomstart: function() {
+				// this._gmx.zoomstart = true;
+			// },
+			// zoomend: function() {
+				// this._gmx.zoomstart = false;
+			// }
+		// });
+        var gmx = this._gmx;
+		if (gmx.properties.type === 'Vector') {
+			events.moveend = function() {
+				if ('dataManager' in this._gmx) {
+					this._gmx.dataManager.fire('moveend');
+				}
+				//console.log('_moveEnd', this._gmx.layerID);
+				L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
+			};
+		}
+
+		return {
+			map: events,
+			owner: {
+				dateIntervalChanged: function() {
+					setTimeout(L.bind(this._repaintNotLoaded, this), 25);
+				},
+				tileloadstart: function(ev) {				// тайл (ev.coords) загружается
+					var key = this._tileCoordsToKey(ev.coords),
+						tLink = this._tiles[key];
+					// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
+
+					tLink.loaded = 0;
+					tLink.screenTile = new ScreenVectorTile(this, tLink);
+					L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
+				},
+				stylechange: function() {
+					var gmx = this._gmx;
+					if (!gmx.balloonEnable && this._popup) {
+						this.unbindPopup();
+					} else if (gmx.balloonEnable && !this._popup) {
+						this.bindPopup('');
+					}
+					if (this._map) {
+						if (this.options.minZoom !== gmx.styleManager.minZoom || this.options.maxZoom !== gmx.styleManager.maxZoom) {
+							this.options.minZoom = gmx.styleManager.minZoom;
+							this.options.maxZoom = gmx.styleManager.maxZoom;
+							this._map._updateZoomLevels();
+						}
+						if (gmx.labelsLayer) {
+							this._map._labelsLayer.add(this);
+						} else if (!gmx.labelsLayer) {
+							this._map._labelsLayer.remove(this);
+						}
+						this.redraw();
+					}
+				},
+				versionchange: this._onVersionChange
+			}
+		};
 	},
+
+	beforeAdd: function(map) {
+		this._updateShiftY(map.getZoom());
+        L.GridLayer.prototype.beforeAdd.call(this, map);
+		this._map = map;
+    },
 
     onAdd: function(map) {
 		map = map || this._map;
@@ -229,24 +284,16 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		this._initContainer();
 
 		gmx.styleManager.promise.then(function () {
-			map.on('zoomstart', this._zoomStart, this);
-			map.on('zoomend', this._zoomEnd, this);
-			if (gmx.properties.type === 'Vector') {
-				map.on('moveend', this._moveEnd, this);
-			}
 			if (gmx.balloonEnable && !this._popup) { this.bindPopup(''); }
-			this.on('stylechange', this._onStyleChange, this);
-			this.on('versionchange', this._onVersionChange, this);
 
-			// this._zIndexOffsetCheck();
 			if (this._map) {
-				if (this.getEvents) {
-					var events = this.getEvents();
-					map.on(events, this);
-					this.once('remove', function () {
-						map.off(events, this);
-					}, this);
-				}
+				var events = this._getEvents();
+				map.on(events.map, this);
+				this.on(events.owner, this);
+				this.once('remove', function () {
+					map.off(events.map, this);
+					this.off(events.owner, this);
+				}, this);
 
 				this._resetView();
 				this._update();
@@ -255,65 +302,29 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			this.fire('add');
 		}.bind(this));
         gmx.styleManager.initStyles();
-		this
-			.on('dateIntervalChanged', this._checkNotLoaded, this)
-			.on('tileloadstart', this._tileloadstart, this);
-		if (this.options.clickable === false) {
-			this._container.style.pointerEvents = 'none';
-		}
-		this._resetView();
-		this._update();
    },
 
-    _checkNotLoaded: function() {
-		setTimeout(L.bind(this._repaintNotLoaded, this), 25);
-    },
-
-    _tileloadstart: function(ev) {				// тайл (ev.coords) загружается
-		var key = this._tileCoordsToKey(ev.coords),
-			tLink = this._tiles[key];
-		// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
-
-		tLink.loaded = 0;
-		tLink.screenTile = new ScreenVectorTile(this, tLink);
-		L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
-    },
-
     onRemove: function(map) {
-        var gmx = this._gmx;
-		this
-			.off('stylechange', this._onStyleChange, this)
-			.off('versionchange', this._onVersionChange, this)
-			.off('dateIntervalChanged', this._checkNotLoaded, this)
-			.off('tileloadstart', this._tileloadstart, this);
-		map
-			.off('zoomstart', this._zoomStart, this)
-			.off('zoomend', this._zoomEnd, this)
-			.off('moveend', this._moveEnd, this);
-
 		this._removeAllTiles();
 		if (this._container) { L.DomUtil.remove(this._container); }
 		map._removeZoomLimit(this);
 		this._container = null;
 		this._tileZoom = undefined;
 
+        var gmx = this._gmx;
 		if (gmx.labelsLayer) {	// удалить из labelsLayer
 			map._labelsLayer.remove(this);
 		}
 
+		//gmx.badTiles = {};
+        gmx.quicklooksCache = {};
+        gmx.rastersCache = {};
         this._map = null;
-
         delete gmx.map;
         if (gmx.dataManager && !gmx.dataManager.getActiveObserversCount()) {
             L.gmx.layersVersion.remove(this);
         }
         this.fire('remove');
-    },
-
-	beforeAdd: function(map) {
-		this._updateShiftY(map.getZoom());
-        L.GridLayer.prototype.beforeAdd.call(this, map);
-		this._map = map;
     },
 
     _updateZIndex: function () {
@@ -377,11 +388,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			}
 		}
 
-		// sort tile queue to load tiles in order of their distance to center
-		// queue.sort(function (a, b) {
-			// return a.distanceTo(tileCenter) - b.distanceTo(tileCenter);
-		// });
-
 		if (queue.length !== 0) {
 			// if it's the first batch of tiles to load
 			if (!this._loading) {
@@ -431,7 +437,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			current: true
 		};
 
-		// container.appendChild(tile);
 		// @event tileloadstart: TileEvent
 		// Fired when a tile is requested and starts loading.
 		this.fire('tileloadstart', {
@@ -772,11 +777,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         }
     },
 
-    // gmxGetCanvasTile: function (tilePoint) {
-        // var zKey = this._tileCoordsToKey(tilePoint);
-        // return this._tiles[zKey];
-    // },
-
     appendTileToContainer: function (tileLink) {
 		if (this._tileZoom === tileLink.coords.z) {
 			var tilePos = this._getTilePos(tileLink.coords),
@@ -909,27 +909,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
     },
 
 	//block: internal
-    _onStyleChange: function() {
-        var gmx = this._gmx;
-        if (!gmx.balloonEnable && this._popup) {
-            this.unbindPopup();
-        } else if (gmx.balloonEnable && !this._popup) {
-            this.bindPopup('');
-        }
-        if (this._map) {
-            if (this.options.minZoom !== gmx.styleManager.minZoom || this.options.maxZoom !== gmx.styleManager.maxZoom) {
-                this.options.minZoom = gmx.styleManager.minZoom;
-                this.options.maxZoom = gmx.styleManager.maxZoom;
-                this._map._updateZoomLevels();
-            }
-            if (gmx.labelsLayer) {
-                this._map._labelsLayer.add(this);
-            } else if (!gmx.labelsLayer) {
-                this._map._labelsLayer.remove(this);
-            }
-			this.redraw();
-        }
-    },
 
     _getTilesByBounds: function (bounds) {    // Получить список gmxTiles по bounds
         var gmx = this._gmx,
@@ -1134,10 +1113,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
             gmx.imageQuicklookProcessingHook = L.gmx.gmxImageTransform;
         }
         this.options.attribution = prop.Copyright || '';
-    },
-
-    _onVersionChange: function () {
-        this._updateProperties(this._gmx.rawProperties);
     },
 
     _updateShiftY: function(zoom) {

@@ -159,8 +159,10 @@ ScreenVectorTile.prototype = {
 
     // default rasterHook: res - result canvas other parameters as http://www.w3schools.com/tags/canvas_drawimage.asp
     _defaultRasterHook: function (res, image, sx, sy, sw, sh, dx, dy, dw, dh) {
-        var ptx = res.getContext('2d');
-        ptx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+		if (image) {
+			var ptx = res.getContext('2d');
+			ptx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+		}
     },
 
     // get pixels parameters for shifted object

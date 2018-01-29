@@ -7371,13 +7371,23 @@ L.gmx.VectorLayer = L.GridLayer.extend({
    },
 
     onRemove: function(map) {
+        var gmx = this._gmx,
+			dm = gmx.dataManager;
+        if (dm) {
+			for (var key in this._tiles) {
+				var observer = this._tiles[key].observer;
+				if (observer) {
+					observer.deactivate();
+				}
+				dm.removeObserver(key);
+			}
+		}
 		this._removeAllTiles();
 		if (this._container) { L.DomUtil.remove(this._container); }
 		map._removeZoomLimit(this);
 		this._container = null;
 		this._tileZoom = undefined;
 
-        var gmx = this._gmx;
 		if (gmx.labelsLayer) {	// удалить из labelsLayer
 			map._labelsLayer.remove(this);
 		}
@@ -7387,8 +7397,8 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         gmx.rastersCache = {};
         this._map = null;
         delete gmx.map;
-        if (gmx.dataManager && !gmx.dataManager.getActiveObserversCount()) {
-            L.gmx.layersVersion.remove(this);
+        if (dm && !dm.getActiveObserversCount()) {
+			L.gmx.layersVersion.remove(this);
         }
         this.fire('remove');
     },

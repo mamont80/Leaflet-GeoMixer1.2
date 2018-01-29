@@ -6477,6 +6477,16 @@ var DataManager = L.Class.extend({
         return this._observers[id];
     },
 
+    removeScreenObservers: function() {
+        for (var k in this._observers) {
+            var observer = this._observers[k];
+            if (observer.target === 'screen') {
+				observer.deactivate();
+				this.removeObserver(k);
+			}
+        }
+    },
+
     removeObserver: function(id) {
         if (this._observers[id]) {
             this._observerTileLoader.removeObserver(id);
@@ -7374,13 +7384,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         var gmx = this._gmx,
 			dm = gmx.dataManager;
         if (dm) {
-			for (var key in this._tiles) {
-				var observer = this._tiles[key].observer;
-				if (observer) {
-					observer.deactivate();
-				}
-				dm.removeObserver(key);
-			}
+			dm.removeScreenObservers();
 		}
 		this._removeAllTiles();
 		if (this._container) { L.DomUtil.remove(this._container); }

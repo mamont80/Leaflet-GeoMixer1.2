@@ -308,13 +308,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         var gmx = this._gmx,
 			dm = gmx.dataManager;
         if (dm) {
-			for (var key in this._tiles) {
-				var observer = this._tiles[key].observer;
-				if (observer) {
-					observer.deactivate();
-				}
-				dm.removeObserver(key);
-			}
+			dm.removeScreenObservers();
 		}
 		this._removeAllTiles();
 		if (this._container) { L.DomUtil.remove(this._container); }

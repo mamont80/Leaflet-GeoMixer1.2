@@ -578,6 +578,16 @@ var DataManager = L.Class.extend({
         return this._observers[id];
     },
 
+    removeScreenObservers: function() {
+        for (var k in this._observers) {
+            var observer = this._observers[k];
+            if (observer.target === 'screen') {
+				observer.deactivate();
+				this.removeObserver(k);
+			}
+        }
+    },
+
     removeObserver: function(id) {
         if (this._observers[id]) {
             this._observerTileLoader.removeObserver(id);

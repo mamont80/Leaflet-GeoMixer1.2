@@ -404,9 +404,11 @@ var DataManager = L.Class.extend({
                     if (!observer.intersects(dataOption.bounds)) { continue; }
 
                     var it = data[i],
-                        id = it[0],
+						geom = it[it.length - 1];
+                    if (!observer.intersectsWithGeometry(geom)) { continue; }
+
+                    var id = it[0],
                         item = _this.getItem(id),
-						geom = it[it.length - 1],
                         isFiltered = false;
 
                     for (var f = 0; f < filters.length; f++) {

@@ -1393,7 +1393,7 @@ var gmxAPIutils = {
 
         var pos;
         if (crs == 3857) {
-            pos = L.Projection.SphericalMercator.unproject(new L.Point(y, x)._divideBy(gmxAPIutils.rMajor));
+            pos = L.CRS.Simple.unproject(new L.Point(y, x));
             x = pos.lng;
             y = pos.lat;
         }

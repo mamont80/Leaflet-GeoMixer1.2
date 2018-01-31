@@ -1393,7 +1393,7 @@ var gmxAPIutils = {
 
         var pos;
         if (crs == 3857) {
-            pos = L.CRS.Simple.unproject(new L.Point(y, x));
+            pos = L.CRS.Simple.unproject(new L.Point(x, y));
             x = pos.lng;
             y = pos.lat;
         }

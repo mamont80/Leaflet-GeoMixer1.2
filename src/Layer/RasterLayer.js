@@ -33,6 +33,9 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
         if (props.MaxZoom) {
             gmx.maxNativeZoom = props.MaxZoom;
         }
+        if (props.sessionKey) {
+            gmx.sessionKey = props.sessionKey;
+        }
         if (!ph.geometry) {
             ph.geometry = {
                 type: 'POLYGON',

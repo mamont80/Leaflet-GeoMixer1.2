@@ -376,7 +376,7 @@ var DataManager = L.Class.extend({
     getItems: function(oId) {
         var resArr = [],
             observer = this._observers[oId];
-//console.log('getItems', oId, this.options.name);
+// console.log('getItems', oId, this.options.name);
 
         if (!observer) {
             return [];
@@ -580,12 +580,28 @@ var DataManager = L.Class.extend({
         return this._observers[id];
     },
 
-    removeScreenObservers: function() {
+    removeScreenObservers: function(z) {
         for (var k in this._observers) {
             var observer = this._observers[k];
             if (observer.target === 'screen') {
+				if (z && observer.z === z) {
+					continue;
+				}
 				observer.deactivate();
 				this.removeObserver(k);
+			}
+        }
+    },
+
+    toggleScreenObservers: function(flag, z) {
+        for (var k in this._observers) {
+            var observer = this._observers[k];
+            if (observer.target === 'screen' && observer.z === z) {
+				if (flag) {
+					observer.activate();
+				} else {
+					observer.deactivate();
+				}
 			}
         }
     },

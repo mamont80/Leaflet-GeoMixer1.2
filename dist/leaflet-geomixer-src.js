@@ -5358,6 +5358,7 @@ var Observer = L.Class.extend({
             active: [Boolean=true]      // is this observer active
             layerID: String           	// ID слоя view
 			target: String				// ключ назначения обсервера
+			z: zoom						// zoom для 'screen' обсервера
             targetZoom: [Number]        // for zoom generalized type default(null)
 			topLeft: {}					// для screen
             needBbox: [Boolean=false]   // режим запросов списка тайлов по BBOX
@@ -5435,7 +5436,10 @@ var Observer = L.Class.extend({
     updateData: function(data) {
         var len = data.length,
             out = {count: len};
-
+// if (!this.layerID) {
+// console.log('________', this.id, len)
+// }
+// console.log('updateData', this.id, this.layerID, len)
         if (this.type === 'update') {
             //calculate difference with previous data
             if (!this._items) { this._items = {}; }
@@ -6275,7 +6279,7 @@ var DataManager = L.Class.extend({
     getItems: function(oId) {
         var resArr = [],
             observer = this._observers[oId];
-//console.log('getItems', oId, this.options.name);
+// console.log('getItems', oId, this.options.name);
 
         if (!observer) {
             return [];
@@ -6479,12 +6483,28 @@ var DataManager = L.Class.extend({
         return this._observers[id];
     },
 
-    removeScreenObservers: function() {
+    removeScreenObservers: function(z) {
         for (var k in this._observers) {
             var observer = this._observers[k];
             if (observer.target === 'screen') {
+				if (z && observer.z === z) {
+					continue;
+				}
 				observer.deactivate();
 				this.removeObserver(k);
+			}
+        }
+    },
+
+    toggleScreenObservers: function(flag, z) {
+        for (var k in this._observers) {
+            var observer = this._observers[k];
+            if (observer.target === 'screen' && observer.z === z) {
+				if (flag) {
+					observer.activate();
+				} else {
+					observer.deactivate();
+				}
 			}
         }
     },
@@ -7150,12 +7170,12 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				if (!tile.loaded) {
 					arr.push(key);
 					//break;
-				} else if (tile.count) {
-					if (!tile.el.parentNode && this._levels[z]) {
-						this._levels[z].appendChild(tile.el);
-					}
-				} else if (tile.el.parentNode) {
-					tile.el.parentNode.removeChild(tile.el);
+				// } else if (tile.count) {
+					// if (!tile.el.parentNode && this._levels[z]) {
+						// this._levels[z].appendChild(tile.el);
+					// }
+				// } else if (tile.el.parentNode) {
+					// tile.el.parentNode.removeChild(tile.el);
 				}
 			}
 		}
@@ -7163,10 +7183,26 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			this.repaint(arr);
 			L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
 		} else if (this.options.clearCacheOnLoad) {
+ // console.log('_repaintNotLoaded', this._loading, this._tileZoom);
+
 			this._gmx.rastersCache = {};
 			this._gmx.quicklooksCache = {};
+			this._clearOtherLevels();
 		}
     },
+	_clearOtherLevels: function () {
+		var zoom = this._tileZoom;
+		if (zoom === undefined) { return undefined; }
+
+		for (var z in this._levels) {
+			if (z != zoom) {
+				L.DomUtil.remove(this._levels[z].el);
+				this._removeTilesAtZoom(z);
+				this._onRemoveLevel(z);
+				delete this._levels[z];
+			}
+		}
+	},
 
 	//block: extended from L.GridLayer
 	_setView: function (center, zoom, noPrune, noUpdate) {
@@ -7199,7 +7235,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			// Fired when there is an error loading a tile.
 			this.fire('tileerror', {
 				error: err,
-				tile: tile,
+				//tile: tile,
 				coords: coords
 			});
 		}
@@ -7218,7 +7254,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		}
 
 		if (!err) {
-			L.DomUtil.addClass(tile.el, 'leaflet-tile-loaded');
+			if (tile.el) { L.DomUtil.addClass(tile.el, 'leaflet-tile-loaded'); }
 
 			// @event tileload: TileEvent
 			// Fired when a tile loads.
@@ -7278,21 +7314,29 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 
 	_getEvents: function () {
 		var events = L.GridLayer.prototype.getEvents.call(this);
-		// L.extend(events, {
-			// zoomstart: function() {
-				// this._gmx.zoomstart = true;
-			// },
-			// zoomend: function() {
-				// this._gmx.zoomstart = false;
-			// }
-		// });
+		L.extend(events, {
+			zoomstart: function() {
+				// console.log('zoomstart', this._tileZoom, this._gmx.zoomstart, this._gmx.layerID);
+				this._gmx.zoomstart = true;
+			},
+			zoomend: function() {
+				// console.log('zoomend', this._tileZoom, this._gmx.zoomstart, this._gmx.layerID);
+				this._gmx.zoomstart = false;
+				var gmx = this._gmx,
+					dm = gmx.dataManager;
+				if (dm) {
+					dm.removeScreenObservers(this._tileZoom);
+				}
+
+			}
+		});
         var gmx = this._gmx;
 		if (gmx.properties.type === 'Vector') {
 			events.moveend = function() {
 				if ('dataManager' in this._gmx) {
 					this._gmx.dataManager.fire('moveend');
 				}
-				//console.log('_moveEnd', this._gmx.layerID);
+				// console.log('_moveEnd', this._tileZoom, this._gmx.layerID);
 				L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
 			};
 		}
@@ -7309,7 +7353,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 					// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
 
 					tLink.loaded = 0;
-					tLink.screenTile = new ScreenVectorTile(this, tLink);
+					// tLink.screenTile = new ScreenVectorTile(this, tLink);
 					L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
 				},
 				stylechange: function() {
@@ -7421,8 +7465,16 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 	// Private method to load tiles in the grid's active zoom level according to map bounds
 	_update: function (center) {
 		var map = this._map;
-		if (!map) { return; }
+		if (this._gmx.zoomstart || !map) { return; }
+		if (this._updateTimer) { clearTimeout(this._updateTimer); }
+		this._updateTimer = setTimeout(L.bind(this._updateWait, this, center), 50);
+    },
+	// Private method to load tiles in the grid's active zoom level according to map bounds
+	_updateWait: function (center) {
+		var map = this._map;
+		if (this._gmx.zoomstart || !map) { return; }
 		var zoom = this._clampZoom(map.getZoom());
+// console.log('_update', this._gmx.zoomstart, zoom, this._tileZoom, this._gmx.layerID, center);
 
 		if (center === undefined) { center = map.getCenter(); }
 		if (this._tileZoom === undefined) { return; }	// if out of minzoom/maxzoom
@@ -7486,6 +7538,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 	},
 
 /*eslint-disable no-unused-vars */
+/*
 	createTile: function(coords , done) {
 		this._test = [coords, done];
 		var tile = L.DomUtil.create('canvas', 'leaflet-tile');
@@ -7506,15 +7559,16 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		// tile.style.opacity = this.options.opacity;
 		return tile;
     },
+	*/
 /*eslint-enable */
 
 	_addTile: function (coords) {
-		var tile = this.createTile(this._wrapCoords(coords), L.bind(this._tileReady, this, coords)),
-			key = this._tileCoordsToKey(coords);
+		//var tile = this.createTile(this._wrapCoords(coords), L.bind(this._tileReady, this, coords)),
+		var key = this._tileCoordsToKey(coords);
 
 		// save tile in cache
 		this._tiles[key] = {
-			el: tile,
+			//el: tile,
 			coords: coords,
 			current: true
 		};
@@ -7522,8 +7576,25 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		// @event tileloadstart: TileEvent
 		// Fired when a tile is requested and starts loading.
 		this.fire('tileloadstart', {
-			tile: tile,
+			//tile: tile,
 			coords: coords
+		});
+	},
+
+	_removeTile: function (key) {
+		var tile = this._tiles[key];
+		if (!tile) { return; }
+		if (tile.el) {
+			L.DomUtil.remove(tile.el);
+		}
+
+		delete this._tiles[key];
+
+		// @event tileunload: TileEvent
+		// Fired when a tile is removed (e.g. when a tile goes off the screen).
+		this.fire('tileunload', {
+			tile: tile.el,
+			coords: this._keyToTileCoords(key)
 		});
 	},
 
@@ -7846,7 +7917,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				zKeys[it] = true;
 			}
             this._gmx.dataManager._triggerObservers(zKeys);
-			// L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
+			L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
         }
     },
 
@@ -7859,15 +7930,17 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         }
     },
 
-    appendTileToContainer: function (tileLink) {
+    appendTileToContainer: function (tileLink) {		// call from screenTile
 		if (this._tileZoom === tileLink.coords.z) {
 			var tilePos = this._getTilePos(tileLink.coords),
 				tile = tileLink.el,
 				levelEl = this._levels[tileLink.coords.z],
 				cont = levelEl ? levelEl.el : this._tileContainer;
 
-			cont.appendChild(tile);
-			L.DomUtil.setPosition(tile, tilePos, L.Browser.chrome || L.Browser.android23);
+			if (cont) {
+				cont.appendChild(tile);
+				L.DomUtil.setPosition(tile, tilePos, L.Browser.chrome || L.Browser.android23);
+			}
 		}
     },
 
@@ -8045,10 +8118,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 
     _updateProperties: function (prop) {
         var gmx = this._gmx;
-            // apikeyRequestHost = this.options.apikeyRequestHost || gmx.hostName;
-
-        // gmx.sessionKey = prop.sessionKey = this.options.sessionKey || gmxSessionManager.getSessionKey(apikeyRequestHost); //should be already received
-        gmx.sessionKey = prop.sessionKey = this.options.sessionKey || ''; //should be already received
+        if (!gmx.sessionKey) {
+			gmx.sessionKey = prop.sessionKey = this.options.sessionKey || ''; //should be already received
+		}
 
         if (this.options.parentOptions) {
 			prop = this.options.parentOptions;
@@ -8230,9 +8302,10 @@ L.gmx.VectorLayer = L.GridLayer.extend({
                     type: 'resend',
                     layerID: gmx.layerID,
                     needBbox: gmx.needBbox,
-					topLeft: tileElem.screenTile.topLeft,
+					//topLeft: tileElem.screenTile.topLeft,
                     srs: gmx.srs,
                     target: 'screen',
+                    z: zoom,
 					targetZoom: myLayer.options.isGeneralized ? zoom : null,
 					dateInterval: gmx.layerType === 'VectorTemporal' ? [gmx.beginDate, gmx.endDate] : null,
                     active: true,
@@ -8241,6 +8314,11 @@ L.gmx.VectorLayer = L.GridLayer.extend({
                     callback: function(data) {
                         if (myLayer._tiles[zKey]) {
 							myLayer._tiles[zKey].loaded = 0;
+
+							if (!tileElem.screenTile) {
+								tileElem.screenTile = new ScreenVectorTile(myLayer, tileElem);
+							}
+
 							tileElem.screenTile.drawTile(data).then(function(res) {
 								// console.log('resolve', zKey, res, data);
 								if (res) { tileElem.count = res.count; }
@@ -8904,6 +8982,21 @@ ScreenVectorTile.prototype = {
         this.rasterRequests = {};
     },
 
+	_createTile: function() {
+		var tile = L.DomUtil.create('canvas', 'leaflet-tile');
+		tile.width = tile.height = 256;
+		tile.style.width = tile.style.height = '256px';
+		tile.onselectstart = L.Util.falseFn;
+		tile.onmousemove = L.Util.falseFn;
+
+		// without this hack, tiles disappear after zoom on Chrome for Android
+		// https://github.com/Leaflet/Leaflet/issues/2078
+		if (L.Browser.android && !L.Browser.android23) {
+			tile.style.WebkitBackfaceVisibility = 'hidden';
+		}
+		return tile;
+    },
+
     drawTile: function (data) {
 		this.destructor();
 		return new Promise(function(resolve, reject) {
@@ -8916,7 +9009,7 @@ ScreenVectorTile.prototype = {
 			this._uniqueID++;       // count draw attempt
 
 			if (geoItems) {
-				var tile = this.tile,
+				var tile = this._createTile(),
 					ctx = tile.getContext('2d'),
 					gmx = this.gmx,
 					dattr = {
@@ -8987,6 +9080,7 @@ ScreenVectorTile.prototype = {
 						_this.rasters = {}; // clear rasters
 						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
 					}, reject);
+					_this.tileElem.el = tile;
 					_this.layer.appendTileToContainer(_this.tileElem);
 				};
 
@@ -11080,6 +11174,9 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
 
         if (props.MaxZoom) {
             gmx.maxNativeZoom = props.MaxZoom;
+        }
+        if (props.sessionKey) {
+            gmx.sessionKey = props.sessionKey;
         }
         if (!ph.geometry) {
             ph.geometry = {

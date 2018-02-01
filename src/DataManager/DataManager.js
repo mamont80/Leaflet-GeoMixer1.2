@@ -73,23 +73,24 @@ var ObserverTileLoader = L.Class.extend({
     },
 
     startLoadTiles: function(observer) {
-
         //force active tile list update
         this._dataManager._getActiveTileKeys();
 
         var obsData = this._observerData[observer.id];
-        if (obsData.leftToLoad < 1) {
-            this.fire('observertileload', {observer: observer});
-            return this;
-        }
+        if (obsData) {
+			if (obsData.leftToLoad < 1) {
+				this.fire('observertileload', {observer: observer});
+				return this;
+			}
 
-        if (!obsData.loadingState) {
-            obsData.loadingState = true;
-            observer.fire('startLoadingTiles');
-        }
+			if (!obsData.loadingState) {
+				obsData.loadingState = true;
+				observer.fire('startLoadingTiles');
+			}
 
-        for (var tileId in obsData.tiles) {
-            this._tileData[tileId].tile.load();
+			for (var tileId in obsData.tiles) {
+				this._tileData[tileId].tile.load();
+			}
         }
 
         return this;
@@ -742,12 +743,9 @@ var DataManager = L.Class.extend({
 
     _waitCheckObservers: function() {
         //TODO: refactor
-        // if (this._checkObserversTimer) {
-            // clearTimeout(this._checkObserversTimer);
-        // }
-
-        // this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 0);
-		L.Util.requestAnimFrame(this.checkObservers, this);
+        if (this._checkObserversTimer) { clearTimeout(this._checkObserversTimer); }
+        this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 25);
+		//L.Util.requestAnimFrame(this.checkObservers, this);
     },
 
     _triggerObservers: function(oKeys) {

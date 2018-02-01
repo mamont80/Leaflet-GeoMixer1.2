@@ -5976,23 +5976,24 @@ var ObserverTileLoader = L.Class.extend({
     },
 
     startLoadTiles: function(observer) {
-
         //force active tile list update
         this._dataManager._getActiveTileKeys();
 
         var obsData = this._observerData[observer.id];
-        if (obsData.leftToLoad < 1) {
-            this.fire('observertileload', {observer: observer});
-            return this;
-        }
+        if (obsData) {
+			if (obsData.leftToLoad < 1) {
+				this.fire('observertileload', {observer: observer});
+				return this;
+			}
 
-        if (!obsData.loadingState) {
-            obsData.loadingState = true;
-            observer.fire('startLoadingTiles');
-        }
+			if (!obsData.loadingState) {
+				obsData.loadingState = true;
+				observer.fire('startLoadingTiles');
+			}
 
-        for (var tileId in obsData.tiles) {
-            this._tileData[tileId].tile.load();
+			for (var tileId in obsData.tiles) {
+				this._tileData[tileId].tile.load();
+			}
         }
 
         return this;
@@ -6645,12 +6646,9 @@ var DataManager = L.Class.extend({
 
     _waitCheckObservers: function() {
         //TODO: refactor
-        // if (this._checkObserversTimer) {
-            // clearTimeout(this._checkObserversTimer);
-        // }
-
-        // this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 0);
-		L.Util.requestAnimFrame(this.checkObservers, this);
+        if (this._checkObserversTimer) { clearTimeout(this._checkObserversTimer); }
+        this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 25);
+		//L.Util.requestAnimFrame(this.checkObservers, this);
     },
 
     _triggerObservers: function(oKeys) {
@@ -7180,20 +7178,29 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			}
 		}
 		if (arr.length) {
+			if (this._clearOtherLevelsTimer) { clearTimeout(this._clearOtherLevelsTimer); }
 			this.repaint(arr);
-			L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
+			if (this._repaintNotLoadedTimer) { clearTimeout(this._repaintNotLoadedTimer); }
+			this._repaintNotLoadedTimer = setTimeout(L.bind(this._repaintNotLoaded, this), 250);
 		} else if (this.options.clearCacheOnLoad) {
- // console.log('_repaintNotLoaded', this._loading, this._tileZoom);
 
 			this._gmx.rastersCache = {};
 			this._gmx.quicklooksCache = {};
-			this._clearOtherLevels();
+			if (this._clearOtherLevelsTimer) { clearTimeout(this._clearOtherLevelsTimer); }
+			this._clearOtherLevelsTimer = setTimeout(L.bind(this._clearOtherLevels, this), 350);
+			// L.Util.cancelAnimFrame(this._clearOtherLevelsTimer);
+			// this._clearOtherLevelsTimer = L.Util.requestAnimFrame(this._clearOtherLevels, this);
+
+			// this._clearOtherLevels();
 		}
     },
 	_clearOtherLevels: function () {
 		var zoom = this._tileZoom;
-		if (zoom === undefined) { return undefined; }
-
+		if (this._gmx.zoomstart || this._loading || zoom === undefined) {
+			return undefined;
+		}
+ // console.log('_clearOtherLevels', this._loading, this._tileZoom, this._gmx.zoomstart);
+		this._abortLoading();
 		for (var z in this._levels) {
 			if (z != zoom) {
 				L.DomUtil.remove(this._levels[z].el);
@@ -7205,26 +7212,105 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 	},
 
 	//block: extended from L.GridLayer
+
 	_setView: function (center, zoom, noPrune, noUpdate) {
-		if (!this._map) { return; }
-		L.GridLayer.prototype._setView.call(this, center, zoom, noPrune, noUpdate);
+		var tileZoom = this._clampZoom(Math.round(zoom));
+		if ((this.options.maxZoom !== undefined && tileZoom > this.options.maxZoom) ||
+		    (this.options.minZoom !== undefined && tileZoom < this.options.minZoom)) {
+			tileZoom = undefined;
+		}
+
+		var tileZoomChanged = this.options.updateWhenZooming && (tileZoom !== this._tileZoom);
+
+		if (!noUpdate || tileZoomChanged) {
+
+			this._tileZoom = tileZoom;
+
+			if (this._abortLoading) {
+				this._abortLoading();
+			}
+
+			this._updateLevels();
+			this._resetGrid();
+
+			if (tileZoom !== undefined) {
+				this._update(center);
+			}
+
+			if (!noPrune) {
+				this._pruneTiles();
+			}
+
+			// Flag to prevent _updateOpacity from pruning tiles during
+			// a zoom anim or a pinch gesture
+			this._noPrune = !!noPrune;
+		}
+
+		this._setZoomTransforms(center, zoom);
 	},
+	// _setView: function (center, zoom, noPrune, noUpdate) {
+		// if (!this._map) { return; }
+		// L.GridLayer.prototype._setView.call(this, center, zoom, noPrune, noUpdate);
+	// },
 
 	_updateOpacity: function () {
 		if (!this._map) { return; }
 
 		// IE doesn't inherit filter opacity properly, so we're forced to set it on tiles
 		if (L.Browser.ielt9) { return; }
-		var willPrune = false;
+		// var willPrune = false;
 		for (var key in this._tiles) {
 			var tile = this._tiles[key];
 			if (!tile.current || !tile.loaded) { continue; }
-			if (tile.active) {
-				willPrune = true;
-			}
+			// if (tile.active) {
+				// willPrune = true;
+			// }
 			tile.active = true;
 		}
-		if (willPrune && !this._noPrune) { this._pruneTiles(); }
+		// if (willPrune && !this._noPrune) { this._pruneTiles(); }
+	},
+
+	_updateLevels: function () {
+		var zoom = this._tileZoom,
+		    maxZoom = this.options.maxZoom;
+
+		if (zoom === undefined) { return undefined; }
+
+		for (var z in this._levels) {
+			if (this._levels[z].el.children.length || z === zoom) {
+				this._levels[z].el.style.zIndex = maxZoom - Math.abs(zoom - z);
+				this._onUpdateLevel(z);
+			} else {
+				// L.DomUtil.remove(this._levels[z].el);
+				// this._removeTilesAtZoom(z);
+				// this._onRemoveLevel(z);
+				// delete this._levels[z];
+			}
+		}
+
+		var level = this._levels[zoom],
+		    map = this._map;
+
+		if (!level) {
+			level = this._levels[zoom] = {};
+
+			level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated', this._container);
+			level.el.style.zIndex = maxZoom;
+
+			level.origin = map.project(map.unproject(map.getPixelOrigin()), zoom).round();
+			level.zoom = zoom;
+
+			this._setZoomTransform(level, map.getCenter(), map.getZoom());
+
+			// force the browser to consider the newly added element for transition
+			L.Util.falseFn(level.el.offsetWidth);
+
+			this._onCreateLevel(level);
+		}
+
+		this._level = level;
+
+		return level;
 	},
 
 	_tileReady: function (coords, err, tile) {
@@ -7281,16 +7367,22 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 	},
 
 	// stops loading all tiles in the background layer
-	// _abortLoading: function () {
+	_abortLoading: function () {
 // console.log('_abortLoading ', this._loading, this._tileZoom, this._map._zoom, this._map.getZoom());
-		// var i, tile;
-		// for (i in this._tiles) {
-			// if (this._tiles[i].coords.z !== this._tileZoom) {
-				// tile = this._tiles[i];
-				// delete this._tiles[i];
-			// }
-		// }
-	// },
+		var zoom = this._tileZoom,
+			i, tile;
+		for (i in this._tiles) {
+			tile = this._tiles[i];
+			if (tile.observer) {
+				if (tile.coords.z === zoom) {
+					tile.observer.activate();
+				} else {
+					tile.observer.deactivate();
+				}
+			}
+		}
+	},
+
     _onCreateLevel: function(level) {
 		this._updateShiftY(level.zoom);
 		//console.log('_onCreateLevel ', level);
@@ -7337,7 +7429,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 					this._gmx.dataManager.fire('moveend');
 				}
 				// console.log('_moveEnd', this._tileZoom, this._gmx.layerID);
-				L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
+				// L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
+				if (this._repaintNotLoadedTimer) { clearTimeout(this._repaintNotLoadedTimer); }
+				this._repaintNotLoadedTimer = setTimeout(L.bind(this._repaintNotLoaded, this), 100);
 			};
 		}
 
@@ -7917,7 +8011,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				zKeys[it] = true;
 			}
             this._gmx.dataManager._triggerObservers(zKeys);
-			L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
+			//L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
         }
     },
 
@@ -8296,6 +8390,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				tileElem.reject = reject;
 				var filters = gmx.dataManager.getViewFilters('screen', gmx.layerID);
                 var done = function() {
+					// L.Util.requestAnimFrame(myLayer._tileReady, myLayer, coords, null, tileElem.el);
 					myLayer._tileReady(coords, null, tileElem.el);
                 };
 				tileElem.observer = gmx.dataManager.addObserver({

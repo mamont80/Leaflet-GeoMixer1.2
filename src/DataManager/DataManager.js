@@ -377,9 +377,13 @@ var DataManager = L.Class.extend({
     getItems: function(oId) {
         var resArr = [],
             observer = this._observers[oId];
-// console.log('getItems', oId, this.options.name);
+//console.log('getItems', oId, this.options.name);
 
+        // if (!observer || !observer.isActive()) {
         if (!observer) {
+            return [];
+        }
+        if (!observer.isActive() && observer.id !== 'hover') {
             return [];
         }
 

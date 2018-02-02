@@ -89,10 +89,7 @@ var Observer = L.Class.extend({
     updateData: function(data) {
         var len = data.length,
             out = {count: len};
-// if (!this.layerID) {
-// console.log('________', this.id, len)
-// }
-// console.log('updateData', this.id, this.layerID, len)
+
         if (this.type === 'update') {
             //calculate difference with previous data
             if (!this._items) { this._items = {}; }

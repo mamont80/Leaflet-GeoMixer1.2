@@ -620,21 +620,6 @@ ScreenVectorTile.prototype = {
         this.rasterRequests = {};
     },
 
-	_createTile: function() {
-		var tile = L.DomUtil.create('canvas', 'leaflet-tile');
-		tile.width = tile.height = 256;
-		tile.style.width = tile.style.height = '256px';
-		tile.onselectstart = L.Util.falseFn;
-		tile.onmousemove = L.Util.falseFn;
-
-		// without this hack, tiles disappear after zoom on Chrome for Android
-		// https://github.com/Leaflet/Leaflet/issues/2078
-		if (L.Browser.android && !L.Browser.android23) {
-			tile.style.WebkitBackfaceVisibility = 'hidden';
-		}
-		return tile;
-    },
-
     drawTile: function (data) {
 		this.destructor();
 		return new Promise(function(resolve, reject) {
@@ -647,7 +632,8 @@ ScreenVectorTile.prototype = {
 			this._uniqueID++;       // count draw attempt
 
 			if (geoItems) {
-				var tile = this._createTile(),
+				this.tile.width = this.tile.height = 256;
+				var tile = this.tile,
 					ctx = tile.getContext('2d'),
 					gmx = this.gmx,
 					dattr = {
@@ -718,7 +704,6 @@ ScreenVectorTile.prototype = {
 						_this.rasters = {}; // clear rasters
 						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
 					}, reject);
-					_this.tileElem.el = tile;
 					_this.layer.appendTileToContainer(_this.tileElem);
 				};
 

@@ -61,7 +61,8 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         }
 	},
 
-	_repaintNotLoaded: function () {
+	__repaintNotLoaded: function () {
+		//return;
 		if (!this._map) { return; }
 
 		var arr = [], key, tile, z;
@@ -72,22 +73,26 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				if (!tile.loaded) {
 					arr.push(key);
 					//break;
-				} else if (tile.count) {
-					if (!tile.el.parentNode && this._levels[z]) {
-						this._levels[z].el.appendChild(tile.el);
-					}
-				} else if (tile.el.parentNode) {
-					tile.el.parentNode.removeChild(tile.el);
+				// } else if (tile.count) {
+					// if (!tile.el.parentNode && this._levels[z]) {
+						// this._levels[z].el.appendChild(tile.el);
+					// }
+				// } else if (tile.el.parentNode) {
+					// tile.el.parentNode.removeChild(tile.el);
 				}
 			}
 		}
 		if (arr.length) {
+			// console.log('_repaintNotLoaded ', this._gmx.layerID, arr.length);
 			this.repaint(arr);
-			L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
 		} else if (this.options.clearCacheOnLoad) {
 			this._gmx.rastersCache = {};
 			this._gmx.quicklooksCache = {};
 		}
+    },
+	__runRepaint: function (msek) {
+		if (this.__repaintNotLoadedTimer) { clearTimeout(this.__repaintNotLoadedTimer); }
+		this.__repaintNotLoadedTimer = setTimeout(L.bind(this.__repaintNotLoaded, this), msek || 100);
     },
 
 	//block: extended from L.GridLayer
@@ -212,6 +217,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			},
 			zoomend: function() {
 				this._gmx.zoomstart = false;
+				this.__runRepaint();
 			}
 		});
         var gmx = this._gmx;
@@ -221,7 +227,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 					this._gmx.dataManager.fire('moveend');
 				}
 				//console.log('_moveEnd', this._gmx.layerID);
-				L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
 			};
 		}
 
@@ -229,7 +234,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			map: events,
 			owner: {
 				dateIntervalChanged: function() {
-					setTimeout(L.bind(this._repaintNotLoaded, this), 25);
+					this.__runRepaint(150);
 				},
 				tileloadstart: function(ev) {				// тайл (ev.coords) загружается
 					var key = this._tileCoordsToKey(ev.coords),
@@ -780,7 +785,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				zKeys[it] = true;
 			}
             this._gmx.dataManager._triggerObservers(zKeys);
-			// L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
         }
     },
 

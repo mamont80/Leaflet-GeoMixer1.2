@@ -2,18 +2,10 @@
 
 var ImageRequest = function(id, url, options) {
     this._id = id;
+    this.def = new L.gmx.Deferred(L.gmx.imageLoader._cancelRequest.bind(L.gmx.imageLoader, this));
     this.remove = L.gmx.imageLoader._removeRequestFromCache.bind(L.gmx.imageLoader, this);
     this.url = url;
     this.options = options || {};
-    this.promise = this.def = new Promise(function(resolve, reject) {
-		this.resolve = resolve;
-		this.reject = function() {
-			reject(this.url);
-			L.gmx.imageLoader._cancelRequest(this);
-		};
-	}.bind(this)).catch(function(e) {
-		console.warn('Warning: skip url ', e);
-	});
 };
 
 var GmxImageLoader = L.Class.extend({
@@ -30,7 +22,7 @@ var GmxImageLoader = L.Class.extend({
         this.uniqueID = 0;
     },
 
-    _checkIE11bugFix: function(request, image) {
+    _checkIE11bugFix: function(def, image) {
 		if (!this.divIE11bugFix) {
 			var div = document.createElement('div');
 			this.divIE11bugFix = div;
@@ -39,7 +31,7 @@ var GmxImageLoader = L.Class.extend({
 			document.body.insertBefore(div, document.body.childNodes[0]);
 		}
 		var ieResolve = function() {
-			request.resolve(image);
+			def.resolve(image);
 			// if (image.parentNode) {
 				// image.parentNode.removeChild(image);
 			// }
@@ -49,6 +41,7 @@ var GmxImageLoader = L.Class.extend({
     },
 
     _resolveRequest: function(request, image, canceled) {
+        var def = request.def;
         if (image) {
             if (!canceled && request.options.cache) {
                 var url = request.url,
@@ -58,12 +51,12 @@ var GmxImageLoader = L.Class.extend({
                 if (!cacheItem.requests[cacheKey]) { cacheItem.requests[cacheKey] = request; }
             }
 			if (L.gmxUtil.isIE11 && /\.svg/.test(request.url)) {   // skip bug in IE11
-				this._checkIE11bugFix(request, image);
+				this._checkIE11bugFix(def, image);
 			} else {
-				request.resolve(image);
+				def.resolve(image);
 			}
         } else if (!canceled) {
-            request.reject();
+            def.reject();
         }
         this.fire('requestdone', {request: request});
     },

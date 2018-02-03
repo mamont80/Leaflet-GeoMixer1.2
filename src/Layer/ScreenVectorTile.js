@@ -110,7 +110,7 @@ ScreenVectorTile.prototype = {
 					} else {
 						request.options.tileRastersId = _this._uniqueID;
 					}
-					request.promise.then(
+					request.def.then(
 						function(imageObj) {
 							if (imageObj) {
 								if (gmx.rastersCache) {
@@ -652,7 +652,7 @@ ScreenVectorTile.prototype = {
 					ctx.clearRect(0, 0, 256, 256);
 					if (gmx.showScreenTiles) {
 						ctx.strokeRect(0, 0, 255, 255);
-						ctx.strokeText(_this.zKey, 50, 50);
+						ctx.strokeText(_this.zKey + ' ' + _this.gmxTilePoint.x + ' ' + _this.gmxTilePoint.y, 50, 50);
 					}
 					var hookInfo = {
 							zKey: _this.zKey,

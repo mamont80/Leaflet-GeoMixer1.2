@@ -727,18 +727,10 @@ L.gmx.Deferred = Deferred;
 
 var ImageRequest = function(id, url, options) {
     this._id = id;
+    this.def = new L.gmx.Deferred(L.gmx.imageLoader._cancelRequest.bind(L.gmx.imageLoader, this));
     this.remove = L.gmx.imageLoader._removeRequestFromCache.bind(L.gmx.imageLoader, this);
     this.url = url;
     this.options = options || {};
-    this.promise = this.def = new Promise(function(resolve, reject) {
-		this.resolve = resolve;
-		this.reject = function() {
-			reject(this.url);
-			L.gmx.imageLoader._cancelRequest(this);
-		};
-	}.bind(this)).catch(function(e) {
-		console.warn('Warning: skip url ', e);
-	});
 };
 
 var GmxImageLoader = L.Class.extend({
@@ -755,7 +747,7 @@ var GmxImageLoader = L.Class.extend({
         this.uniqueID = 0;
     },
 
-    _checkIE11bugFix: function(request, image) {
+    _checkIE11bugFix: function(def, image) {
 		if (!this.divIE11bugFix) {
 			var div = document.createElement('div');
 			this.divIE11bugFix = div;
@@ -764,7 +756,7 @@ var GmxImageLoader = L.Class.extend({
 			document.body.insertBefore(div, document.body.childNodes[0]);
 		}
 		var ieResolve = function() {
-			request.resolve(image);
+			def.resolve(image);
 			// if (image.parentNode) {
 				// image.parentNode.removeChild(image);
 			// }
@@ -774,6 +766,7 @@ var GmxImageLoader = L.Class.extend({
     },
 
     _resolveRequest: function(request, image, canceled) {
+        var def = request.def;
         if (image) {
             if (!canceled && request.options.cache) {
                 var url = request.url,
@@ -783,12 +776,12 @@ var GmxImageLoader = L.Class.extend({
                 if (!cacheItem.requests[cacheKey]) { cacheItem.requests[cacheKey] = request; }
             }
 			if (L.gmxUtil.isIE11 && /\.svg/.test(request.url)) {   // skip bug in IE11
-				this._checkIE11bugFix(request, image);
+				this._checkIE11bugFix(def, image);
 			} else {
-				request.resolve(image);
+				def.resolve(image);
 			}
         } else if (!canceled) {
-            request.reject();
+            def.reject();
         }
         this.fire('requestdone', {request: request});
     },
@@ -7158,7 +7151,8 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         }
 	},
 
-	_repaintNotLoaded: function () {
+	__repaintNotLoaded: function () {
+		//return;
 		if (!this._map) { return; }
 
 		var arr = [], key, tile, z;
@@ -7169,22 +7163,26 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				if (!tile.loaded) {
 					arr.push(key);
 					//break;
-				} else if (tile.count) {
-					if (!tile.el.parentNode && this._levels[z]) {
-						this._levels[z].el.appendChild(tile.el);
-					}
-				} else if (tile.el.parentNode) {
-					tile.el.parentNode.removeChild(tile.el);
+				// } else if (tile.count) {
+					// if (!tile.el.parentNode && this._levels[z]) {
+						// this._levels[z].el.appendChild(tile.el);
+					// }
+				// } else if (tile.el.parentNode) {
+					// tile.el.parentNode.removeChild(tile.el);
 				}
 			}
 		}
 		if (arr.length) {
+			// console.log('_repaintNotLoaded ', this._gmx.layerID, arr.length);
 			this.repaint(arr);
-			L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
 		} else if (this.options.clearCacheOnLoad) {
 			this._gmx.rastersCache = {};
 			this._gmx.quicklooksCache = {};
 		}
+    },
+	__runRepaint: function (msek) {
+		if (this.__repaintNotLoadedTimer) { clearTimeout(this.__repaintNotLoadedTimer); }
+		this.__repaintNotLoadedTimer = setTimeout(L.bind(this.__repaintNotLoaded, this), msek || 100);
     },
 
 	//block: extended from L.GridLayer
@@ -7309,6 +7307,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			},
 			zoomend: function() {
 				this._gmx.zoomstart = false;
+				this.__runRepaint();
 			}
 		});
         var gmx = this._gmx;
@@ -7318,7 +7317,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 					this._gmx.dataManager.fire('moveend');
 				}
 				//console.log('_moveEnd', this._gmx.layerID);
-				L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
 			};
 		}
 
@@ -7326,7 +7324,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			map: events,
 			owner: {
 				dateIntervalChanged: function() {
-					setTimeout(L.bind(this._repaintNotLoaded, this), 25);
+					this.__runRepaint(150);
 				},
 				tileloadstart: function(ev) {				// тайл (ev.coords) загружается
 					var key = this._tileCoordsToKey(ev.coords),
@@ -7877,7 +7875,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				zKeys[it] = true;
 			}
             this._gmx.dataManager._triggerObservers(zKeys);
-			// L.Util.requestAnimFrame(L.bind(this._repaintNotLoaded, this));
         }
     },
 
@@ -8432,7 +8429,7 @@ ScreenVectorTile.prototype = {
 					} else {
 						request.options.tileRastersId = _this._uniqueID;
 					}
-					request.promise.then(
+					request.def.then(
 						function(imageObj) {
 							if (imageObj) {
 								if (gmx.rastersCache) {
@@ -8974,7 +8971,7 @@ ScreenVectorTile.prototype = {
 					ctx.clearRect(0, 0, 256, 256);
 					if (gmx.showScreenTiles) {
 						ctx.strokeRect(0, 0, 255, 255);
-						ctx.strokeText(_this.zKey, 50, 50);
+						ctx.strokeText(_this.zKey + ' ' + _this.gmxTilePoint.x + ' ' + _this.gmxTilePoint.y, 50, 50);
 					}
 					var hookInfo = {
 							zKey: _this.zKey,

@@ -724,6 +724,53 @@ L.gmx.Deferred = Deferred;
 
 
 (function() {
+'use strict';
+
+if ('createImageBitmap' in window && 'Worker' in window) {
+	var ImageBitmapLoader = function() {
+		this.jobs = {};
+		var workerSrc = document.currentScript.src.replace(/[^/]*$/, name + 'ImageBitmapLoader-worker.js');
+		this.worker = new Worker(workerSrc);
+		this.worker.onmessage = this.chkMessage.bind(this);
+	}
+
+	ImageBitmapLoader.prototype = {
+		chkMessage: function(evt) {
+			var message = evt.data,
+				url = message.url;
+// console.log('ImageBitmapLoader ', message, evt, requestIdleCallback);
+
+			for (var i = 0, it, arr = this.jobs[url] || [], len = arr.length; i < len; i++) {
+				it = arr[i];
+				if (message.imageBitmap) { it.resolve(message); }
+				else { it.reject(message); }
+			}
+			this.jobs[url].length = 0;
+		},
+
+		push: function(url, options) {	// добавить запрос в worker
+			var attr = {
+					options: options
+				},
+				src = url;		// Ensure the URL is absolute.
+			if (typeof this.jobs[src] === 'undefined') { this.jobs[src] = []; }
+
+			this.jobs[src].push(attr);
+			this.worker.postMessage({src: src, options: options});
+			return new Promise(function(resolve, reject) {
+				attr.resolve = resolve;
+				attr.reject = reject;
+			});
+		}
+	};
+
+	var imageBitmapLoader = new ImageBitmapLoader();
+	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
+}
+})();
+
+
+(function() {
 
 var ImageRequest = function(id, url, options) {
     this._id = id;
@@ -7140,6 +7187,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
             preRenderHooks: [],
             _needPopups: {}
         };
+		if (/\buseWebGL=1\b/.test(location.search)) {
+			this._gmx.useWebGL = true;
+		}
         if (options.cacheQuicklooks) {			// cache quicklooks for CR
             this._gmx.quicklooksCache = {};
         }
@@ -8318,6 +8368,11 @@ L.Map.addInitHook(function () {
 
 
 // Single tile on screen with vector data
+var fetchOptions = {
+	//mode: 'cors',
+	credentials: 'include'
+};
+
 function ScreenVectorTile(layer, tileElem) {
     this.layer = layer;
 	this.tileElem = tileElem;
@@ -8414,37 +8469,57 @@ ScreenVectorTile.prototype = {
 						return;
 					}
 
-					var request = _this.rasterRequests[rUrl];
-					if (!request) {
-						if (gmx.rasterProcessingHook) {
-							crossOrigin = 'anonymous';
-						}
-						request = L.gmx.imageLoader.push(rUrl, {
-							tileRastersId: _this._uniqueID,
-							zoom: _this.zoom,
-							cache: true,
-							crossOrigin: gmx.crossOrigin || crossOrigin || ''
-						});
-						_this.rasterRequests[rUrl] = request;
-					} else {
-						request.options.tileRastersId = _this._uniqueID;
-					}
-					request.def.then(
-						function(imageObj) {
-							if (imageObj) {
+					if (L.gmx.getBitmap) {
+						L.gmx.getBitmap(rUrl, fetchOptions).then(
+							function(res) {
+								var imageObj = res.imageBitmap,
+									canvas_ = document.createElement('canvas');
+								canvas_.width = imageObj.width;
+								canvas_.height = imageObj.height;
+								canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
 								if (gmx.rastersCache) {
-									gmx.rastersCache[rUrl] = imageObj;
+									gmx.rastersCache[rUrl] = canvas_;
 								}
-								resolve({gtp: gtp, image: imageObj});
-							} else {
+								resolve({gtp: gtp, image: canvas_});
+							},
+							function() {
 								tryHigherLevelTile(rUrl);
 							}
-						},
-						function() {
-							// console.log('tryHigherLevelTile111 ', rUrl);
-							tryHigherLevelTile(rUrl);
+						)
+						.catch(L.Util.falseFn);
+					} else {
+						var request = _this.rasterRequests[rUrl];
+						if (!request) {
+							if (gmx.rasterProcessingHook) {
+								crossOrigin = 'anonymous';
+							}
+							request = L.gmx.imageLoader.push(rUrl, {
+								tileRastersId: _this._uniqueID,
+								zoom: _this.zoom,
+								cache: true,
+								crossOrigin: gmx.crossOrigin || crossOrigin || ''
+							});
+							_this.rasterRequests[rUrl] = request;
+						} else {
+							request.options.tileRastersId = _this._uniqueID;
 						}
-					);
+						request.def.then(
+							function(imageObj) {
+								if (imageObj) {
+									if (gmx.rastersCache) {
+										gmx.rastersCache[rUrl] = imageObj;
+									}
+									resolve({gtp: gtp, image: imageObj});
+								} else {
+									tryHigherLevelTile(rUrl);
+								}
+							},
+							function() {
+								// console.log('tryHigherLevelTile111 ', rUrl);
+								tryHigherLevelTile(rUrl);
+							}
+						);
+					}
 				}
 			};
 
@@ -8722,6 +8797,21 @@ ScreenVectorTile.prototype = {
 
 						if (gmx.quicklooksCache && gmx.quicklooksCache[url]) {
 							resolve1(gmx.quicklooksCache[url]);
+						} else if (L.gmx.getBitmap) {
+							L.gmx.getBitmap(url, fetchOptions).then(
+								function(res) {
+									var imageObj = res.imageBitmap,
+										canvas_ = document.createElement('canvas');
+									canvas_.width = imageObj.width;
+									canvas_.height = imageObj.height;
+									canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
+									resolve1(canvas_);
+								},
+								function() {
+									resolve1();
+								}
+							)
+							.catch(L.Util.falseFn);
 						} else {
 							var request = this.rasterRequests[url];
 							if (!request) {
@@ -8736,7 +8826,7 @@ ScreenVectorTile.prototype = {
 
 							// in fact, we want to return request.def, but need to do additional action during cancellation.
 							// so, we consctruct new promise and add pipe it with request.def
-							request.promise.then(resolve1, resolve1);
+							request.def.then(resolve1, resolve1);
 						}
 					} else {
 						resolve1();

@@ -2,6 +2,7 @@
     "commonjs.js",
     "Parsers.js",
     "Deferred.js",
+    "ImageBitmapLoader.js",
     "ImageLoader.js",
     "Utils.js",
     "DrawCanvas.js",

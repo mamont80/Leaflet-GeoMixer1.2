@@ -50,6 +50,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
             preRenderHooks: [],
             _needPopups: {}
         };
+		if (/\buseWebGL=1\b/.test(location.search)) {
+			this._gmx.useWebGL = true;
+		}
         if (options.cacheQuicklooks) {			// cache quicklooks for CR
             this._gmx.quicklooksCache = {};
         }

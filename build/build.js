@@ -22,6 +22,7 @@ exports.build = function () {
 	chkDistPath();
 
 	var copy = fs.readFileSync('src/copyright.js', 'utf8'),
+		worker = fs.readFileSync('src/ImageBitmapLoader-worker.js', 'utf8'),
 	    intro = '(function () {\n"use strict";\n',
 	    outro = '}());',
 	    newSrc = copy + intro + combineFiles(depsJS) + outro,
@@ -30,6 +31,7 @@ exports.build = function () {
 
 	console.log('\tUncompressed size: ' + newSrc.length + ' bytes');
 
+	fs.writeFileSync('dist/ImageBitmapLoader-worker.js', worker);
 	fs.writeFileSync(srcPath, newSrc);
 	console.log('\tSaved to ' + srcPath);
 

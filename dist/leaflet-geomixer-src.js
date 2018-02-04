@@ -726,11 +726,17 @@ L.gmx.Deferred = Deferred;
 (function() {
 'use strict';
 
-if ('createImageBitmap' in window && 'Worker' in window) {
+	var worker;
+	if ('createImageBitmap' in window && 'Worker' in window) {
+		worker = new Worker(location.href.replace(/[^/]*$/, 'ImageBitmapLoader-worker.js'));
+	}
+	if (!worker) {
+		return;
+	}
+
 	var ImageBitmapLoader = function() {
 		this.jobs = {};
-		var workerSrc = document.currentScript.src.replace(/[^/]*$/, name + 'ImageBitmapLoader-worker.js');
-		this.worker = new Worker(workerSrc);
+		this.worker = worker;
 		this.worker.onmessage = this.chkMessage.bind(this);
 	}
 
@@ -766,7 +772,6 @@ if ('createImageBitmap' in window && 'Worker' in window) {
 
 	var imageBitmapLoader = new ImageBitmapLoader();
 	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
-}
 })();
 
 

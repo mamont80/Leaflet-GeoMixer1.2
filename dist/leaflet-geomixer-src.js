@@ -772,6 +772,11 @@ L.gmx.Deferred = Deferred;
 
 	var imageBitmapLoader = new ImageBitmapLoader();
 	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
+	worker.onerror = function(ev) {
+		console.warn('Error: Worker init: ImageBitmapLoader-worker.js', ev);
+		ev.target.terminate();
+		delete L.gmx.getBitmap;
+	};
 })();
 
 

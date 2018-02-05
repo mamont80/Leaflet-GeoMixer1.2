@@ -94,8 +94,11 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		}
     },
 	__runRepaint: function (msek) {
-		if (this.__repaintNotLoadedTimer) { clearTimeout(this.__repaintNotLoadedTimer); }
-		this.__repaintNotLoadedTimer = setTimeout(L.bind(this.__repaintNotLoaded, this), msek || 100);
+		if (this.__repaintNotLoadedTimer) { cancelIdleCallback(this.__repaintNotLoadedTimer); }
+		this.__repaintNotLoadedTimer = requestIdleCallback(L.bind(this.__repaintNotLoaded, this), {timeout: msek || 100});
+
+		// if (this.__repaintNotLoadedTimer) { clearTimeout(this.__repaintNotLoadedTimer); }
+		// this.__repaintNotLoadedTimer = setTimeout(L.bind(this.__repaintNotLoaded, this), msek || 100);
     },
 
 	//block: extended from L.GridLayer
@@ -169,7 +172,8 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			} else {
 				// Wait a bit more than 0.2 secs (the duration of the tile fade-in)
 				// to trigger a pruning.
-				setTimeout(L.bind(this._pruneTiles, this), 250);
+				requestIdleCallback(L.bind(this._pruneTiles, this), {timeout: 250});
+				// setTimeout(L.bind(this._pruneTiles, this), 250);
 			}
 		}
 	},
@@ -358,8 +362,8 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 	_update: function (center) {
 		var map = this._map;
 		if (this._gmx.zoomstart || !map) { return; }
-		if (this._updateTimer) { clearTimeout(this._updateTimer); }
-		this._updateTimer = setTimeout(L.bind(this._updateWait, this, center), 150);
+		if (this._updateTimer) { cancelIdleCallback(this._updateTimer); }
+		this._updateTimer = requestIdleCallback(L.bind(this._updateWait, this, center), {timeout: 150});
     },
 	// Private method to load tiles in the grid's active zoom level according to map bounds
 	_updateWait: function (center) {

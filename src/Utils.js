@@ -3020,6 +3020,13 @@ L.extend(L.gmxUtil, {
 });
 
 L.gmxUtil.isIEOrEdge = L.gmxUtil.gtIE11 || L.gmxUtil.isIE11 || L.gmxUtil.isIE10 || L.gmxUtil.isIE9;
+if (!('requestIdleCallback' in window)) {
+	window.requestIdleCallback = function(func, opt) {
+		var timeout = opt ? opt.timeout : 0;
+		return window.setTimeout(func, timeout);
+	}
+	window.cancelIdleCallback = window.clearTimeout;
+}
 
 (function() {
     var requests = {};

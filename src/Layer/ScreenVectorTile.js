@@ -112,8 +112,10 @@ ScreenVectorTile.prototype = {
 									gmx.rastersCache[rUrl] = canvas_;
 								}
 								resolve({gtp: gtp, image: canvas_});
+								_this.layer.fire('bitmap', {id: item.id, loaded: true, url: rUrl});
 							},
 							function() {
+								_this.layer.fire('bitmap', {id: item.id, loaded: false, url: rUrl});
 								tryHigherLevelTile(rUrl);
 							}
 						)
@@ -427,6 +429,7 @@ ScreenVectorTile.prototype = {
 
 		return new Promise(function(resolve1) {
 			var skipRaster = function() {
+				_this.layer.fire('bitmap', {id: idr, loaded: false, url: url});
 				item.skipRasters = true;
 				resolve1();
 			};
@@ -470,6 +473,7 @@ ScreenVectorTile.prototype = {
 						canvas_.height = imageObj.height;
 						canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
 						done(canvas_);
+						_this.layer.fire('bitmap', {id: idr, loaded: true, url: url});
 					}, skipRaster)
 				.catch(L.Util.falseFn);
 			} else {

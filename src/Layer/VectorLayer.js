@@ -86,9 +86,10 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			}
 		}
 		if (arr.length) {
-			// console.log('_repaintNotLoaded ', this._gmx.layerID, arr.length);
+			 // console.log('_repaintNotLoaded ', this._gmx.layerID, arr.length);
 			this.repaint(arr);
 		} else if (this.options.clearCacheOnLoad) {
+			 // console.log('_repaintNotLoaded - done', this._gmx.layerID, arr.length);
 			this._gmx.rastersCache = {};
 			this._gmx.quicklooksCache = {};
 		}
@@ -268,6 +269,24 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		return {
 			map: events,
 			owner: {
+				// bitmap: function(ev) {				// Fired when bitmap load results
+					// console.log('bitmap ', ev);
+				// },
+				// load: function(ev) {				// Fired when the grid layer starts loading tiles.
+					// console.log('load ', ev);
+				// },
+				// loading: function(ev) {				// Fired when the grid layer starts loading tiles.
+					// console.log('loading ', ev);
+				// },
+				// tileload: function(ev) {			// Fired when a tile loads.
+					// console.log('tileload ', ev);
+				// },
+				// tileerror: function(ev) {			// Fired when there is an error loading a tile.
+					// console.log('tileerror ', ev);
+				// },
+				// tileunload: function(ev) {			// Fired when a tile is removed (e.g. when a tile goes off the screen).
+					// console.log('tileunload ', ev);
+				// },
 				dateIntervalChanged: function() {
 					this.__runRepaint(150);
 				},

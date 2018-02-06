@@ -652,23 +652,23 @@ ScreenVectorTile.prototype = {
 			this._uniqueID++;       // count draw attempt
 
 			if (geoItems) {
-				this.tile.width = this.tile.height = 256;
-				var tile = this.tile,
-					ctx = tile.getContext('2d'),
-					gmx = this.gmx,
-					dattr = {
-						//tileLink: tileLink,
-						tbounds: this.tbounds,
-						rasters: this.rasters,
-						gmx: gmx,
-						topLeft: this.topLeft,
-						tpx: this.tpx,
-						tpy: this.tpy,
-						ctx: ctx
-					};
-				L.DomUtil.addClass(tile, 'zKey:' + this.zKey);
-
 				var doDraw = function() {
+					_this.tile.width = _this.tile.height = 256;
+					var tile = _this.tile,
+						ctx = tile.getContext('2d'),
+						gmx = _this.gmx,
+						dattr = {
+							//tileLink: tileLink,
+							tbounds: _this.tbounds,
+							rasters: _this.rasters,
+							gmx: gmx,
+							topLeft: _this.topLeft,
+							tpx: _this.tpx,
+							tpy: _this.tpy,
+							ctx: ctx
+						};
+					L.DomUtil.addClass(tile, 'zKey:' + _this.zKey);
+
 					ctx.clearRect(0, 0, 256, 256);
 					if (gmx.showScreenTiles) {
 						ctx.strokeRect(0, 0, 255, 255);

@@ -1163,7 +1163,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
                     url = url.replace(matches[0], item.properties[gmx.tileAttributeIndexes[matches[1]]]);
                     matches = reg.exec(url);
                 }
-				if (gmx.srs) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'srs=' + gmx.srs; }
+				//if (gmx.srs) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'srs=' + gmx.srs; }
                 return url;
             };
             gmx.imageQuicklookProcessingHook = L.gmx.gmxImageTransform;

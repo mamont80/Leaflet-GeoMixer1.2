@@ -302,221 +302,193 @@ ScreenVectorTile.prototype = {
             resCanvas = null;
 
 		item.v = geo.v;
+		if (gmx.IsRasterCatalog && (gmx.rawProperties.type === 'Raster' || gmxAPIutils.getPropItem('GMX_RasterCatalogID', properties, indexes))) {
+			isTiles = true;                     // Raster Layer
+		} else if (gmx.quicklookBGfunc) {
+			url = gmx.quicklookBGfunc(item);    // Quicklook
+			itemImageProcessingHook = gmx.imageQuicklookProcessingHook;
+		} else if (urlBG) {
+			url = urlBG;                        // Image urlBG from properties
+			itemImageProcessingHook = gmx.imageQuicklookProcessingHook;
+		}
+		if (isTiles) {
+			return new Promise(function(resolve1) {
+				var dataOption = geo.dataOption || {},
+					tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp], geo);
 
-		var itemRasterPromise = new Promise(function(resolve) {
-			if (gmx.IsRasterCatalog && (gmx.rawProperties.type === 'Raster' || gmxAPIutils.getPropItem('GMX_RasterCatalogID', properties, indexes))) {
-				isTiles = true;                     // Raster Layer
-			} else if (gmx.quicklookBGfunc) {
-				url = gmx.quicklookBGfunc(item);    // Quicklook
-				itemImageProcessingHook = gmx.imageQuicklookProcessingHook;
-			} else if (urlBG) {
-				url = urlBG;                        // Image urlBG from properties
-				itemImageProcessingHook = gmx.imageQuicklookProcessingHook;
-			}
-			new Promise(function(resolve1) {
-				if (isTiles) {
-					var dataOption = geo.dataOption || {},
-						tileToLoadPoints = this._chkRastersByItemIntersect(isShift ? this._getShiftTilesArray(dataOption.bounds, shiftX, shiftY) : [ntp], geo);
+				var cnt = tileToLoadPoints.length,
+					chkReadyRasters = function() {
+						if (cnt < 1) { resolve1(); }
+					},
+					skipRasterFunc = function() {
+						cnt--;
+						chkReadyRasters();
+					},
+					onLoadFunction = function(gtp, p, img) {
+						item.skipRasters = false;
+						var isImage = true;
 
-					var cnt = tileToLoadPoints.length,
-						chkReadyRasters = function() {
-							if (cnt < 1) { resolve1(); }
-						},
-						skipRasterFunc = function() {
-							cnt--;
-							chkReadyRasters();
-						},
-						onLoadFunction = function(gtp, p, img) {
-							item.skipRasters = false;
-							var isImage = true;
+						if (itemImageProcessingHook) {
+							img = itemImageProcessingHook(img, {
+								gmx: gmx,
+								geoItem: geo,
+								item: item,
+								gmxTilePoint: gtp
+							});
+							isImage = false;
+						}
 
-							if (itemImageProcessingHook) {
-								img = itemImageProcessingHook(img, {
-									gmx: gmx,
-									geoItem: geo,
-									item: item,
-									gmxTilePoint: gtp
-								});
-								isImage = false;
+						var info = {
+								geoItem: geo,
+								image: img,
+								destinationTilePoint: tilePoint,
+								sourceTilePoint: gtp,
+								sx: 0, sy: 0, sw: 256, sh: 256,
+								dx: 0, dy: 0, dw: 256, dh: 256
+							};
+
+						if (isShift) {
+							var pos = _this._getShiftPixels(p);
+							if (pos === null) {
+								skipRasterFunc();
+								return;
 							}
+							L.extend(info, pos);
+							isImage = false;
+						}
 
-							var info = {
-									geoItem: geo,
-									image: img,
-									destinationTilePoint: tilePoint,
-									sourceTilePoint: gtp,
-									sx: 0, sy: 0, sw: 256, sh: 256,
-									dx: 0, dy: 0, dw: 256, dh: 256
+						if (gtp.z !== ntp.z) {
+							var posInfo = _this.getTilePosZoomDelta(ntp, ntp.z, gtp.z);
+							if (posInfo.size < 1 / 256) {// меньше 1px
+								chkReadyRasters();
+								return;
+							}
+							isImage = false;
+							info.sx = Math.floor(posInfo.x);
+							info.sy = Math.floor(posInfo.y);
+							info.sw = info.sh = posInfo.size;
+							if (isShift) {
+								var sw = Math.floor(info.dw / posInfo.zDelta);
+								info.sx = (info.dx === 0 ? info.sw : 256) - sw;
+								info.sw = sw;
+
+								var sh = Math.floor(info.dh / posInfo.zDelta);
+								info.sy = (info.dy === 0 ? info.sh : 256) - sh;
+								info.sh = sh;
+							}
+						}
+						if (isImage && !gmx.rasterProcessingHook) {
+							cnt--;
+							resCanvas = img;
+							rasters[idr] = resCanvas;
+							chkReadyRasters();
+						} else {
+							if (!resCanvas) {
+								resCanvas = document.createElement('canvas');
+								resCanvas.width = resCanvas.height = 256;
+							}
+							info.res = resCanvas;
+							var hookResult = _this._rasterHook(info),
+								then = function() {
+									cnt--;
+									//p.resImage = resCanvas;
+									rasters[idr] = resCanvas;
+									chkReadyRasters();
 								};
 
-							if (isShift) {
-								var pos = _this._getShiftPixels(p);
-								if (pos === null) {
-									skipRasterFunc();
-									return;
+							if (hookResult) {
+								if (hookResult.then) {
+									hookResult.then(then);
 								}
-								L.extend(info, pos);
-								isImage = false;
-							}
-
-							if (gtp.z !== ntp.z) {
-								var posInfo = _this.getTilePosZoomDelta(ntp, ntp.z, gtp.z);
-								if (posInfo.size < 1 / 256) {// меньше 1px
-									chkReadyRasters();
-									return;
-								}
-								isImage = false;
-								info.sx = Math.floor(posInfo.x);
-								info.sy = Math.floor(posInfo.y);
-								info.sw = info.sh = posInfo.size;
-								if (isShift) {
-									var sw = Math.floor(info.dw / posInfo.zDelta);
-									info.sx = (info.dx === 0 ? info.sw : 256) - sw;
-									info.sw = sw;
-
-									var sh = Math.floor(info.dh / posInfo.zDelta);
-									info.sy = (info.dy === 0 ? info.sh : 256) - sh;
-									info.sh = sh;
-								}
-							}
-							if (isImage && !gmx.rasterProcessingHook) {
-								cnt--;
-								resCanvas = img;
-								rasters[idr] = resCanvas;
-								chkReadyRasters();
-							} else {
-								if (!resCanvas) {
-									resCanvas = document.createElement('canvas');
-									resCanvas.width = resCanvas.height = 256;
-								}
-								info.res = resCanvas;
-								var hookResult = _this._rasterHook(info),
-									then = function() {
-										cnt--;
-										//p.resImage = resCanvas;
-										rasters[idr] = resCanvas;
-										chkReadyRasters();
-									};
-
-								if (hookResult) {
-									if (hookResult.then) {
-										hookResult.then(then);
-									}
-								} else if (hookResult === null) {
-									item.skipRasters = true;
-									skipRasterFunc();
-								} else {
-									then();
-								}
-							}
-						};
-					if (cnt) {
-						tileToLoadPoints.map(function(it) {
-							var loader = _this._loadTileRecursive(it, item);
-							loader.then(function(loadResult) {
-								onLoadFunction(loadResult.gtp, it, loadResult.image);
-							}, skipRasterFunc);
-							return loader;
-						});
-					} else {
-						item.skipRasters = true;
-						skipRasterFunc();
-					}
-				} else {
-					if (url) {
-						if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
-
-						if (gmx.quicklooksCache && gmx.quicklooksCache[url]) {
-							resolve1(gmx.quicklooksCache[url]);
-						} else if (L.gmx.getBitmap) {
-							L.gmx.getBitmap(url, fetchOptions).then(
-								function(res) {
-									var imageObj = res.imageBitmap,
-										canvas_ = document.createElement('canvas');
-									canvas_.width = imageObj.width;
-									canvas_.height = imageObj.height;
-									canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
-									resolve1(canvas_);
-								},
-								function() {
-									resolve1();
-								}
-							)
-							.catch(L.Util.falseFn);
-						} else {
-							var request = this.rasterRequests[url];
-							if (!request) {
-								request = L.gmx.imageLoader.push(url, {
-									tileRastersId: _this._uniqueID,
-									crossOrigin: gmx.crossOrigin || 'anonymous'
-								});
-								this.rasterRequests[url] = request;
-							} else {
-								request.options.tileRastersId = this._uniqueID;
-							}
-
-							// in fact, we want to return request.def, but need to do additional action during cancellation.
-							// so, we consctruct new promise and add pipe it with request.def
-							request.def.then(resolve1, resolve1);
-						}
-					} else {
-						resolve1();
-					}
-					item.skipRasters = false;
-				}
-			}.bind(this)).then(function(img) {
-				if (isTiles) {
-					resolve();
-				} else {
-					if (img) {
-						if (gmx.quicklooksCache) {
-							gmx.quicklooksCache[url] = img;
-						}
-						var imgAttr = {
-							gmx: gmx,
-							topLeft: _this.topLeft,
-							geoItem: geo,
-							item: item,
-							gmxTilePoint: gmxTilePoint
-						};
-						if (!resCanvas) {
-							resCanvas = document.createElement('canvas');
-							resCanvas.width = resCanvas.height = 256;
-						}
-						var prepareItem = function(imageElement) {
-							var promise = _this._rasterHook({
-								topLeft: _this.topLeft,
-								geoItem: geo,
-								res: resCanvas,
-								image: itemImageProcessingHook ? itemImageProcessingHook(imageElement, imgAttr) : imageElement,
-								destinationTilePoint: gmxTilePoint,
-								url: url
-							}),
-							then = function() {
-								rasters[idr] = resCanvas;
-								resolve();
-							};
-							if (promise) {
-								if (promise.then) {
-									promise.then(then);
-								}
-							} else if (promise === null) {
+							} else if (hookResult === null) {
 								item.skipRasters = true;
-								resolve();
+								skipRasterFunc();
 							} else {
 								then();
 							}
-						};
-						prepareItem(img);
-					} else {
-							item.skipRasters = true;
-							resolve();
-					}
-					delete _this.rasterRequests[url];
+						}
+					};
+				if (cnt) {
+					tileToLoadPoints.map(function(it) {
+						var loader = _this._loadTileRecursive(it, item);
+						loader.then(function(loadResult) {
+							onLoadFunction(loadResult.gtp, it, loadResult.image);
+						}, skipRasterFunc);
+						return loader;
+					});
+				} else {
+					item.skipRasters = true;
+					skipRasterFunc();
 				}
 			}.bind(this));
+		}
+
+		if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
+
+		return new Promise(function(resolve1) {
+			var skipRaster = function() {
+				item.skipRasters = true;
+				resolve1();
+			};
+
+// console.log('____3_____', this.zKey, url)
+			if (!url) { skipRaster(); return; }
+
+			var done = function(resCanvas) {
+				gmx.quicklooksCache[url] = resCanvas;
+				var res = resCanvas;
+				if (this.gmx.rasterProcessingHook) {
+					//console.warn('rasterProcessingHook for quicklooks did`t work!');
+				}
+				if (itemImageProcessingHook) {	// требуется transform
+					var imgAttr = {
+						gmx: gmx,
+						topLeft: this.topLeft,
+						geoItem: geo,
+						item: item,
+						gmxTilePoint: gmxTilePoint
+					};
+					res = itemImageProcessingHook(resCanvas, imgAttr);
+				}
+				if (res) {
+					resolve1(res);
+					item.skipRasters = false;
+					rasters[idr] = res;
+				} else {
+					skipRaster();
+				}
+			}.bind(this);
+
+			if (gmx.quicklooksCache && gmx.quicklooksCache[url]) {
+				done(gmx.quicklooksCache[url]);
+			} else if (L.gmx.getBitmap) {
+				L.gmx.getBitmap(url, fetchOptions).then(
+					function(res) {
+						var imageObj = res.imageBitmap,
+							canvas_ = document.createElement('canvas');
+						canvas_.width = imageObj.width;
+						canvas_.height = imageObj.height;
+						canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
+						done(canvas_);
+					}, skipRaster)
+				.catch(L.Util.falseFn);
+			} else {
+				var request = this.rasterRequests[url];
+				if (!request) {
+					request = L.gmx.imageLoader.push(url, {
+						tileRastersId: _this._uniqueID,
+						crossOrigin: gmx.crossOrigin || 'anonymous'
+					});
+					this.rasterRequests[url] = request;
+				} else {
+					request.options.tileRastersId = this._uniqueID;
+				}
+
+				// in fact, we want to return request.def, but need to do additional action during cancellation.
+				// so, we consctruct new promise and add pipe it with request.def
+				request.def.then(done, skipRaster);
+			}
 		}.bind(this));
-        return itemRasterPromise;
     },
 
     _getVisibleItems: function (geoItems) {
@@ -611,8 +583,12 @@ ScreenVectorTile.prototype = {
 
     _getTileRasters: function (geoItems) {   //load all missing rasters for items we are going to render
 		return new Promise(function(resolve) {
-			Promise.all(this._getNeedRasterItems(geoItems).map(this._getItemRasters.bind(this)))
-				.then(resolve);
+			var arr = this._getNeedRasterItems(geoItems).map(this._getItemRasters.bind(this));
+// console.log('_getTileRasters___', arr)
+			Promise.all(arr)
+				.then(resolve, function() {
+// console.log('_getTileRasters', ev)
+				});
 		}.bind(this));
     },
 
@@ -718,6 +694,7 @@ ScreenVectorTile.prototype = {
 					});
 					Promise.all(fArr).then(function() {
 						if (bgImage) { dattr.bgImage = bgImage; }
+
 						//ctx.save();
 						for (var i = 0, len = geoItems.length; i < len; i++) {
 							var geoItem = geoItems[i],
@@ -733,6 +710,9 @@ ScreenVectorTile.prototype = {
 										L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? it.parsedStyleHover : it.parsedStyle, it.style);
 									}
 								} else {
+// if(!dattr.rasters[item.id]) {
+// console.log('___bg', _this.ntp, item.skipRasters, item.id, dattr.rasters[item.id]);
+// }
 									L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style);
 								}
 								if (id in gmx._needPopups && !gmx._needPopups[id]) {

@@ -744,7 +744,7 @@ L.gmx.Deferred = Deferred;
 		chkMessage: function(evt) {
 			var message = evt.data,
 				url = message.url;
-// console.log('ImageBitmapLoader ', message, evt, requestIdleCallback);
+// console.log('ImageBitmapLoader ', message, evt);
 
 			for (var i = 0, it, arr = this.jobs[url] || [], len = arr.length; i < len; i++) {
 				it = arr[i];
@@ -752,6 +752,7 @@ L.gmx.Deferred = Deferred;
 				else { it.reject(message); }
 			}
 			this.jobs[url].length = 0;
+			L.gmxUtil.loaderStatus(url, true);
 		},
 
 		push: function(url, options) {	// добавить запрос в worker
@@ -763,6 +764,7 @@ L.gmx.Deferred = Deferred;
 
 			this.jobs[src].push(attr);
 			this.worker.postMessage({src: src, options: options});
+			L.gmxUtil.loaderStatus(src);
 			return new Promise(function(resolve, reject) {
 				attr.resolve = resolve;
 				attr.reject = reject;
@@ -7276,6 +7278,34 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			tile.active = true;
 		}
 		if (willPrune && !this._noPrune) { this._pruneTiles(); }
+	},
+
+	_removeTile: function (key) {
+		var tile = this._tiles[key];
+		if (!tile) { return; }
+
+        var gmx = this._gmx,
+			dm = gmx.dataManager;
+        if (dm) {
+			dm.removeObserver(key);		// TODO: про active
+		}
+
+		// Cancels any pending http requests associated with the tile	dataManager
+		// unless we're on Android's stock browser,
+		// see https://github.com/Leaflet/Leaflet/issues/137
+		// if (!Browser.androidStock) {
+			// tile.el.setAttribute('src', Util.emptyImageUrl);
+		// }
+		L.DomUtil.remove(tile.el);
+
+		delete this._tiles[key];
+
+		// @event tileunload: TileEvent
+		// Fired when a tile is removed (e.g. when a tile goes off the screen).
+		this.fire('tileunload', {
+			tile: tile.el,
+			coords: this._keyToTileCoords(key)
+		});
 	},
 
 	_tileReady: function (coords, err, tile) {

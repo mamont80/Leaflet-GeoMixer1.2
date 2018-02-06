@@ -19,7 +19,7 @@
 		chkMessage: function(evt) {
 			var message = evt.data,
 				url = message.url;
-// console.log('ImageBitmapLoader ', message, evt, requestIdleCallback);
+// console.log('ImageBitmapLoader ', message, evt);
 
 			for (var i = 0, it, arr = this.jobs[url] || [], len = arr.length; i < len; i++) {
 				it = arr[i];
@@ -27,6 +27,7 @@
 				else { it.reject(message); }
 			}
 			this.jobs[url].length = 0;
+			L.gmxUtil.loaderStatus(url, true);
 		},
 
 		push: function(url, options) {	// добавить запрос в worker
@@ -38,6 +39,7 @@
 
 			this.jobs[src].push(attr);
 			this.worker.postMessage({src: src, options: options});
+			L.gmxUtil.loaderStatus(src);
 			return new Promise(function(resolve, reject) {
 				attr.resolve = resolve;
 				attr.reject = reject;

@@ -124,6 +124,34 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		if (willPrune && !this._noPrune) { this._pruneTiles(); }
 	},
 
+	_removeTile: function (key) {
+		var tile = this._tiles[key];
+		if (!tile) { return; }
+
+        var gmx = this._gmx,
+			dm = gmx.dataManager;
+        if (dm) {
+			dm.removeObserver(key);		// TODO: про active
+		}
+
+		// Cancels any pending http requests associated with the tile	dataManager
+		// unless we're on Android's stock browser,
+		// see https://github.com/Leaflet/Leaflet/issues/137
+		// if (!Browser.androidStock) {
+			// tile.el.setAttribute('src', Util.emptyImageUrl);
+		// }
+		L.DomUtil.remove(tile.el);
+
+		delete this._tiles[key];
+
+		// @event tileunload: TileEvent
+		// Fired when a tile is removed (e.g. when a tile goes off the screen).
+		this.fire('tileunload', {
+			tile: tile.el,
+			coords: this._keyToTileCoords(key)
+		});
+	},
+
 	_tileReady: function (coords, err, tile) {
 		if (!this._map) { return; }
 

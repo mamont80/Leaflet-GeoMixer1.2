@@ -13,8 +13,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         cacheQuicklooks: true,
         clearCacheOnLoad: true,
         showScreenTiles: false,
-		updateWhenZooming: false,
+		// updateWhenZooming: false,
 		// bubblingMouseEvents: false,
+		keepBuffer: 0,
         clickable: true
     },
 
@@ -63,7 +64,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
             this._gmx.crossOrigin = options.crossOrigin;
         }
 	},
-
+/*
 	__repaintNotLoaded: function () {
 		//return;
 		if (!this._map) { return; }
@@ -86,22 +87,18 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			}
 		}
 		if (arr.length) {
-			 // console.log('_repaintNotLoaded ', this._gmx.layerID, arr.length);
+			// console.log('_repaintNotLoaded ', this._gmx.layerID, arr.length);
 			this.repaint(arr);
 		} else if (this.options.clearCacheOnLoad) {
-			 // console.log('_repaintNotLoaded - done', this._gmx.layerID, arr.length);
 			this._gmx.rastersCache = {};
 			this._gmx.quicklooksCache = {};
 		}
     },
 	__runRepaint: function (msek) {
-		if (this.__repaintNotLoadedTimer) { cancelIdleCallback(this.__repaintNotLoadedTimer); }
-		this.__repaintNotLoadedTimer = requestIdleCallback(L.bind(this.__repaintNotLoaded, this), {timeout: msek || 100});
-
-		// if (this.__repaintNotLoadedTimer) { clearTimeout(this.__repaintNotLoadedTimer); }
-		// this.__repaintNotLoadedTimer = setTimeout(L.bind(this.__repaintNotLoaded, this), msek || 100);
+		if (this.__repaintNotLoadedTimer) { clearTimeout(this.__repaintNotLoadedTimer); }
+		this.__repaintNotLoadedTimer = setTimeout(L.bind(this.__repaintNotLoaded, this), msek || 100);
     },
-
+*/
 	//block: extended from L.GridLayer
 	_setView: function (center, zoom, noPrune, noUpdate) {
 		if (!this._map) { return; }
@@ -123,34 +120,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			tile.active = true;
 		}
 		if (willPrune && !this._noPrune) { this._pruneTiles(); }
-	},
-
-	_removeTile: function (key) {
-		var tile = this._tiles[key];
-		if (!tile) { return; }
-
-        var gmx = this._gmx,
-			dm = gmx.dataManager;
-        if (dm) {
-			dm.removeObserver(key);		// TODO: про active
-		}
-
-		// Cancels any pending http requests associated with the tile	dataManager
-		// unless we're on Android's stock browser,
-		// see https://github.com/Leaflet/Leaflet/issues/137
-		// if (!Browser.androidStock) {
-			// tile.el.setAttribute('src', Util.emptyImageUrl);
-		// }
-		L.DomUtil.remove(tile.el);
-
-		delete this._tiles[key];
-
-		// @event tileunload: TileEvent
-		// Fired when a tile is removed (e.g. when a tile goes off the screen).
-		this.fire('tileunload', {
-			tile: tile.el,
-			coords: this._keyToTileCoords(key)
-		});
 	},
 
 	_tileReady: function (coords, err, tile) {
@@ -201,12 +170,11 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			} else {
 				// Wait a bit more than 0.2 secs (the duration of the tile fade-in)
 				// to trigger a pruning.
-				requestIdleCallback(L.bind(this._pruneTiles, this), {timeout: 250});
-				// setTimeout(L.bind(this._pruneTiles, this), 250);
+				setTimeout(L.bind(this._pruneTiles, this), 250);
 			}
 		}
 	},
-
+/*
 	// stops loading all tiles in the background layer
 	_abortLoading: function () {
 // console.log('_abortLoading ', this._loading, this._tileZoom, this._map._zoom, this._map.getZoom());
@@ -223,7 +191,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			}
 		}
 	},
-
+*/
     _onCreateLevel: function(level) {
 		this._updateShiftY(level.zoom);
 		//console.log('_onCreateLevel ', level);
@@ -243,7 +211,32 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 
     _onVersionChange: function () {
         this._updateProperties(this._gmx.rawProperties);
+		this._onmoveend({repaint: true});
     },
+
+	_onmoveend: function (attr) {
+// console.log('_onmoveend', this._gmx.layerID, arguments);
+		var zoom = this._tileZoom,
+			key, tile;
+
+		for (key in this._tiles) {
+			tile = this._tiles[key];
+			if (tile.coords.z === zoom) {
+				if (tile.promise) { 	// тайл уже рисовался - можно только repaint
+					if (attr && attr.repaint) {
+						// this.repaint(key);
+					}
+				} else {			// данный тайл еще не рисовался
+					this.__drawTile(tile);
+				}
+			}
+		}
+        if (this._gmx && this._gmx.dataManager) {
+			var dm = this._gmx.dataManager;
+			dm.removeScreenObservers(zoom);
+			//dm.fire('moveend');
+		}
+	},
 
 	_getEvents: function () {
 		var events = L.GridLayer.prototype.getEvents.call(this);
@@ -253,16 +246,14 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			},
 			zoomend: function() {
 				this._gmx.zoomstart = false;
-				this.__runRepaint();
+				//this.__runRepaint();
 			}
 		});
         var gmx = this._gmx;
 		if (gmx.properties.type === 'Vector') {
 			events.moveend = function() {
-				if ('dataManager' in this._gmx) {
-					this._gmx.dataManager.fire('moveend');
-				}
-				//console.log('_moveEnd', this._gmx.layerID);
+				if (this._onmoveendTimer) { cancelIdleCallback(this._onmoveendTimer); }
+				this._onmoveendTimer = requestIdleCallback(L.bind(this._onmoveend, this), {timeout: 25});
 			};
 		}
 
@@ -288,7 +279,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 					// console.log('tileunload ', ev);
 				// },
 				dateIntervalChanged: function() {
-					this.__runRepaint(150);
+						// this.redraw();
+					this._onmoveend({repaint: true});
+					//this.__runRepaint(150);
 				},
 				tileloadstart: function(ev) {				// тайл (ev.coords) загружается
 					var key = this._tileCoordsToKey(ev.coords),
@@ -296,8 +289,8 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 					// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
 
 					tLink.loaded = 0;
-					tLink.screenTile = new ScreenVectorTile(this, tLink);
-					L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
+					//tLink.screenTile = new ScreenVectorTile(this, tLink);
+					//L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
 				},
 				stylechange: function() {
 					var gmx = this._gmx;
@@ -362,6 +355,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 
 				this._resetView();
 				this._update();
+				gmx.dataManager.fire('moveend');
+
+				this._onmoveend();
 			}
 			L.gmx.layersVersion.add(this);
 			this.fire('add');
@@ -408,14 +404,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 	// Private method to load tiles in the grid's active zoom level according to map bounds
 	_update: function (center) {
 		var map = this._map;
-		if (this._gmx.zoomstart || !map) { return; }
-		if (this._updateTimer) { cancelIdleCallback(this._updateTimer); }
-		this._updateTimer = requestIdleCallback(L.bind(this._updateWait, this, center), {timeout: 150});
-    },
-	// Private method to load tiles in the grid's active zoom level according to map bounds
-	_updateWait: function (center) {
-		var map = this._map;
-		if (this._gmx.zoomstart || !map) { return; }
+		if (!map) { return; }
 		var zoom = this._clampZoom(map.getZoom());
 
 		if (center === undefined) { center = map.getCenter(); }
@@ -1209,7 +1198,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			zoom = this._tileZoom,
             gmx = this._gmx;
 
-        if (tileElem && !tileElem.promise) {
+        if (!tileElem.promise) {
 			tileElem.loaded = 0;
 			tileElem.key = zKey;
 			tileElem.promise = new Promise(function(resolve, reject) {
@@ -1254,14 +1243,14 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 						}
                     }
 				}, zKey)
-					.on('activate', function() {
+					// .on('activate', function() {
 						//if observer is deactivated before drawing,
 						//we can consider corresponding tile as already drawn
-						if (!this.isActive()) {
-							// console.log('isActive', zKey)
-							done();
-						}
-					});
+						// if (!this.isActive()) {
+							 // console.log('isActive', zKey)
+							// done();
+						// }
+					// });
 					//.activate();
 			}).catch(function(e) {
 				console.warn('catch:', e);

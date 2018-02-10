@@ -54,6 +54,9 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		if (/\buseWebGL=1\b/.test(location.search)) {
 			this._gmx.useWebGL = true;
 		}
+		if (/\bdebug=1\b/.test(location.search)) {
+			this._gmx.debug = true;
+		}
         if (options.cacheQuicklooks) {			// cache quicklooks for CR
             this._gmx.quicklooksCache = {};
         }
@@ -250,71 +253,92 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			}
 		});
         var gmx = this._gmx;
+        var owner = {
+			dateIntervalChanged: function() {
+				this._onmoveend({repaint: true});
+			},
+			tileloadstart: function(ev) {				// тайл (ev.coords) загружается
+				var key = ev.key || this._tileCoordsToKey(ev.coords),
+					tLink = this._tiles[key];
+
+				tLink.loaded = 0;
+				// if (gmx.debug) {
+					// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
+				// }
+			},
+			stylechange: function() {
+				// var gmx = this._gmx;
+				if (!gmx.balloonEnable && this._popup) {
+					this.unbindPopup();
+				} else if (gmx.balloonEnable && !this._popup) {
+					this.bindPopup('');
+				}
+				if (this._map) {
+					if (this.options.minZoom !== gmx.styleManager.minZoom || this.options.maxZoom !== gmx.styleManager.maxZoom) {
+						this.options.minZoom = gmx.styleManager.minZoom;
+						this.options.maxZoom = gmx.styleManager.maxZoom;
+						this._map._updateZoomLevels();
+					}
+					if (gmx.labelsLayer) {
+						this._map._labelsLayer.add(this);
+					} else if (!gmx.labelsLayer) {
+						this._map._labelsLayer.remove(this);
+					}
+					this.redraw();
+				}
+			},
+			versionchange: this._onVersionChange
+		};
 		if (gmx.properties.type === 'Vector') {
-			events.moveend = function() {
+			events.moveend = function(ev) {
 				if (this._onmoveendTimer) { cancelIdleCallback(this._onmoveendTimer); }
 				this._onmoveendTimer = requestIdleCallback(L.bind(this._onmoveend, this), {timeout: 25});
+				if (gmx.debug) {
+					console.log('moveend ', gmx.layerID, this._loading, this._tileZoom, ev);
+				}
 			};
+			if (gmx.debug) {
+				owner.load = function(ev) {					// Fired when the grid layer starts loading tiles.
+					var zoom = this._tileZoom,
+						err = [],
+						key, tile;
+					for (key in this._tiles) {
+						tile = this._tiles[key];
+						if (!tile.loaded) {
+							err.push({err: 'notLoaded', key: key, tile: tile});
+						}
+						if (!tile.promise) {
+							err.push({err: 'notPromise', key: key, tile: tile});
+						}
+					}
+					var cntTiles = Object.keys(this._tiles);
+					var cntObservers = Object.keys(gmx.dataManager._observers);
+					if (cntTiles.length !== cntObservers.length) {
+						err.push({err: 'cntObservers', observers: cntObservers, tiles: cntTiles});
+					}
+					console.log('load ', gmx.layerID, zoom, err, ev);
+				};
+				// owner.bitmap = function(ev) {				// Fired when bitmap load results
+					// console.log('bitmap ', ev);
+				// };
+				// owner.loading = function(ev) {				// Fired when the grid layer starts loading tiles.
+					// console.log('loading ', ev);
+				// };
+				// owner.tileload = function(ev) {			// Fired when a tile loads.
+					// console.log('tileload ', ev);
+				// };
+				// owner.tileerror = function(ev) {			// Fired when there is an error loading a tile.
+					// console.log('tileerror ', ev);
+				// };
+				// owner.tileunload = function(ev) {			// Fired when a tile is removed (e.g. when a tile goes off the screen).
+					// console.log('tileunload ', ev);
+				// };
+			}
 		}
 
 		return {
 			map: events,
-			owner: {
-				// load: function(ev) {					// Fired when the grid layer starts loading tiles.
-					// console.log('load ', ev);
-				// },
-				// bitmap: function(ev) {				// Fired when bitmap load results
-					// console.log('bitmap ', ev);
-				// },
-				// loading: function(ev) {				// Fired when the grid layer starts loading tiles.
-					// console.log('loading ', ev);
-				// },
-				// tileload: function(ev) {			// Fired when a tile loads.
-					// console.log('tileload ', ev);
-				// },
-				// tileerror: function(ev) {			// Fired when there is an error loading a tile.
-					// console.log('tileerror ', ev);
-				// },
-				// tileunload: function(ev) {			// Fired when a tile is removed (e.g. when a tile goes off the screen).
-					// console.log('tileunload ', ev);
-				// },
-				dateIntervalChanged: function() {
-						// this.redraw();
-					this._onmoveend({repaint: true});
-					//this.__runRepaint(150);
-				},
-				tileloadstart: function(ev) {				// тайл (ev.coords) загружается
-					var key = this._tileCoordsToKey(ev.coords),
-						tLink = this._tiles[key];
-					// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
-
-					tLink.loaded = 0;
-					//tLink.screenTile = new ScreenVectorTile(this, tLink);
-					//L.Util.requestAnimFrame(L.bind(this.__drawTile, this, ev));
-				},
-				stylechange: function() {
-					var gmx = this._gmx;
-					if (!gmx.balloonEnable && this._popup) {
-						this.unbindPopup();
-					} else if (gmx.balloonEnable && !this._popup) {
-						this.bindPopup('');
-					}
-					if (this._map) {
-						if (this.options.minZoom !== gmx.styleManager.minZoom || this.options.maxZoom !== gmx.styleManager.maxZoom) {
-							this.options.minZoom = gmx.styleManager.minZoom;
-							this.options.maxZoom = gmx.styleManager.maxZoom;
-							this._map._updateZoomLevels();
-						}
-						if (gmx.labelsLayer) {
-							this._map._labelsLayer.add(this);
-						} else if (!gmx.labelsLayer) {
-							this._map._labelsLayer.remove(this);
-						}
-						this.redraw();
-					}
-				},
-				versionchange: this._onVersionChange
-			}
+			owner: owner
 		};
 	},
 
@@ -511,6 +535,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		// Fired when a tile is requested and starts loading.
 		this.fire('tileloadstart', {
 			tile: tile,
+			key: key,
 			coords: coords
 		});
 	},
@@ -834,7 +859,8 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				zKeys[it] = true;
 			}
             this._gmx.dataManager._triggerObservers(zKeys);
-        }
+			this._onmoveend();
+       }
     },
 
     redrawItem: function (id) {

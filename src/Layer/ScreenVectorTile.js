@@ -112,10 +112,10 @@ ScreenVectorTile.prototype = {
 									gmx.rastersCache[rUrl] = canvas_;
 								}
 								resolve({gtp: gtp, image: canvas_});
-								_this.layer.fire('bitmap', {id: item.id, loaded: true, url: rUrl});
+								_this.layer.fire('bitmap', {id: item.id, loaded: true, url: rUrl, result: res});
 							},
-							function() {
-								_this.layer.fire('bitmap', {id: item.id, loaded: false, url: rUrl});
+							function(res) {
+								_this.layer.fire('bitmap', {id: item.id, loaded: false, url: rUrl, result: res});
 								tryHigherLevelTile(rUrl);
 							}
 						)
@@ -428,8 +428,8 @@ ScreenVectorTile.prototype = {
 		if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
 
 		return new Promise(function(resolve1) {
-			var skipRaster = function() {
-				_this.layer.fire('bitmap', {id: idr, loaded: false, url: url});
+			var skipRaster = function(res) {
+				_this.layer.fire('bitmap', {id: idr, loaded: false, url: url, result: res});
 				item.skipRasters = true;
 				resolve1();
 			};
@@ -473,7 +473,7 @@ ScreenVectorTile.prototype = {
 						canvas_.height = imageObj.height;
 						canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
 						done(canvas_);
-						_this.layer.fire('bitmap', {id: idr, loaded: true, url: url});
+						_this.layer.fire('bitmap', {id: idr, loaded: true, url: url, result: res});
 					}, skipRaster)
 				.catch(L.Util.falseFn);
 			} else {

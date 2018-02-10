@@ -5428,6 +5428,7 @@ var Observer = L.Class.extend({
         this._callback = options.callback;
         this.layerID = options.layerID;
         this.target = options.target;
+        this.z = options.z;
         this.itemHook = options.itemHook;	// set hook for item (set empty data for callback function)
         this._items = null;
         this.bbox = options.bbox;      		// set bbox by Mercator bounds
@@ -6336,7 +6337,7 @@ var DataManager = L.Class.extend({
     getItems: function(oId) {
         var resArr = [],
             observer = this._observers[oId];
-//console.log('getItems', oId, this.options.name);
+// console.log('getItems', oId, this.options.name);
 
         // if (!observer || !observer.isActive()) {
         if (!observer) {
@@ -6706,9 +6707,10 @@ var DataManager = L.Class.extend({
 
     _waitCheckObservers: function() {
         //TODO: refactor
-        if (this._checkObserversTimer) { clearTimeout(this._checkObserversTimer); }
-        this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 25);
-		//L.Util.requestAnimFrame(this.checkObservers, this);
+        // if (this._checkObserversTimer) { clearTimeout(this._checkObserversTimer); }
+        // this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 25);
+		if (this._checkObserversTimer) { cancelIdleCallback(this._checkObserversTimer); }
+		this._checkObserversTimer = requestIdleCallback(L.bind(this.checkObservers, this), {timeout: 25});
     },
 
     _triggerObservers: function(oKeys) {
@@ -7370,7 +7372,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		this._onmoveend({repaint: true});
     },
 
-	_onmoveend: function (attr) {
+	_onmoveend: function () {
 // console.log('_onmoveend', this._gmx.layerID, arguments);
 		var zoom = this._tileZoom,
 			key, tile;
@@ -7379,19 +7381,19 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			tile = this._tiles[key];
 			if (tile.coords.z === zoom) {
 				if (tile.promise) { 	// тайл уже рисовался - можно только repaint
-					if (attr && attr.repaint) {
+					// if (attr && attr.repaint) {
 						// this.repaint(key);
-					}
+					// }
 				} else {			// данный тайл еще не рисовался
 					this.__drawTile(tile);
 				}
 			}
 		}
-        if (this._gmx && this._gmx.dataManager) {
-			var dm = this._gmx.dataManager;
-			dm.removeScreenObservers(zoom);
+        // if (this._gmx && this._gmx.dataManager) {
+			// var dm = this._gmx.dataManager;
+			//dm.removeScreenObservers(zoom);
 			//dm.fire('moveend');
-		}
+		// }
 	},
 
 	_getEvents: function () {
@@ -7416,11 +7418,11 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		return {
 			map: events,
 			owner: {
+				// load: function(ev) {					// Fired when the grid layer starts loading tiles.
+					// console.log('load ', ev);
+				// },
 				// bitmap: function(ev) {				// Fired when bitmap load results
 					// console.log('bitmap ', ev);
-				// },
-				// load: function(ev) {				// Fired when the grid layer starts loading tiles.
-					// console.log('load ', ev);
 				// },
 				// loading: function(ev) {				// Fired when the grid layer starts loading tiles.
 					// console.log('loading ', ev);
@@ -7547,6 +7549,12 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         }
         this.fire('remove');
     },
+	_removeTile: function (key) {
+        if (this._gmx && this._gmx.dataManager) {
+			this._gmx.dataManager.removeObserver(key);		// TODO: про active
+		}
+        L.GridLayer.prototype._removeTile.call(this, key);
+	},
 
     _updateZIndex: function () {
         if (this._container) {
@@ -8399,15 +8407,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 						}
                     }
 				}, zKey)
-					// .on('activate', function() {
-						//if observer is deactivated before drawing,
-						//we can consider corresponding tile as already drawn
-						// if (!this.isActive()) {
-							 // console.log('isActive', zKey)
-							// done();
-						// }
-					// });
-					//.activate();
 			}).catch(function(e) {
 				console.warn('catch:', e);
 			});
@@ -8540,10 +8539,10 @@ ScreenVectorTile.prototype = {
 									gmx.rastersCache[rUrl] = canvas_;
 								}
 								resolve({gtp: gtp, image: canvas_});
-								_this.layer.fire('bitmap', {id: item.id, loaded: true, url: rUrl});
+								_this.layer.fire('bitmap', {id: item.id, loaded: true, url: rUrl, result: res});
 							},
-							function() {
-								_this.layer.fire('bitmap', {id: item.id, loaded: false, url: rUrl});
+							function(res) {
+								_this.layer.fire('bitmap', {id: item.id, loaded: false, url: rUrl, result: res});
 								tryHigherLevelTile(rUrl);
 							}
 						)
@@ -8856,8 +8855,8 @@ ScreenVectorTile.prototype = {
 		if (gmx.sessionKey) { url += (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + encodeURIComponent(gmx.sessionKey); }
 
 		return new Promise(function(resolve1) {
-			var skipRaster = function() {
-				_this.layer.fire('bitmap', {id: idr, loaded: false, url: url});
+			var skipRaster = function(res) {
+				_this.layer.fire('bitmap', {id: idr, loaded: false, url: url, result: res});
 				item.skipRasters = true;
 				resolve1();
 			};
@@ -8901,7 +8900,7 @@ ScreenVectorTile.prototype = {
 						canvas_.height = imageObj.height;
 						canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
 						done(canvas_);
-						_this.layer.fire('bitmap', {id: idr, loaded: true, url: url});
+						_this.layer.fire('bitmap', {id: idr, loaded: true, url: url, result: res});
 					}, skipRaster)
 				.catch(L.Util.falseFn);
 			} else {

@@ -22,6 +22,7 @@ var Observer = L.Class.extend({
         this._callback = options.callback;
         this.layerID = options.layerID;
         this.target = options.target;
+        this.z = options.z;
         this.itemHook = options.itemHook;	// set hook for item (set empty data for callback function)
         this._items = null;
         this.bbox = options.bbox;      		// set bbox by Mercator bounds

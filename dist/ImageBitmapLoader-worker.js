@@ -1,9 +1,9 @@
 'use strict';
 
-// var log = self.console.log.bind(self.console);
+//var log = self.console.log.bind(self.console);
 
 function ImageHandler(workerContext) {
-    this.maxCount = 16;
+    this.maxCount = 48;
     this.loading = 0;
     this.queue = [];
     this.workerContext = workerContext;
@@ -19,34 +19,33 @@ ImageHandler.prototype = {
 	},
 
 	processQueue: function() {
+		// log('processQueue', this.queue.length, this.loading, this.maxCount);
 		if (this.queue.length > 0 && this.loading < this.maxCount) {
-			var queue = this.queue.shift(),
-				url = queue.src,
-				options = queue.options || {},
-				out = {url: url, load: true};
 			this.loading++;
-			return fetch(url, options)					// Fetch the image.
+			var queue = this.queue.shift(),
+				out = {url: queue.src, load: false, loading: this.loading, queueLength: this.queue.length},
+				_this = this;
+
+			return fetch(out.url, queue.options || {})		// Fetch the image.
 				.then(function(response) {
-					out.load = true;
-					this.loading--;
-					// this.workerContext.postMessage(out);
-					if (response.status !== 200) {
-						out.error = 'Unable to load resource with url ' + url;
-						//log('status !== 200', out);
-						return this.workerContext.postMessage(out);
-					}
-					return response.blob();
-				}.bind(this))
+					return response.status >= 200 && response.status < 300 ? response.blob() : Promise.reject(response)
+				})
 				.then(createImageBitmap)				// Turn it into an ImageBitmap.
 				.then(function(imageBitmap) {			// Post it back to main thread.
+					_this.loading--;
+					out.load = true;
 					out.imageBitmap = imageBitmap;
-					this.workerContext.postMessage(out, [imageBitmap]);
-				}.bind(this), function(err) {
+					// log('imageBitmap __', _this.queue.length, _this.loading, out);
+					_this.workerContext.postMessage(out, [imageBitmap]);
+					_this.processQueue();
+				})
+				.catch(function(err) {
 					out.error = err.toString();
-					this.workerContext.postMessage(out);
-				}.bind(this))
-				.then(this.processQueue.bind(this))				// Check the queue.
-				.catch(this.processQueue.bind(this))
+					_this.workerContext.postMessage(out);
+					_this.loading--;
+					// log('catch', err, out);
+					_this.processQueue();
+				})
 		}
 	}
 };

@@ -214,7 +214,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		this._onmoveend({repaint: true});
     },
 
-	_onmoveend: function (attr) {
+	_onmoveend: function () {
 // console.log('_onmoveend', this._gmx.layerID, arguments);
 		var zoom = this._tileZoom,
 			key, tile;
@@ -223,19 +223,19 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			tile = this._tiles[key];
 			if (tile.coords.z === zoom) {
 				if (tile.promise) { 	// тайл уже рисовался - можно только repaint
-					if (attr && attr.repaint) {
+					// if (attr && attr.repaint) {
 						// this.repaint(key);
-					}
+					// }
 				} else {			// данный тайл еще не рисовался
 					this.__drawTile(tile);
 				}
 			}
 		}
-        if (this._gmx && this._gmx.dataManager) {
-			var dm = this._gmx.dataManager;
-			dm.removeScreenObservers(zoom);
+        // if (this._gmx && this._gmx.dataManager) {
+			// var dm = this._gmx.dataManager;
+			//dm.removeScreenObservers(zoom);
 			//dm.fire('moveend');
-		}
+		// }
 	},
 
 	_getEvents: function () {
@@ -260,11 +260,11 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		return {
 			map: events,
 			owner: {
+				// load: function(ev) {					// Fired when the grid layer starts loading tiles.
+					// console.log('load ', ev);
+				// },
 				// bitmap: function(ev) {				// Fired when bitmap load results
 					// console.log('bitmap ', ev);
-				// },
-				// load: function(ev) {				// Fired when the grid layer starts loading tiles.
-					// console.log('load ', ev);
 				// },
 				// loading: function(ev) {				// Fired when the grid layer starts loading tiles.
 					// console.log('loading ', ev);
@@ -391,6 +391,12 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         }
         this.fire('remove');
     },
+	_removeTile: function (key) {
+        if (this._gmx && this._gmx.dataManager) {
+			this._gmx.dataManager.removeObserver(key);		// TODO: про active
+		}
+        L.GridLayer.prototype._removeTile.call(this, key);
+	},
 
     _updateZIndex: function () {
         if (this._container) {
@@ -1243,15 +1249,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 						}
                     }
 				}, zKey)
-					// .on('activate', function() {
-						//if observer is deactivated before drawing,
-						//we can consider corresponding tile as already drawn
-						// if (!this.isActive()) {
-							 // console.log('isActive', zKey)
-							// done();
-						// }
-					// });
-					//.activate();
 			}).catch(function(e) {
 				console.warn('catch:', e);
 			});

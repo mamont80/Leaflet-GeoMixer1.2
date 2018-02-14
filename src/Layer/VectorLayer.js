@@ -13,7 +13,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         cacheQuicklooks: true,
         clearCacheOnLoad: true,
         showScreenTiles: false,
-		// updateWhenZooming: false,
+		updateWhenZooming: false,
 		// bubblingMouseEvents: false,
 		keepBuffer: 0,
         clickable: true
@@ -104,10 +104,10 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 */
 	//block: extended from L.GridLayer
 	_setView: function (center, zoom, noPrune, noUpdate) {
-		if (!this._map) { return; }
+		if (!this._map || this._map._animatingZoom) { return; }
 		L.GridLayer.prototype._setView.call(this, center, zoom, noPrune, noUpdate);
 	},
-
+/*
 	_updateOpacity: function () {
 		if (!this._map) { return; }
 
@@ -177,7 +177,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			}
 		}
 	},
-/*
+
 	// stops loading all tiles in the background layer
 	_abortLoading: function () {
 // console.log('_abortLoading ', this._loading, this._tileZoom, this._map._zoom, this._map.getZoom());
@@ -234,22 +234,25 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				}
 			}
 		}
-        // if (this._gmx && this._gmx.dataManager) {
-			// var dm = this._gmx.dataManager;
-			//dm.removeScreenObservers(zoom);
-			//dm.fire('moveend');
-		// }
+        if (this._gmx && this._gmx.dataManager) {
+			var dm = this._gmx.dataManager;
+			dm.removeScreenObservers(zoom);
+			dm.fire('moveend');
+		}
 	},
 
 	_getEvents: function () {
 		var events = L.GridLayer.prototype.getEvents.call(this);
 		L.extend(events, {
-			zoomstart: function() {
+			// zoomstart: function() {
+				// this._gmx.zoomstart = true;
+			// },
+			beforezoomanim: function(ev) {
+				this._setZoomTransforms(ev.center, ev.zoom);
 				this._gmx.zoomstart = true;
 			},
 			zoomend: function() {
 				this._gmx.zoomstart = false;
-				//this.__runRepaint();
 			}
 		});
         var gmx = this._gmx;
@@ -257,6 +260,22 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			dateIntervalChanged: function() {
 				this._onmoveend({repaint: true});
 			},
+			load: function() {				// Fired when the grid layer starts loading tiles.
+				// console.log('load ', ev, Date.now() - window.startTest, ev);
+				if (this._tileZoom) {
+					var z = this._tileZoom;
+					if (this._gmx && this._gmx.dataManager) {
+						var dm = this._gmx.dataManager;
+						dm.removeScreenObservers(z);
+					}
+					for (var key in this._levels) {
+						if (key !== z) {
+							this._removeTilesAtZoom(key);
+						}
+					}
+				}
+			},
+
 			tileloadstart: function(ev) {				// тайл (ev.coords) загружается
 				var key = ev.key || this._tileCoordsToKey(ev.coords),
 					tLink = this._tiles[key];
@@ -298,26 +317,26 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				}
 			};
 			if (gmx.debug) {
-				owner.load = function(ev) {					// Fired when the grid layer starts loading tiles.
-					var zoom = this._tileZoom,
-						err = [],
-						key, tile;
-					for (key in this._tiles) {
-						tile = this._tiles[key];
-						if (!tile.loaded) {
-							err.push({err: 'notLoaded', key: key, tile: tile});
-						}
-						if (!tile.promise) {
-							err.push({err: 'notPromise', key: key, tile: tile});
-						}
-					}
-					var cntTiles = Object.keys(this._tiles);
-					var cntObservers = Object.keys(gmx.dataManager._observers);
-					if (cntTiles.length !== cntObservers.length) {
-						err.push({err: 'cntObservers', observers: cntObservers, tiles: cntTiles});
-					}
-					console.log('load ', gmx.layerID, zoom, err, ev);
-				};
+				// owner.load = function(ev) {
+					// var zoom = this._tileZoom,
+						// err = [],
+						// key, tile;
+					// for (key in this._tiles) {
+						// tile = this._tiles[key];
+						// if (!tile.loaded) {
+							// err.push({err: 'notLoaded', key: key, tile: tile});
+						// }
+						// if (!tile.promise) {
+							// err.push({err: 'notPromise', key: key, tile: tile});
+						// }
+					// }
+					// var cntTiles = Object.keys(this._tiles);
+					// var cntObservers = Object.keys(gmx.dataManager._observers);
+					// if (cntTiles.length !== cntObservers.length) {
+						// err.push({err: 'cntObservers', observers: cntObservers, tiles: cntTiles});
+					// }
+					// console.log('load ', gmx.layerID, zoom, err, ev);
+				// };
 				// owner.bitmap = function(ev) {				// Fired when bitmap load results
 					// console.log('bitmap ', ev);
 				// };
@@ -416,6 +435,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         this.fire('remove');
     },
 	_removeTile: function (key) {
+		if (!this._map || this._map._animatingZoom) { return; }
         if (this._gmx && this._gmx.dataManager) {
 			this._gmx.dataManager.removeObserver(key);		// TODO: про active
 		}
@@ -428,10 +448,16 @@ L.gmx.VectorLayer = L.GridLayer.extend({
                 zIndex = options.zIndex || 0,
                 zIndexOffset = options.zIndexOffset || 0;
 
-            this._container.style.zIndex = zIndexOffset + zIndex;
+           this._container.style.zIndex = zIndexOffset + zIndex;
         }
+	},
+
+    _update: function (center) {
+		if (!this._map || this._map._animatingZoom) { return; }
+        L.GridLayer.prototype._update.call(this, center);
     },
 	// Private method to load tiles in the grid's active zoom level according to map bounds
+	/*
 	_update: function (center) {
 		var map = this._map;
 		if (!map) { return; }
@@ -497,10 +523,10 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			}
 		}
 	},
-
+*/
 /*eslint-disable no-unused-vars */
 	createTile: function(coords , done) {
-		this._test = [coords, done];
+		//this._test = [coords, done];
 		var tile = L.DomUtil.create('canvas', 'leaflet-tile');
 		var size = this.getTileSize();
 		tile.width = tile.height = 0;
@@ -514,12 +540,12 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		if (L.Browser.android && !L.Browser.android23) {
 			tile.style.WebkitBackfaceVisibility = 'hidden';
 		}
+		// tile.setAttribute('role', 'presentation');
 
 		// tile.style.opacity = this.options.opacity;
 		return tile;
     },
 /*eslint-enable */
-
 	_addTile: function (coords) {
 		var tile = this.createTile(this._wrapCoords(coords), L.bind(this._tileReady, this, coords)),
 			key = this._tileCoordsToKey(coords);

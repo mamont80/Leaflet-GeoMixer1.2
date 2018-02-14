@@ -238,9 +238,9 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
         // if (map.options.zoomAnimation && L.Browser.any3d) {
             // map.on('zoomanim', this._animateZoom, this);
         // } else {
-			map.on('zoomstart', function() {
-				if (this._canvas.parentNode) { this._canvas.parentNode.removeChild(this._canvas); }
-			}, this);
+			// map.on('zoomstart', function() {
+				// if (this._canvas.parentNode) { this._canvas.parentNode.removeChild(this._canvas); }
+			// }, this);
 		// }
 
         this._reset();

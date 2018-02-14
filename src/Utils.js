@@ -3019,6 +3019,7 @@ L.extend(L.gmxUtil, {
     parseTemplate: gmxAPIutils.parseTemplate
 });
 
+L.gmxUtil.isOldVersion = L.version.substr(0, 3) === '0.7';
 L.gmxUtil.isIEOrEdge = L.gmxUtil.gtIE11 || L.gmxUtil.isIE11 || L.gmxUtil.isIE10 || L.gmxUtil.isIE9;
 if (!('requestIdleCallback' in window)) {
 	window.requestIdleCallback = function(func, opt) {

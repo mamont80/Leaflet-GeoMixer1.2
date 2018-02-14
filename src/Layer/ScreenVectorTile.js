@@ -667,7 +667,7 @@ ScreenVectorTile.prototype = {
 							tpy: _this.tpy,
 							ctx: ctx
 						};
-					L.DomUtil.addClass(tile, 'zKey:' + _this.zKey);
+					// L.DomUtil.addClass(tile, 'zKey:' + _this.zKey);
 
 					ctx.clearRect(0, 0, 256, 256);
 					if (gmx.showScreenTiles) {

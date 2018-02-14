@@ -263,8 +263,12 @@ var layersVersion = {
     chkVersion: chkVersion,
 
     now: function() {
-		if (timeoutID) { clearTimeout(timeoutID); }
-		timeoutID = setTimeout(chkVersion, 0);
+		if (timeoutID) { cancelIdleCallback(timeoutID); }
+		timeoutID = requestIdleCallback(function() {
+			chkVersion();
+		}, {timeout: 25});
+		// if (timeoutID) { clearTimeout(timeoutID); }
+		// timeoutID = setTimeout(chkVersion, 0);
     },
 
     stop: function() {

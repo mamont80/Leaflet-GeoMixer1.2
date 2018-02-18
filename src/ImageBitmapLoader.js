@@ -23,7 +23,7 @@
 
 			for (var i = 0, it, arr = this.jobs[url] || [], len = arr.length; i < len; i++) {
 				it = arr[i];
-				if (message.imageBitmap) { it.resolve(message); }
+				if (message.load) { it.resolve(message); }
 				else { it.reject(message); }
 			}
 			this.jobs[url].length = 0;

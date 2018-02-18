@@ -1,4 +1,4 @@
-L.gmx.VectorLayer = L.GridLayer.extend({
+var ext = L.extend({
     options: {
 		tilesCRS: L.CRS.EPSG3395,
         openPopups: [],
@@ -67,134 +67,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
             this._gmx.crossOrigin = options.crossOrigin;
         }
 	},
-/*
-	__repaintNotLoaded: function () {
-		//return;
-		if (!this._map) { return; }
 
-		var arr = [], key, tile, z;
-		for (key in this._tiles) {
-			tile = this._tiles[key];
-			z = tile.coords.z;
-			if (z == this._tileZoom) {
-				if (!tile.loaded) {
-					arr.push(key);
-					//break;
-				// } else if (tile.count) {
-					// if (!tile.el.parentNode && this._levels[z]) {
-						// this._levels[z].el.appendChild(tile.el);
-					// }
-				// } else if (tile.el.parentNode) {
-					// tile.el.parentNode.removeChild(tile.el);
-				}
-			}
-		}
-		if (arr.length) {
-			// console.log('_repaintNotLoaded ', this._gmx.layerID, arr.length);
-			this.repaint(arr);
-		} else if (this.options.clearCacheOnLoad) {
-			this._gmx.rastersCache = {};
-			this._gmx.quicklooksCache = {};
-		}
-    },
-	__runRepaint: function (msek) {
-		if (this.__repaintNotLoadedTimer) { clearTimeout(this.__repaintNotLoadedTimer); }
-		this.__repaintNotLoadedTimer = setTimeout(L.bind(this.__repaintNotLoaded, this), msek || 100);
-    },
-*/
-	//block: extended from L.GridLayer
-	_setView: function (center, zoom, noPrune, noUpdate) {
-		if (!this._map || this._map._animatingZoom) { return; }
-		L.GridLayer.prototype._setView.call(this, center, zoom, noPrune, noUpdate);
-	},
-/*
-	_updateOpacity: function () {
-		if (!this._map) { return; }
-
-		// IE doesn't inherit filter opacity properly, so we're forced to set it on tiles
-		if (L.Browser.ielt9) { return; }
-		var willPrune = false;
-		for (var key in this._tiles) {
-			var tile = this._tiles[key];
-			if (!tile.current || !tile.loaded) { continue; }
-			if (tile.active) {
-				willPrune = true;
-			}
-			tile.active = true;
-		}
-		if (willPrune && !this._noPrune) { this._pruneTiles(); }
-	},
-
-	_tileReady: function (coords, err, tile) {
-		if (!this._map) { return; }
-
-		if (err) {
-			// @event tileerror: TileErrorEvent
-			// Fired when there is an error loading a tile.
-			this.fire('tileerror', {
-				error: err,
-				tile: tile,
-				coords: coords
-			});
-		}
-
-		var key = this._tileCoordsToKey(coords);
-
-		tile = this._tiles[key];
-		if (!tile) { return; }
-
-		tile.loaded = +new Date();
-		if (this._map._fadeAnimated) {
-			L.Util.cancelAnimFrame(this._fadeFrame);
-			this._fadeFrame = L.Util.requestAnimFrame(this._updateOpacity, this);
-		} else {
-			tile.active = true;
-		}
-
-		if (!err) {
-			L.DomUtil.addClass(tile.el, 'leaflet-tile-loaded');
-
-			// @event tileload: TileEvent
-			// Fired when a tile loads.
-			this.fire('tileload', {
-				tile: tile.el,
-				coords: coords
-			});
-		}
-
-		if (this._noTilesToLoad()) {
-			this._loading = false;
-			// @event load: Event
-			// Fired when the grid layer loaded all visible tiles.
-			this.fire('load');
-
-			if (L.Browser.ielt9 || !this._map._fadeAnimated) {
-				L.Util.requestAnimFrame(this._pruneTiles, this);
-			} else {
-				// Wait a bit more than 0.2 secs (the duration of the tile fade-in)
-				// to trigger a pruning.
-				setTimeout(L.bind(this._pruneTiles, this), 250);
-			}
-		}
-	},
-
-	// stops loading all tiles in the background layer
-	_abortLoading: function () {
-// console.log('_abortLoading ', this._loading, this._tileZoom, this._map._zoom, this._map.getZoom());
-		var zoom = this._tileZoom,
-			i, tile;
-		for (i in this._tiles) {
-			tile = this._tiles[i];
-			if (tile.observer) {
-				if (tile.coords.z === zoom) {
-					tile.observer.activate();
-				} else {
-					tile.observer.deactivate();
-				}
-			}
-		}
-	},
-*/
     _onCreateLevel: function(level) {
 		this._updateShiftY(level.zoom);
 		//console.log('_onCreateLevel ', level);
@@ -218,7 +91,7 @@ L.gmx.VectorLayer = L.GridLayer.extend({
     },
 
 	_onmoveend: function () {
-// console.log('_onmoveend', this._gmx.layerID, arguments);
+		// console.log('_onmoveend', this._gmx.layerID, arguments);
 		var zoom = this._tileZoom,
 			key, tile;
 
@@ -234,22 +107,36 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 				}
 			}
 		}
+		this._removeScreenObservers(zoom, true);
+		//L.DomUtil.addClass(this._level.el, 'leaflet-zoom-animated');
+		// if (L.Browser.any3d) {
+			// L.DomUtil.setTransform(this._level.el, this._map._translateFrom, 1);
+		// } else {
+			// L.DomUtil.setPosition(this._level.el, this._map._translateFrom);
+		// }
+	},
+
+	_removeScreenObservers: function (z, flag) {
         if (this._gmx && this._gmx.dataManager) {
 			var dm = this._gmx.dataManager;
-			dm.removeScreenObservers(zoom);
-			dm.fire('moveend');
+			dm.removeScreenObservers(z);
+			if (flag) {
+				dm.fire('moveend');
+			}
 		}
 	},
 
 	_getEvents: function () {
 		var events = L.GridLayer.prototype.getEvents.call(this);
 		L.extend(events, {
-			// zoomstart: function() {
-				// this._gmx.zoomstart = true;
-			// },
-			beforezoomanim: function(ev) {
-				this._setZoomTransforms(ev.center, ev.zoom);
+			zoomstart: function() {
+				// console.log('zoomstart', this._gmx.layerID, arguments);
 				this._gmx.zoomstart = true;
+				this._removeScreenObservers();
+			},
+			zoomanim: function(ev) {
+				this._setZoomTransforms(ev.center, ev.zoom);
+				// this._gmx.zoomstart = true;
 			},
 			zoomend: function() {
 				this._gmx.zoomstart = false;
@@ -452,78 +339,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
         }
 	},
 
-    _update: function (center) {
-		if (!this._map || this._map._animatingZoom) { return; }
-        L.GridLayer.prototype._update.call(this, center);
-    },
-	// Private method to load tiles in the grid's active zoom level according to map bounds
-	/*
-	_update: function (center) {
-		var map = this._map;
-		if (!map) { return; }
-		var zoom = this._clampZoom(map.getZoom());
-
-		if (center === undefined) { center = map.getCenter(); }
-		if (this._tileZoom === undefined) { return; }	// if out of minzoom/maxzoom
-
-		var pixelBounds = this._getTiledPixelBounds(center),
-		    tileRange = this._pxBoundsToTileRange(pixelBounds),
-		    // tileCenter = tileRange.getCenter(),
-		    queue = [],
-		    margin = this.options.keepBuffer,
-		    noPruneRange = new L.Bounds(tileRange.getBottomLeft().subtract([margin, -margin]),
-		                              tileRange.getTopRight().add([margin, -margin]));
-
-		// Sanity check: panic if the tile range contains Infinity somewhere.
-		if (!(isFinite(tileRange.min.x) &&
-		      isFinite(tileRange.min.y) &&
-		      isFinite(tileRange.max.x) &&
-		      isFinite(tileRange.max.y))) { throw new Error('Attempted to load an infinite number of tiles'); }
-
-		for (var key in this._tiles) {
-			var c = this._tiles[key].coords;
-			if (c.z !== this._tileZoom || !noPruneRange.contains(new L.Point(c.x, c.y))) {
-				this._tiles[key].current = false;
-			}
-		}
-
-		// _update just loads more tiles. If the tile zoom level differs too much
-		// from the map's, let _setView reset levels and prune old tiles.
-		if (Math.abs(zoom - this._tileZoom) > 1) { this._setView(center, zoom); return; }
-
-		// create a queue of coordinates to load tiles from
-		var i, j, len, coords;
-		for (j = tileRange.min.y; j <= tileRange.max.y; j++) {
-			for (i = tileRange.min.x; i <= tileRange.max.x; i++) {
-				coords = new L.Point(i, j);
-				coords.z = this._tileZoom;
-
-				if (!this._isValidTile(coords)) { continue; }
-
-				var tile = this._tiles[this._tileCoordsToKey(coords)];
-				if (tile) {
-					tile.current = true;
-				} else {
-					queue.push(coords);
-				}
-			}
-		}
-
-		if (queue.length !== 0) {
-			// if it's the first batch of tiles to load
-			if (!this._loading) {
-				this._loading = true;
-				// @event loading: Event
-				// Fired when the grid layer starts loading tiles.
-				this.fire('loading');
-			}
-
-			for (i = 0, len = queue.length; i < len; i++) {
-				this._addTile(queue[i]);
-			}
-		}
-	},
-*/
 /*eslint-disable no-unused-vars */
 	createTile: function(coords , done) {
 		//this._test = [coords, done];
@@ -546,25 +361,6 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 		return tile;
     },
 /*eslint-enable */
-	_addTile: function (coords) {
-		var tile = this.createTile(this._wrapCoords(coords), L.bind(this._tileReady, this, coords)),
-			key = this._tileCoordsToKey(coords);
-
-		// save tile in cache
-		this._tiles[key] = {
-			el: tile,
-			coords: coords,
-			current: true
-		};
-
-		// @event tileloadstart: TileEvent
-		// Fired when a tile is requested and starts loading.
-		this.fire('tileloadstart', {
-			tile: tile,
-			key: key,
-			coords: coords
-		});
-	},
 
     //block: public interface
     initFromDescription: function(ph) {
@@ -1308,7 +1104,11 @@ L.gmx.VectorLayer = L.GridLayer.extend({
 			tileElem.resolve();
 		}
     }
+},
+{
 });
+L.gmx.VectorLayer = L.GridLayer.extend(ext);
+
 L.Map.addInitHook(function () {
     if (L.Mixin.ContextMenu) {
 		L.gmx.VectorLayer.include(L.Mixin.ContextMenu);

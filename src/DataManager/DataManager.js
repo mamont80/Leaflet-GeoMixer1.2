@@ -592,7 +592,7 @@ var DataManager = L.Class.extend({
 				if (z && observer.z === z) {
 					continue;
 				}
-				observer.deactivate();
+				observer.deactivate(true);
 				this.removeObserver(k);
 			}
         }

@@ -2,7 +2,7 @@
 'use strict';
 
 	var worker;
-	if ('createImageBitmap' in window && 'Worker' in window) {
+	if ('createImageBitmap' in window && 'Worker' in window && location.protocol !== 'file:') {
 		worker = new Worker(location.href.replace(/[^/]*$/, 'ImageBitmapLoader-worker.js'));
 	}
 	if (!worker) {

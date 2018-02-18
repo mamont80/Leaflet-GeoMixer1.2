@@ -71,10 +71,10 @@ var Observer = L.Class.extend({
         return this;
     },
 
-    deactivate: function() {
+    deactivate: function(withoutActivate) {
         if (this.active) {
             this.active = false;
-            this.fire('activate');
+            if (!withoutActivate) { this.fire('activate'); }
         }
         return this;
     },

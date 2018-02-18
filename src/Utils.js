@@ -1755,6 +1755,11 @@ var gmxAPIutils = {
         }
         return length;
     },
+    getText: function(str) {
+		str = str || '';
+        if (L.gmxLocale) { return L.gmxLocale.getText(str); }
+		return str.split('.').pop();
+	},
 
     /** Get prettify length
      * @memberof L.gmxUtil
@@ -1763,13 +1768,13 @@ var gmxAPIutils = {
      * @return {String} prettify length
     */
     prettifyDistance: function(length, type) {
-        var km = ' ' + L.gmxLocale.getText('units.km');
+        var km = ' ' + gmxAPIutils.getText('units.km');
         if (type === 'nm') {
-            return (Math.round(0.539956803 * length) / 1000) + ' ' + L.gmxLocale.getText('units.nm');
+            return (Math.round(0.539956803 * length) / 1000) + ' ' + gmxAPIutils.getText('units.nm');
         } else if (type === 'km') {
             return (Math.round(length) / 1000) + km;
         } else if (length < 2000 || type === 'm') {
-            return Math.round(length) + ' ' + L.gmxLocale.getText('units.m');
+            return Math.round(length) + ' ' + gmxAPIutils.getText('units.m');
         } else if (length < 200000) {
             return (Math.round(length / 10) / 100) + km;
         }
@@ -1900,14 +1905,14 @@ var gmxAPIutils = {
      * @return {String} prettified area
     */
     prettifyArea: function(area, type) {
-        var km2 = ' ' + L.gmxLocale.getText('units.km2');
+        var km2 = ' ' + gmxAPIutils.getText('units.km2');
 
         if (type === 'km2') {
             return ('' + (Math.round(area / 100) / 10000)) + km2;
         } else if (type === 'ha') {
-            return ('' + (Math.round(area / 100) / 100)) + ' ' + L.gmxLocale.getText('units.ha');
+            return ('' + (Math.round(area / 100) / 100)) + ' ' + gmxAPIutils.getText('units.ha');
         } else if (area < 100000 || type === 'm2') {
-            return Math.round(area) + ' ' + L.gmxLocale.getText('units.m2');
+            return Math.round(area) + ' ' + gmxAPIutils.getText('units.m2');
         } else if (area < 3000000) {
             return ('' + (Math.round(area / 1000) / 1000)).replace('.', ',') + km2;
         } else if (area < 30000000) {
@@ -2193,7 +2198,7 @@ var gmxAPIutils = {
 					var latLngGeometry = L.gmxUtil.geometryToGeoJSON(geom, true, unitOptions.srs == 3857);
                     if (type.indexOf('POINT') !== -1) {
                         var latlng = L.latLng(latLngGeometry.coordinates.reverse());
-                        out = '<b>' + L.gmxLocale.getText('Coordinates') + '</b>: '
+                        out = '<b>' + gmxAPIutils.getText('Coordinates') + '</b>: '
                             + gmxAPIutils.getCoordinatesString(latlng, unitOptions.coordinatesFormat);
                     } else if (type.indexOf('LINESTRING') !== -1) {
                         res += gmxAPIutils.geoJSONGetLength(latLngGeometry);
@@ -2205,10 +2210,10 @@ var gmxAPIutils = {
         }
         if (!out) {
             if (type.indexOf('LINESTRING') !== -1) {
-                out = '<b>' + L.gmxLocale.getText('Length') + '</b>: '
+                out = '<b>' + gmxAPIutils.getText('Length') + '</b>: '
                     + gmxAPIutils.prettifyDistance(res, unitOptions.distanceUnit);
             } else if (type.indexOf('POLYGON') !== -1) {
-                out = '<b>' + L.gmxLocale.getText('Area') + '</b>: '
+                out = '<b>' + gmxAPIutils.getText('Area') + '</b>: '
                     + gmxAPIutils.prettifyArea(res, unitOptions.squareUnit);
             }
         }
@@ -2951,6 +2956,7 @@ L.extend(L.gmxUtil, {
     isIE10: gmxAPIutils.isIE(10),
     isIE11: gmxAPIutils.isIE(11),
     gtIE11: gmxAPIutils.gtIE(11),
+	getText: gmxAPIutils.getText,
     getFormData: gmxAPIutils.getFormData,
     requestJSONP: gmxAPIutils.requestJSONP,
     requestLink: gmxAPIutils.requestLink,

@@ -19,8 +19,8 @@
 		chkMessage: function(evt) {
 			var message = evt.data,
 				url = message.url;
-// console.log('ImageBitmapLoader ', message, evt);
 
+			// console.log('ImageBitmapLoader ', message, evt);
 			for (var i = 0, it, arr = this.jobs[url] || [], len = arr.length; i < len; i++) {
 				it = arr[i];
 				if (message.load) { it.resolve(message); }
@@ -49,9 +49,11 @@
 
 	var imageBitmapLoader = new ImageBitmapLoader();
 	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
+	L.gmx.getJSON = imageBitmapLoader.push.bind(imageBitmapLoader);
 	worker.onerror = function(ev) {
 		console.warn('Error: Worker init: ImageBitmapLoader-worker.js', ev);
 		ev.target.terminate();
 		delete L.gmx.getBitmap;
+		delete L.gmx.getJSON;
 	};
 })();

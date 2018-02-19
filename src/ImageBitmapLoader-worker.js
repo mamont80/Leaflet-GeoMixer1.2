@@ -9,6 +9,7 @@ function ImageHandler(workerContext) {
     this.workerContext = workerContext;
 }
 ImageHandler.prototype = {
+
 	enqueue: function(evt) {
 		var toEnqueue = evt.data;
 		if (this.queue.indexOf(toEnqueue) < 0) {
@@ -17,70 +18,25 @@ ImageHandler.prototype = {
 		}
 	},
 
-	// getContentType: function(headers) {
-		// var ret = 'text';
-		// if (contentType.indexOf('text/javascript') > 0						// text/javascript; charset=utf-8
-			// || contentType.indexOf('application/json') > 0					// application/json; charset=utf-8
-			// ) {
-			// ret = 'json';
-		// } else if (contentType.indexOf('application/json') > 0) {	 		// application/json; charset=utf-8
-			// ret = 'formData';
-		// } else if (contentType.indexOf('application/json') > 0) {	 		// application/json; charset=utf-8
-			// ret = 'arrayBuffer';
-		// } else if (type === 'bitmap') {
-			// ret = 'blob';
-		// }
-		// return ret;
-	// },
-
 	processQueue: function() {
 		// log('processQueue', this.queue.length, this.loading, this.maxCount);
 		if (this.queue.length > 0 && this.loading < this.maxCount) {
 			this.loading++;
 			var queue = this.queue.shift(),
-				options = queue.options || {},
-				type = options.type || 'bitmap',
-				out = {url: queue.src, type: type, load: false, loading: this.loading, queueLength: this.queue.length},
-				_this = this,
-				promise = fetch(out.url, options).then(function(resp) {
-					var ret = '',
-						contentType = resp.headers.get('Content-Type');
+				out = {url: queue.src, load: false, loading: this.loading, queueLength: this.queue.length},
+				_this = this;
 
-					out.contentType = contentType;
-					if (resp.status < 200 || resp.status >= 300) {						// error
-						ret = Promise.reject(resp);
-					} else if ( contentType.indexOf('text/javascript') > -1				// text/javascript; charset=utf-8
-							|| contentType.indexOf('application/json') > -1				// application/json; charset=utf-8
-						) {
-						ret = resp.json();
-					} else if (contentType.indexOf('application/json') > -1) {	 		// application/json; charset=utf-8
-						ret = resp.text();
-					} else if (contentType.indexOf('application/json') > -1) {	 		// application/json; charset=utf-8
-						ret = resp.formData();
-					} else if (contentType.indexOf('application/json') > -1) {	 		// application/json; charset=utf-8
-						ret = resp.arrayBuffer();
-					} else if (type === 'bitmap') {
-						ret = resp.blob();
-					}
-					return ret;
-				});
-
-			if (type === 'bitmap') {
-				promise = promise.then(createImageBitmap);				// Turn it into an ImageBitmap.
-			}
-			return promise
-				.then(function(res) {									// Post it back to main thread.
+			return fetch(out.url, queue.options || {})		// Fetch the image.
+				.then(function(response) {
+					return response.status >= 200 && response.status < 300 ? response.blob() : Promise.reject(response)
+				})
+				.then(createImageBitmap)				// Turn it into an ImageBitmap.
+				.then(function(imageBitmap) {			// Post it back to main thread.
 					_this.loading--;
 					out.load = true;
-					var arr = [];
-					if (type === 'bitmap') {
-						arr = [res];
-						out.imageBitmap = res;
-					} else {
-						out.res = res;
-					}
+					out.imageBitmap = imageBitmap;
 					// log('imageBitmap __', _this.queue.length, _this.loading, out);
-					_this.workerContext.postMessage(out, arr);
+					_this.workerContext.postMessage(out, [imageBitmap]);
 					_this.processQueue();
 				})
 				.catch(function(err) {
@@ -89,7 +45,7 @@ ImageHandler.prototype = {
 					_this.loading--;
 					// log('catch', err, out);
 					_this.processQueue();
-				});
+				})
 		}
 	}
 };

@@ -338,6 +338,7 @@ var ext = L.extend({
 
            this._container.style.zIndex = zIndexOffset + zIndex;
         }
+	   this.fire('zindexupdated')
 	},
 
 /*eslint-disable no-unused-vars */
@@ -1107,6 +1108,13 @@ var ext = L.extend({
     }
 },
 {
+	_update: function (center) {				// Add by Geomixer (для события update _tiles)
+		if (this._map) {
+			L.GridLayer.prototype._update.call(this, center);
+			this.fire('update');
+		}
+	},
+
 	_tileReady: function (coords, err, tile) {
 		if (!this._map) { return; }				// Add by Geomixer (нет возможности отключения fade-anim)
 

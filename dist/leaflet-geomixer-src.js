@@ -7256,29 +7256,19 @@ var ext = L.extend({
     },
 
 	_onmoveend: function () {
-		// console.log('_onmoveend', this._gmx.layerID, arguments);
+		// if (this._gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
+			// console.log('moveend 1', this._tileZoom, this._gmx.layerID, this._loading, this._noTilesToLoad(), this._tileZoom);
+		// }
 		var zoom = this._tileZoom,
 			key, tile;
 
 		for (key in this._tiles) {
 			tile = this._tiles[key];
-			if (tile.coords.z === zoom) {
-				if (tile.promise) { 	// тайл уже рисовался - можно только repaint
-					// if (attr && attr.repaint) {
-						// this.repaint(key);
-					// }
-				} else {			// данный тайл еще не рисовался
-					this.__drawTile(tile);
-				}
+			if (tile.coords.z == zoom && !tile.promise) {	// данный тайл еще не рисовался
+				this.__drawTile(tile);
 			}
 		}
 		this._removeScreenObservers(zoom, true);
-		//L.DomUtil.addClass(this._level.el, 'leaflet-zoom-animated');
-		// if (L.Browser.any3d) {
-			// L.DomUtil.setTransform(this._level.el, this._map._translateFrom, 1);
-		// } else {
-			// L.DomUtil.setPosition(this._level.el, this._map._translateFrom);
-		// }
 	},
 
 	_removeScreenObservers: function (z, flag) {
@@ -7313,18 +7303,35 @@ var ext = L.extend({
 				this._onmoveend({repaint: true});
 			},
 			load: function() {				// Fired when the grid layer starts loading tiles.
-				// console.log('load ', ev, Date.now() - window.startTest, ev);
+				// if (gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
+					// console.log('load ', this._tileZoom, this._loading, this._noTilesToLoad(), Object.keys(this._levels), Date.now() - window.startTest);
+				// }
 				if (this._tileZoom) {
-					var z = this._tileZoom;
+					var z = this._tileZoom,
+						key, tile;
 					if (this._gmx && this._gmx.dataManager) {
-						var dm = this._gmx.dataManager;
-						dm.removeScreenObservers(z);
+						this._gmx.dataManager.removeScreenObservers(z);
 					}
-					for (var key in this._levels) {
-						if (key !== z) {
-							this._removeTilesAtZoom(key);
+					for (key in this._tiles) {
+						tile = this._tiles[key];
+						if (tile.coords.z !== z) {
+							this._removeTile(key);
+						} else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
+							this._level.el.appendChild(tile.el);
 						}
 					}
+
+					for (key in this._levels) {
+						var zz = Number(key);
+						if (zz !== z) {
+							L.DomUtil.remove(this._levels[key].el);
+							this._removeTilesAtZoom(zz);
+							this._onRemoveLevel(zz);
+							delete this._levels[key];
+						}
+					}
+				} else {
+					console.warn('load event without tileZoom on layer:', gmx.layerID);
 				}
 			},
 
@@ -7362,10 +7369,12 @@ var ext = L.extend({
 		};
 		if (gmx.properties.type === 'Vector') {
 			events.moveend = function(ev) {
+				// window.startTest = Date.now();
 				if (this._onmoveendTimer) { cancelIdleCallback(this._onmoveendTimer); }
 				this._onmoveendTimer = requestIdleCallback(L.bind(this._onmoveend, this), {timeout: 25});
 				if (gmx.debug) {
-					console.log('moveend ', gmx.layerID, this._loading, this._tileZoom, ev);
+				// if (gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
+					console.log('moveend ', this._tileZoom, gmx.layerID, this._loading, this._noTilesToLoad(), this._tileZoom, ev);
 				}
 			};
 			if (gmx.debug) {
@@ -8273,6 +8282,15 @@ var ext = L.extend({
     }
 },
 {
+	_removeTilesAtZoom: function (zoom) {		// Add by Geomixer (coords.z is Number however _levels keys is String)
+		zoom = Number(zoom);
+		for (var key in this._tiles) {
+			if (this._tiles[key].coords.z !== zoom) {
+				continue;
+			}
+			this._removeTile(key);
+		}
+	},
 	_update: function (center) {				// Add by Geomixer (для события update _tiles)
 		if (this._map) {
 			L.GridLayer.prototype._update.call(this, center);
@@ -8299,6 +8317,7 @@ var ext = L.extend({
 		if (!tile) { return; }
 
 		tile.loaded = +new Date();
+/*
 		if (this._map._fadeAnimated) {
 			// L.DomUtil.setOpacity(tile.el, 0);
 			L.Util.cancelAnimFrame(this._fadeFrame);
@@ -8307,7 +8326,7 @@ var ext = L.extend({
 			tile.active = true;
 			this._pruneTiles();
 		}
-
+*/
 		if (!err) {
 			L.DomUtil.addClass(tile.el, 'leaflet-tile-loaded');
 
@@ -8325,13 +8344,14 @@ var ext = L.extend({
 			// Fired when the grid layer loaded all visible tiles.
 			this.fire('load');
 
-			if (L.Browser.ielt9 || !this._map._fadeAnimated) {
-				L.Util.requestAnimFrame(this._pruneTiles, this);
-			} else {
+			// if (L.Browser.ielt9 || !this._map._fadeAnimated) {
+				// L.Util.requestAnimFrame(this._pruneTiles, this);
+			// } else {
 				// Wait a bit more than 0.2 secs (the duration of the tile fade-in)
 				// to trigger a pruning.
-				setTimeout(L.bind(this._pruneTiles, this), 250);
-			}
+				// setTimeout(L.bind(this._pruneTiles, this), 250);
+				// this._pruneTiles();
+			// }
 		}
 	},
 

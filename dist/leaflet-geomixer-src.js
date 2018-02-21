@@ -8282,6 +8282,50 @@ var ext = L.extend({
     }
 },
 {
+	_updateLevels: function () {		// Add by Geomixer (coords.z is Number however _levels keys is String)
+
+		var zoom = this._tileZoom,
+		    maxZoom = this.options.maxZoom;
+
+		if (zoom === undefined) { return undefined; }
+
+		for (var z in this._levels) {
+			var delta = zoom - z;
+			if (this._levels[z].el.children.length || delta === 0) {
+				this._levels[z].el.style.zIndex = maxZoom - Math.abs(delta);
+				this._onUpdateLevel(z);
+			} else {
+				L.DomUtil.remove(this._levels[z].el);
+				this._removeTilesAtZoom(z);
+				this._onRemoveLevel(z);
+				delete this._levels[z];
+			}
+		}
+
+		var level = this._levels[zoom],
+		    map = this._map;
+
+		if (!level) {
+			level = this._levels[zoom] = {};
+
+			level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated', this._container);
+			level.el.style.zIndex = maxZoom;
+
+			level.origin = map.project(map.unproject(map.getPixelOrigin()), zoom).round();
+			level.zoom = zoom;
+
+			this._setZoomTransform(level, map.getCenter(), map.getZoom());
+
+			// force the browser to consider the newly added element for transition
+			L.Util.falseFn(level.el.offsetWidth);
+
+			this._onCreateLevel(level);
+		}
+
+		this._level = level;
+
+		return level;
+	},
 	_removeTilesAtZoom: function (zoom) {		// Add by Geomixer (coords.z is Number however _levels keys is String)
 		zoom = Number(zoom);
 		for (var key in this._tiles) {

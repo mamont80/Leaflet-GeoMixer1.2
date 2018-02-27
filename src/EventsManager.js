@@ -73,7 +73,7 @@ var GmxEventsManager = L.Handler.extend({
 					drawingControl.on('activechange', function (ev) {
 						this._drawstart = ev.activeIcon;
 						map._container.style.cursor = this._drawstart ? 'pointer' : '';
-					});
+					}.bind(this));
 				}
 			}
 			this._drawstart = false;
@@ -121,7 +121,7 @@ var GmxEventsManager = L.Handler.extend({
 				return delta ? delta : this._layers[b] - this._layers[a];
 			}
 			return 0;
-		});
+		}.bind(this));
 
 		var layer,
 			foundLayer = null,
@@ -163,12 +163,12 @@ L.Map.addInitHook(function () {
         this._gmxEventsManager = new GmxEventsManager(this);
 		this.isGmxDrawing = function () {
 			return this._gmxEventsManager._drawstart;
-		};
+		}.bind(this);
 
         this.on('remove', function () {
             if (this._gmxEventsManager) {
                 this._gmxEventsManager.removeHooks();
             }
-        });
+        }, this);
     }
 });

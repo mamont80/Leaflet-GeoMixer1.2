@@ -140,7 +140,7 @@ L.Map.addInitHook(function () {
 					IsRasterCatalog: true,
 					RCMinZoomForRasters: 1
 				}
-			})
+			}, {_vectorType: 'multiRasterLayer'})
 			.setFilter(function (it) {
 				var zoom = map.getZoom(),
 					pArr = it.properties;

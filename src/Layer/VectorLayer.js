@@ -91,9 +91,6 @@ var ext = L.extend({
     },
 
 	_onmoveend: function () {
-		// if (this._gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
-			// console.log('moveend 1', this._tileZoom, this._gmx.layerID, this._loading, this._noTilesToLoad(), this._tileZoom);
-		// }
 		var zoom = this._tileZoom,
 			key, tile;
 
@@ -151,8 +148,8 @@ var ext = L.extend({
 						tile = this._tiles[key];
 						if (tile.coords.z !== z) {
 							this._removeTile(key);
-						} else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
-							this._level.el.appendChild(tile.el);
+						// } else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
+							// this._level.el.appendChild(tile.el);
 						}
 					}
 
@@ -522,6 +519,7 @@ var ext = L.extend({
         this._initPromise.then(function() {
             this._gmx.styleManager.setStyle(style, num, createFlag).then(function () {
                 this.fire('stylechange', {num: num || 0});
+                this.repaint();
             }.bind(this));
         }.bind(this));
         return this;
@@ -1071,6 +1069,9 @@ var ext = L.extend({
 				tileElem.reject = reject;
 				var filters = gmx.dataManager.getViewFilters('screen', gmx.layerID);
                 var done = function() {
+					if (tileElem.count) {
+						myLayer.appendTileToContainer(tileElem);
+					}
 					myLayer._tileReady(coords, null, tileElem.el);
                 };
 				tileElem.observer = gmx.dataManager.addObserver({
@@ -1170,11 +1171,81 @@ var ext = L.extend({
 			this._removeTile(key);
 		}
 	},
-	_update: function (center) {				// Add by Geomixer (для события update _tiles)
-		if (this._map) {
-			L.GridLayer.prototype._update.call(this, center);
-			this.fire('update');
+	// Private method to load tiles in the grid's active zoom level according to map bounds
+	_update: function (center) {				// Add by Geomixer (для события update _tiles + не добавлять пустые тайлы)
+		var map = this._map;
+		if (!map) { return; }
+		var zoom = this._clampZoom(map.getZoom());
+
+		if (center === undefined) { center = map.getCenter(); }
+		if (this._tileZoom === undefined) { return; }	// if out of minzoom/maxzoom
+
+		var pixelBounds = this._getTiledPixelBounds(center),
+		    tileRange = this._pxBoundsToTileRange(pixelBounds),
+		    tileCenter = tileRange.getCenter(),
+		    queue = [],
+		    margin = this.options.keepBuffer,
+		    noPruneRange = new L.Bounds(tileRange.getBottomLeft().subtract([margin, -margin]),
+		                              tileRange.getTopRight().add([margin, -margin]));
+
+		// Sanity check: panic if the tile range contains Infinity somewhere.
+		if (!(isFinite(tileRange.min.x) &&
+		      isFinite(tileRange.min.y) &&
+		      isFinite(tileRange.max.x) &&
+		      isFinite(tileRange.max.y))) { throw new Error('Attempted to load an infinite number of tiles'); }
+
+		for (var key in this._tiles) {
+			var c = this._tiles[key].coords;
+			if (c.z !== this._tileZoom || !noPruneRange.contains(new L.Point(c.x, c.y))) {
+				this._tiles[key].current = false;
+			}
 		}
+
+		// _update just loads more tiles. If the tile zoom level differs too much
+		// from the map's, let _setView reset levels and prune old tiles.
+		if (Math.abs(zoom - this._tileZoom) > 1) { this._setView(center, zoom); return; }
+
+		// create a queue of coordinates to load tiles from
+		for (var j = tileRange.min.y; j <= tileRange.max.y; j++) {
+			for (var i = tileRange.min.x; i <= tileRange.max.x; i++) {
+				var coords = new L.Point(i, j);
+				coords.z = this._tileZoom;
+
+				if (!this._isValidTile(coords)) { continue; }
+
+				var tile = this._tiles[this._tileCoordsToKey(coords)];
+				if (tile) {
+					tile.current = true;
+				} else {
+					queue.push(coords);
+				}
+			}
+		}
+
+		// sort tile queue to load tiles in order of their distance to center
+		queue.sort(function (a, b) {
+			return a.distanceTo(tileCenter) - b.distanceTo(tileCenter);
+		});
+
+		if (queue.length !== 0) {
+			// if it's the first batch of tiles to load
+			if (!this._loading) {
+				this._loading = true;
+				// @event loading: Event
+				// Fired when the grid layer starts loading tiles.
+				this.fire('loading');
+			}
+
+			// create DOM fragment to append tiles in one batch
+			var fragment = document.createDocumentFragment();
+
+			for (i = 0; i < queue.length; i++) {
+				this._addTile(queue[i], fragment);
+			}
+
+			// this._level.el.appendChild(fragment);
+		}
+		this.fire('update');
 	},
 
 	_tileReady: function (coords, err, tile) {

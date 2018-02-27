@@ -667,7 +667,7 @@ ScreenVectorTile.prototype = {
 							tpy: _this.tpy,
 							ctx: ctx
 						};
-					// L.DomUtil.addClass(tile, 'zKey:' + _this.zKey);
+					L.DomUtil.addClass(tile, 'zKey:' + _this.zKey + ' count: ' + geoItems.length);
 
 					ctx.clearRect(0, 0, 256, 256);
 					if (gmx.showScreenTiles) {
@@ -728,7 +728,7 @@ ScreenVectorTile.prototype = {
 						_this.rasters = {}; // clear rasters
 						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
 					}, reject);
-					_this.layer.appendTileToContainer(_this.tileElem);
+					// _this.layer.appendTileToContainer(_this.tileElem);
 				};
 
 				if (this.showRaster) {

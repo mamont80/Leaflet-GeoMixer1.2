@@ -744,7 +744,7 @@ L.gmx.Deferred = Deferred;
 		chkMessage: function(evt) {
 			var message = evt.data,
 				url = message.url;
-// console.log('ImageBitmapLoader ', message, evt);
+			// console.log('ImageBitmapLoader ', message, evt);
 
 			for (var i = 0, it, arr = this.jobs[url] || [], len = arr.length; i < len; i++) {
 				it = arr[i];
@@ -774,10 +774,12 @@ L.gmx.Deferred = Deferred;
 
 	var imageBitmapLoader = new ImageBitmapLoader();
 	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
+	L.gmx.getJSON = imageBitmapLoader.push.bind(imageBitmapLoader);
 	worker.onerror = function(ev) {
 		console.warn('Error: Worker init: ImageBitmapLoader-worker.js', ev);
 		ev.target.terminate();
 		delete L.gmx.getBitmap;
+		delete L.gmx.getJSON;
 	};
 })();
 
@@ -4857,155 +4859,151 @@ var GmxEventsManager = L.Handler.extend({
         this._layers = {};
         this._lastLayer = null;
         this._lastId = null;
-        var _this = this;
         this._drawstart = null;
         this._lastCursor = '';
-
-        var isDrawing = function () {
-            if (_this._drawstart) {
-                return true;
-            } else if (_this._drawstart === null) {
-                if (map.gmxControlsManager) {
-                    var drawingControl = map.gmxControlsManager.get('drawing');
-                    if (drawingControl) {
-                        drawingControl.on('activechange', function (ev) {
-                            _this._drawstart = ev.activeIcon;
-                            map._container.style.cursor = _this._drawstart ? 'pointer' : '';
-                        });
-                    }
-                }
-                _this._drawstart = false;
-            }
-            return false;
-        };
-
-        var getDomIndex = function (layer) {
-            var container = layer._container;
-            if (container) {
-                var arr = container.parentNode.childNodes;
-                for (var i = 0, len = arr.length; i < len; i++) {
-                    if (container === arr[i]) {
-                        return i;
-                    }
-                }
-            }
-            return 0;
-        };
-
-        // var skipNodeName = {
-            // IMG: true,
-            // DIV: true,
-            // path: true
-        // };
-
-        var clearLastHover = function () {
-            if (_this._lastLayer) {
-                _this._lastLayer.gmxEventCheck({type: 'mousemove'}, true);
-                _this._lastLayer = null;
-            }
-        };
-
-        var eventCheck = function (ev) {
-            var type = ev.type,
-                map = _this._map;
-                // skipNode = false;
-            if (ev.originalEvent) {
-                map.gmxMouseDown = L.Browser.webkit && !L.gmxUtil.isIEOrEdge ? ev.originalEvent.which : ev.originalEvent.buttons;
-                // var target = ev.originalEvent.target;
-                // skipNode = skipNodeName[target.nodeName] && !L.DomUtil.hasClass(target, 'leaflet-tile') && !L.DomUtil.hasClass(target, 'leaflet-popup-tip-container');
-            }
-            if (map._animatingZoom ||
-                isDrawing() ||
-                !ev.latlng ||
-                (type === 'click' &&  map._skipClick) ||        // from drawing
-                (type === 'mousemove' &&  map.gmxMouseDown)
-                ) {
-                clearLastHover();
-                map._skipClick = false;
-                return;
-            }
-            if (ev.layerPoint) {
-                map._gmxMouseLatLng = ev.latlng;
-                map.gmxMousePos = map.getPixelOrigin().add(ev.layerPoint);
-            }
-
-            var arr = Object.keys(_this._layers).sort(function(a, b) {
-                var la = map._layers[a],
-                    lb = map._layers[b];
-                if (la && lb) {
-                    var oa = la.options, ob = lb.options,
-                        za = (oa.zIndexOffset || 0) + (oa.zIndex || 0),
-                        zb = (ob.zIndexOffset || 0) + (ob.zIndex || 0),
-                        delta = zb - za;
-                    return delta ? delta : _this._layers[b] - _this._layers[a];
-                }
-                return 0;
-            });
-
-            var layer,
-                foundLayer = null,
-                cursor = '';
-
-            for (var i = 0, len = arr.length; i < len; i++) {
-                var id = arr[i];
-                layer = map._layers[id];
-                if (layer && layer._map && !layer._animating && layer.options.clickable) {
-                    if (layer.gmxEventCheck(ev)) {
-                        if (layer.hasEventListeners('mouseover')) {
-                            cursor = 'pointer';
-                        }
-                        foundLayer = layer;
-                        break;
-                    }
-                }
-            }
-            if (_this._lastCursor !== cursor && !isDrawing()) {
-                map._container.style.cursor = cursor;
-            }
-            _this._lastCursor = cursor;
-
-            if (type !== 'zoomend') {
-                if (foundLayer) {
-                    if (_this._lastLayer !== foundLayer) {
-                        clearLastHover();
-                    }
-                    _this._lastLayer = foundLayer;
-                } else {
-                    clearLastHover();
-                }
-            }
-        };
 
         map.on({
             zoomend: function () {
                 if (map._gmxMouseLatLng) {
-                    setTimeout(function () {
-                        eventCheck({type: 'mousemove', latlng: map._gmxMouseLatLng});
-                    }, 0);
+					this._onmousemove({type: 'mousemove', latlng: map._gmxMouseLatLng});
+                    // setTimeout(function () {
+                        // eventCheck({type: 'mousemove', latlng: map._gmxMouseLatLng});
+                    // }, 0);
                 }
             },
-            click: eventCheck,
-            dblclick: eventCheck,
-            mousedown: eventCheck,
-            mouseup: eventCheck,
-            mousemove: eventCheck,
-            contextmenu: eventCheck,
+            click: this._eventCheck,
+            dblclick: this._eventCheck,
+            mousedown: this._eventCheck,
+            mouseup: this._eventCheck,
+            mousemove: this._onmousemove,
+            contextmenu: this._onmousemove,
             layeradd: function (ev) {
                 var layer = ev.layer;
                 if ('gmxEventCheck' in layer && layer.options.clickable) {
-                    _this._layers[layer._leaflet_id] = getDomIndex(layer);
+					var i = 0;
+					if (layer._container) {
+						var container = layer._container,
+							arr = container.parentNode.childNodes,
+							len;
+						for (i = 0, len = arr.length; i < len; i++) {
+							if (container === arr[i]) { break; }
+						}
+					}
+                    this._layers[layer._leaflet_id] = i;
                 }
             },
             layerremove: function (ev) {
                 var id = ev.layer._leaflet_id;
-                delete _this._layers[id];
-                if (_this._lastLayer && _this._lastLayer._leaflet_id === id) {
-                    _this._lastLayer = null;
-                    _this._lastId = 0;
+                delete this._layers[id];
+                if (this._lastLayer && this._lastLayer._leaflet_id === id) {
+                    this._lastLayer = null;
+                    this._lastId = 0;
                 }
             }
         }, this);
-    }
+    },
+
+    _onmousemove: function (ev) {
+		if (!this._map._animatingZoom) {
+			// if (this._onmousemoveTimer) { clearTimeout(this._onmousemoveTimer); }
+			// this._onmousemoveTimer = setTimeout(this._eventCheck.bind(this, ev), 50);
+			if (this._onmousemoveTimer) { cancelIdleCallback(this._onmousemoveTimer); }
+			this._onmousemoveTimer = requestIdleCallback(this._eventCheck.bind(this, ev), {timeout: 50});
+		}
+	},
+	_isDrawing: function () {
+		var map = this._map;
+		if (this._drawstart) {
+			return true;
+		} else if (this._drawstart === null) {
+			if (map.gmxControlsManager) {
+				var drawingControl = map.gmxControlsManager.get('drawing');
+				if (drawingControl) {
+					drawingControl.on('activechange', function (ev) {
+						this._drawstart = ev.activeIcon;
+						map._container.style.cursor = this._drawstart ? 'pointer' : '';
+					});
+				}
+			}
+			this._drawstart = false;
+		}
+		return false;
+	},
+
+	_clearLastHover: function () {
+		if (this._lastLayer) {
+			this._lastLayer.gmxEventCheck({type: 'mousemove'}, true);
+			this._lastLayer = null;
+		}
+    },
+
+	_eventCheck: function (ev) {
+		var type = ev.type,
+			map = this._map;
+
+		if (ev.originalEvent) {
+			map.gmxMouseDown = L.Browser.webkit && !L.gmxUtil.isIEOrEdge ? ev.originalEvent.which : ev.originalEvent.buttons;
+		}
+		if (map._animatingZoom ||
+			!ev.latlng ||
+			this._isDrawing() ||
+			(type === 'click' &&  map._skipClick) ||        // from drawing
+			(type === 'mousemove' &&  map.gmxMouseDown)
+			) {
+			this._clearLastHover();
+			map._skipClick = false;
+			return;
+		}
+		if (ev.layerPoint) {
+			map._gmxMouseLatLng = ev.latlng;
+			map.gmxMousePos = map.getPixelOrigin().add(ev.layerPoint);
+		}
+
+		var arr = Object.keys(this._layers).sort(function(a, b) {
+			var la = map._layers[a],
+				lb = map._layers[b];
+			if (la && lb) {
+				var oa = la.options, ob = lb.options,
+					za = (oa.zIndexOffset || 0) + (oa.zIndex || 0),
+					zb = (ob.zIndexOffset || 0) + (ob.zIndex || 0),
+					delta = zb - za;
+				return delta ? delta : this._layers[b] - this._layers[a];
+			}
+			return 0;
+		});
+
+		var layer,
+			foundLayer = null,
+			cursor = '';
+
+		for (var i = 0, len = arr.length; i < len; i++) {
+			var id = arr[i];
+			layer = map._layers[id];
+			if (layer && layer._map && !layer._animating && layer.options.clickable) {
+				if (layer.gmxEventCheck(ev)) {
+					if (layer.hasEventListeners('mouseover')) { cursor = 'pointer'; }
+					foundLayer = layer;
+					break;
+				}
+			}
+		}
+		if (this._lastCursor !== cursor && !this._isDrawing()) {
+			map._container.style.cursor = cursor;
+		}
+		this._lastCursor = cursor;
+
+		if (type !== 'zoomend') {
+			if (foundLayer) {
+				if (this._lastLayer !== foundLayer) {
+					this._clearLastHover();
+				}
+				this._lastLayer = foundLayer;
+			} else {
+				this._clearLastHover();
+			}
+		}
+	}
+
 });
 
 L.Map.addInitHook(function () {
@@ -7256,9 +7254,6 @@ var ext = L.extend({
     },
 
 	_onmoveend: function () {
-		// if (this._gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
-			// console.log('moveend 1', this._tileZoom, this._gmx.layerID, this._loading, this._noTilesToLoad(), this._tileZoom);
-		// }
 		var zoom = this._tileZoom,
 			key, tile;
 
@@ -7316,8 +7311,8 @@ var ext = L.extend({
 						tile = this._tiles[key];
 						if (tile.coords.z !== z) {
 							this._removeTile(key);
-						} else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
-							this._level.el.appendChild(tile.el);
+						// } else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
+							// this._level.el.appendChild(tile.el);
 						}
 					}
 
@@ -7687,6 +7682,7 @@ var ext = L.extend({
         this._initPromise.then(function() {
             this._gmx.styleManager.setStyle(style, num, createFlag).then(function () {
                 this.fire('stylechange', {num: num || 0});
+                this.repaint();
             }.bind(this));
         }.bind(this));
         return this;
@@ -8236,6 +8232,9 @@ var ext = L.extend({
 				tileElem.reject = reject;
 				var filters = gmx.dataManager.getViewFilters('screen', gmx.layerID);
                 var done = function() {
+					if (tileElem.count) {
+						myLayer.appendTileToContainer(tileElem);
+					}
 					myLayer._tileReady(coords, null, tileElem.el);
                 };
 				tileElem.observer = gmx.dataManager.addObserver({
@@ -8335,11 +8334,81 @@ var ext = L.extend({
 			this._removeTile(key);
 		}
 	},
-	_update: function (center) {				// Add by Geomixer (для события update _tiles)
-		if (this._map) {
-			L.GridLayer.prototype._update.call(this, center);
-			this.fire('update');
+	// Private method to load tiles in the grid's active zoom level according to map bounds
+	_update: function (center) {				// Add by Geomixer (для события update _tiles + не добавлять пустые тайлы)
+		var map = this._map;
+		if (!map) { return; }
+		var zoom = this._clampZoom(map.getZoom());
+
+		if (center === undefined) { center = map.getCenter(); }
+		if (this._tileZoom === undefined) { return; }	// if out of minzoom/maxzoom
+
+		var pixelBounds = this._getTiledPixelBounds(center),
+		    tileRange = this._pxBoundsToTileRange(pixelBounds),
+		    tileCenter = tileRange.getCenter(),
+		    queue = [],
+		    margin = this.options.keepBuffer,
+		    noPruneRange = new L.Bounds(tileRange.getBottomLeft().subtract([margin, -margin]),
+		                              tileRange.getTopRight().add([margin, -margin]));
+
+		// Sanity check: panic if the tile range contains Infinity somewhere.
+		if (!(isFinite(tileRange.min.x) &&
+		      isFinite(tileRange.min.y) &&
+		      isFinite(tileRange.max.x) &&
+		      isFinite(tileRange.max.y))) { throw new Error('Attempted to load an infinite number of tiles'); }
+
+		for (var key in this._tiles) {
+			var c = this._tiles[key].coords;
+			if (c.z !== this._tileZoom || !noPruneRange.contains(new L.Point(c.x, c.y))) {
+				this._tiles[key].current = false;
+			}
 		}
+
+		// _update just loads more tiles. If the tile zoom level differs too much
+		// from the map's, let _setView reset levels and prune old tiles.
+		if (Math.abs(zoom - this._tileZoom) > 1) { this._setView(center, zoom); return; }
+
+		// create a queue of coordinates to load tiles from
+		for (var j = tileRange.min.y; j <= tileRange.max.y; j++) {
+			for (var i = tileRange.min.x; i <= tileRange.max.x; i++) {
+				var coords = new L.Point(i, j);
+				coords.z = this._tileZoom;
+
+				if (!this._isValidTile(coords)) { continue; }
+
+				var tile = this._tiles[this._tileCoordsToKey(coords)];
+				if (tile) {
+					tile.current = true;
+				} else {
+					queue.push(coords);
+				}
+			}
+		}
+
+		// sort tile queue to load tiles in order of their distance to center
+		queue.sort(function (a, b) {
+			return a.distanceTo(tileCenter) - b.distanceTo(tileCenter);
+		});
+
+		if (queue.length !== 0) {
+			// if it's the first batch of tiles to load
+			if (!this._loading) {
+				this._loading = true;
+				// @event loading: Event
+				// Fired when the grid layer starts loading tiles.
+				this.fire('loading');
+			}
+
+			// create DOM fragment to append tiles in one batch
+			var fragment = document.createDocumentFragment();
+
+			for (i = 0; i < queue.length; i++) {
+				this._addTile(queue[i], fragment);
+			}
+
+			// this._level.el.appendChild(fragment);
+		}
+		this.fire('update');
 	},
 
 	_tileReady: function (coords, err, tile) {
@@ -9119,7 +9188,7 @@ ScreenVectorTile.prototype = {
 							tpy: _this.tpy,
 							ctx: ctx
 						};
-					// L.DomUtil.addClass(tile, 'zKey:' + _this.zKey);
+					L.DomUtil.addClass(tile, 'zKey:' + _this.zKey + ' count: ' + geoItems.length);
 
 					ctx.clearRect(0, 0, 256, 256);
 					if (gmx.showScreenTiles) {
@@ -9180,7 +9249,7 @@ ScreenVectorTile.prototype = {
 						_this.rasters = {}; // clear rasters
 						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
 					}, reject);
-					_this.layer.appendTileToContainer(_this.tileElem);
+					// _this.layer.appendTileToContainer(_this.tileElem);
 				};
 
 				if (this.showRaster) {
@@ -11385,7 +11454,7 @@ L.Map.addInitHook(function () {
 					IsRasterCatalog: true,
 					RCMinZoomForRasters: 1
 				}
-			})
+			}, {_vectorType: 'multiRasterLayer'})
 			.setFilter(function (it) {
 				var zoom = map.getZoom(),
 					pArr = it.properties;

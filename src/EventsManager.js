@@ -10,7 +10,6 @@ var GmxEventsManager = L.Handler.extend({
         this._layers = {};
         this._lastLayer = null;
         this._lastId = null;
-        var _this = this;
         this._drawstart = null;
         this._lastCursor = '';
 

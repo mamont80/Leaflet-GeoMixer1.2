@@ -4,6 +4,7 @@
 */
 var gmxAPIutils = {
     lastMapId: 0,
+	debug: /\bdebug=1\b/.test(location.search),
 	fromWebMercY: function(y) {
 		return 90 * (4 * Math.atan(Math.exp(y / gmxAPIutils.rMajor)) / Math.PI - 1);
 	},
@@ -21,6 +22,7 @@ var gmxAPIutils = {
         return id;
     },
 
+    apiLoadedFrom: document.currentScript.src.substring(0, document.currentScript.src.lastIndexOf('/')),
     isPageHidden: function()	{		// Видимость окна браузера
         return document.hidden || document.msHidden || document.webkitHidden || document.mozHidden || false;
     },
@@ -2948,6 +2950,8 @@ if (!L.gmxUtil) { L.gmxUtil = {}; }
 
 //public interface
 L.extend(L.gmxUtil, {
+	debug: gmxAPIutils.debug,
+	apiLoadedFrom: gmxAPIutils.apiLoadedFrom,
     newId: gmxAPIutils.newId,
 	isPageHidden: gmxAPIutils.isPageHidden,
     protocol: location.protocol !== 'https:' ? 'http:' : location.protocol,

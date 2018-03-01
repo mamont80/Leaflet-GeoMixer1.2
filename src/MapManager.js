@@ -17,6 +17,10 @@ var gmxMapManager = {
 			serverHost = options.hostName || options.serverHost,
 			mapName = options.mapName;
 
+		if (!L.gmxUtil.debug) {
+			delete L.gmx.sendCmd;
+		}
+
         if (!maps[serverHost] || !maps[serverHost][mapName]) {
 			var opt = {
 				WrapStyle: 'func',
@@ -27,24 +31,50 @@ var gmxMapManager = {
 				ModeKey: 'map'
 			};
 			var promise = new Promise(function(resolve, reject) {
-				gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
-					opt.key = sessionKey;
-
-					gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/TileSender.ashx', opt).then(function(json) {
-						if (json && json.Status === 'ok' && json.Result) {
-							json.Result.properties.hostName = serverHost;
-							json.Result.properties.sessionKey = sessionKey;
+				if (L.gmx.sendCmd) {
+					L.gmx.sendCmd(null, {
+						serverHost: serverHost,
+						apiKey: options.apiKey,
+						WrapStyle: 'func',
+						skipTiles: options.skipTiles || 'None', // All, NotVisible, None
+						MapName: mapName,
+						srs: options.srs || 3857,
+						ftc: options.ftc || 'osm',
+						ModeKey: 'map',
+						cmd: 'mapProperties'
+					}).then(function(json) {
+						if (json && json.load && json.res) {
+							// json.res.properties.hostName = serverHost;
+							// json.res.properties.sessionKey = sessionKey;
 							L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
 							L.gmx._maps[serverHost][mapName] = {
-								_rawTree: json.Result,
+								_rawTree: json.res,
 								_nodes: {}
 							};
-							resolve(json.Result);
+							resolve(json.res);
 						} else {
 							reject(json);
 						}
+					}).catch(reject);
+				} else {
+					gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
+						opt.key = sessionKey;
+						gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/TileSender.ashx', opt).then(function(json) {
+							if (json && json.Status === 'ok' && json.Result) {
+								json.Result.properties.hostName = serverHost;
+								json.Result.properties.sessionKey = sessionKey;
+								L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
+								L.gmx._maps[serverHost][mapName] = {
+									_rawTree: json.Result,
+									_nodes: {}
+								};
+								resolve(json.Result);
+							} else {
+								reject(json);
+							}
+						}, reject);
 					}, reject);
-				}, reject);
+				}
 			});
             maps[serverHost] = maps[serverHost] || {};
             maps[serverHost][mapName] = {promise: promise};

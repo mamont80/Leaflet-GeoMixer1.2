@@ -34,7 +34,7 @@
 			var attr = {
 					options: options
 				},
-				src = url;		// Ensure the URL is absolute.
+				src = url || L.gmxUtil.newId();		// Ensure the URL is absolute.
 			if (typeof this.jobs[src] === 'undefined') { this.jobs[src] = []; }
 
 			this.jobs[src].push(attr);
@@ -50,10 +50,12 @@
 	var imageBitmapLoader = new ImageBitmapLoader();
 	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
 	L.gmx.getJSON = imageBitmapLoader.push.bind(imageBitmapLoader);
+	L.gmx.sendCmd = imageBitmapLoader.push.bind(imageBitmapLoader);
 	worker.onerror = function(ev) {
 		console.warn('Error: Worker init: ImageBitmapLoader-worker.js', ev);
 		ev.target.terminate();
 		delete L.gmx.getBitmap;
 		delete L.gmx.getJSON;
+		delete L.gmx.sendCmd;
 	};
 })();

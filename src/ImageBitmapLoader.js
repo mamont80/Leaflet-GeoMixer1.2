@@ -50,7 +50,9 @@
 	var imageBitmapLoader = new ImageBitmapLoader();
 	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
 	L.gmx.getJSON = imageBitmapLoader.push.bind(imageBitmapLoader);
-	L.gmx.sendCmd = imageBitmapLoader.push.bind(imageBitmapLoader);
+	if (L.gmxUtil.debug) {
+		L.gmx.sendCmd = imageBitmapLoader.push.bind(imageBitmapLoader);
+	}
 	worker.onerror = function(ev) {
 		console.warn('Error: Worker init: ImageBitmapLoader-worker.js', ev);
 		ev.target.terminate();

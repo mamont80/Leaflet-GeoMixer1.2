@@ -14,997 +14,13 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 
-/*
-   Single-pass recursive descent PEG parser library:
-      http://en.wikipedia.org/wiki/Parsing_expression_grammar
-   Inspired by Chris Double's parser combinator library in JavaScript:
-      http://www.bluishcoder.co.nz/2007/10/javascript-packrat-parser.html
-	+ Добавлены функции: Math.floor
-*/
-(function() {
-    var regexExpression = /\[(.+?)\]/g,
-        regexMath = /(floor\()/g;
-	var Parsers = {						// Парсеры
-        functionFromExpression: function(s) {
-/*eslint-disable no-new-func*/
-            return new Function(
-/*eslint-enable */
-                'props',
-                'indexes',
-                'return ' +
-                    s
-                     .replace(regexExpression, 'props[indexes["$1"]]')
-                     .replace(regexMath, 'Math.$1')
-                    + ';'
-            );
-        }
-    };
-
-	var makePair = function(t1, t2) {
-		return {head: t1, tail: t2};
-	};
-
-// C-style linked list via recursive typedef.
-//   Used purely functionally to get shareable sublists.
-//typedef LinkedList = Pair<Dynamic, LinkedList>;
-	var LinkedList = function(t1, t2) {
-		return makePair(t1, t2);
-	};
-
-// Parser state contains position in string and some accumulated data.
-//typedef ParserState = Pair<Int, LinkedList>;
-	var ParserState = function(t1, t2) {
-		return makePair(t1, t2);
-	};
-
-// Parser accepts string and state, returns another state.
-//typedef Parser = String->ParserState->ParserState;
-
-	// A parser state that indicates failure.
-	var fail = new ParserState(-1, null);
-
-	// Check for failure.
-	var failed = function(state) {
-		return (state.head === -1);
-	};
-
-	// Advance a parser state by n characters.
-	var advance = function(state, n) {
-		return new ParserState(state.head + n, state.tail);
-	};
-
-	// Match a specified string.
-	var token = function(tok) {
-		var len = tok.length;
-		return function(s, state) {
-			return (s.substr(state.head, len) === tok) ? advance(state, len) : fail;
-		};
-	};
-
-	// Match a string without regard to case.
-	var caseInsensitiveToken = function(tok) {
-		var len = tok.length;
-		tok = tok.toLowerCase();
-		return function(s, state) {
-			return (s.substr(state.head, len).toLowerCase() === tok) ? advance(state, len) : fail;
-		};
-	};
-
-	// Match a single character in a specified range.
-	var range = function(startChar, endChar) {
-		var startCode = startChar.charCodeAt(0);
-		var endCode = endChar.charCodeAt(0);
-		return function(s, state) {
-			var code = s.charCodeAt(state.head);
-			return ((code >= startCode) && (code <= endCode)) ? advance(state, 1) : fail;
-		};
-	};
-
-	// Match any character outside a certain set.
-	//   This combinator is intended only for single character parsers.
-	var anythingExcept = function(parser) {
-		return function(s, state) {
-			return ((s.length > state.head) && failed(parser(s, state))) ? advance(state, 1) : fail;
-		};
-	};
-
-	// Match thing1, then thing2, ..., then thingN.
-	var sequence = function(parsers) {
-		return function(s, state) {
-			for (var i = 0; i < parsers.length; i++) {
-				state = parsers[i](s, state);
-				if (failed(state)) {
-					return fail;
-                }
-			}
-			return state;
-		};
-	};
-
-	// Match thing1, or thing2, ..., or thingN.
-	var choice = function(parsers) {
-		return function(s, state) {
-			for (var i = 0; i < parsers.length; i++) {
-				var newState = parsers[i](s, state);
-				if (!failed(newState)) {
-					return newState;
-                }
-			}
-			return fail;
-		};
-	};
-
-	// Match immediately, without regard to what's in the string.
-	var nothing = function(s, state) {
-		return state;
-	};
-
-	// Match this thing or nothing.
-	var maybe = function(parser) {
-		return choice([parser, nothing]);
-	};
-
-	// Match minCount or more repetitions of this thing.
-	var repeat = function(minCount, parser) {
-		return function(s, state) {
-			var count = 0;
-			while (true) {
-				var newState = parser(s, state);
-				if (failed(newState)) {
-					return (count >= minCount) ? state : fail;
-				} else {
-					count += 1;
-					state = newState;
-				}
-			}
-			// return fail;
-		};
-	};
-
-	// Match a list of minCount or more instances of thing1, separated by thing2.
-	var separatedList = function(minCount, parser, separator) {
-		var parser1 = sequence([parser, repeat(minCount - 1, sequence([separator, parser]))]);
-		return (minCount > 0) ? parser1 : choice([parser1, nothing]);
-	};
-
-	var whitespace = repeat(0, choice([
-		token(' '),
-		token('\t'),
-		token('\n')
-	]));
-
-	// Same as separatedList, but can have whitespace between items and separators.
-	var whitespaceSeparatedList = function(minCount, parser, separator) {
-		return separatedList(minCount, parser, sequence([whitespace, separator, whitespace]));
-	};
-
-	// Same as sequence, but can have whitespace between items.
-	var whitespaceSeparatedSequence = function(parsers) {
-		var newParsers = [];
-		for (var i = 0; i < parsers.length; i++) {
-			if (newParsers.length > 0) { newParsers.push(whitespace); }
-			newParsers.push(parsers[i]);
-		}
-		return sequence(newParsers);
-	};
-
-	// This combinator captures the string that the parser matched
-	//   and adds it to the current parser state, consing a new state.
-	var capture = function(parser) {
-		return function(s, state) {
-			var newState = parser(s, state);
-			return failed(newState) ? fail : new ParserState(newState.head, new LinkedList(s.substr(state.head, newState.head - state.head), newState.tail));
-		};
-	};
-
-	// This combinator passes the accumulated parser state to a given
-	//  function for processing. The result goes into the new state.
-	var action = function(parser, func) {
-		return function(s, state) {
-			var oldState = state;
-			var newState = parser(s, new ParserState(oldState.head, null));
-			return failed(newState) ? fail : new ParserState(newState.head, new LinkedList(func(newState.tail), oldState.tail));
-		};
-	};
-
-	// Define a syntactic subset of SQL WHERE clauses.
-	var fieldName = capture(repeat(1, choice([
-		range('a', 'z'),
-		range('A', 'Z'),
-		range('а', 'я'),
-		range('А', 'Я'),
-		range('0', '9'),
-		token('_')
-	])));
-
-	var fieldNameWithSpaces = capture(repeat(1, choice([
-		range('a', 'z'),
-		range('A', 'Z'),
-		range('а', 'я'),
-		range('А', 'Я'),
-		range('0', '9'),
-		token('_'),
-		token(' ')
-	])));
-
-	var quotedFieldName = choice([
-		fieldName,
-		sequence([token('"'), fieldNameWithSpaces, token('"')]),
-		sequence([token('`'), fieldNameWithSpaces, token('`')])
-	]);
-
-	var stringLiteral = sequence([
-		token('\''),
-		capture(repeat(0, anythingExcept(token('\'')))),
-		token('\'')
-	]);
-
-	var digits = repeat(1, range('0', '9'));
-
-	var numberLiteral = capture(sequence([
-		maybe(token('-')),
-		digits,
-		maybe(sequence([token('.'), digits]))
-	]));
-
-	var literal = choice([numberLiteral, stringLiteral]);
-
-	var applyParser = function(s, parser) {
-		return parser(s, new ParserState(0, null));
-	};
-
-	// Order is important here: longer ops should be tried first.
-	var opTerm = action(
-		whitespaceSeparatedSequence([
-			quotedFieldName,
-			capture(choice([
-				token('=='),
-				token('!='),
-				token('<>'),
-				token('<='),
-				token('>='),
-				token('='),
-				token('<'),
-				token('>'),
-				caseInsensitiveToken('LIKE')
-			])),
-            choice([literal, quotedFieldName])
-		]),
-		function(state) {
-			// Linked list contains fieldname, operation, value
-			// (in reverse order).
-
-			var fieldName = state.tail.tail.head;
-			var op = state.tail.head;
-			var referenceValue = state.head;
-
-			var matchPattern = null;
-			if (op.toUpperCase() === 'LIKE') {
-				matchPattern = function(fieldValue) {
-					var matchFrom = null;
-					matchFrom = function(referenceIdx, fieldIdx) {
-						var referenceChar = referenceValue.charAt(referenceIdx);
-						var fieldChar = fieldValue.charAt(fieldIdx);
-						if (referenceChar === '') {
-							return (fieldChar === '');
-						} else if (referenceChar === '%') {
-							return matchFrom(referenceIdx + 1, fieldIdx) || ((fieldChar !== '') && matchFrom(referenceIdx, fieldIdx + 1));
-						} else {
-							return (referenceChar === fieldChar) && matchFrom(referenceIdx + 1, fieldIdx + 1);
-                        }
-					};
-					return matchFrom(0, 0);
-				};
-			}
-
-			return function(props, indexes, types) {
-				var fieldValue = props[indexes[fieldName]],
-                    rValue = referenceValue;
-                if (referenceValue in indexes) { rValue = props[indexes[rValue]]; }
-                if ((types[fieldName] === 'date' || types[fieldName] === 'datetime') && typeof rValue === 'string') { rValue = L.gmxUtil.getUnixTimeFromStr(rValue); }
-                if (typeof fieldValue === 'boolean' && typeof rValue === 'string') {
-                    fieldValue = fieldValue ? 'True' : 'False';
-                }
-				if (fieldValue === null) { return false; }
-				if (matchPattern !== null) { return matchPattern(fieldValue);
-/*eslint-disable eqeqeq */
-                } else if ((op === '=') || (op === '==')) { return (fieldValue == rValue);
-				} else if ((op === '!=') || (op === '<>')) { return (fieldValue != rValue);
-/*eslint-enable */
-                } else {
-                    var f1, f2;
-					if (!(referenceValue in indexes) && typeof rValue === 'string' && applyParser(rValue, numberLiteral).head === rValue.length) {
-						f1 = parseFloat(fieldValue);
-						f2 = parseFloat(rValue);
-						if (op === '<') { return (f1 < f2);
-						} else if (op === '>') { return (f1 > f2);
-						} else if (op === '<=') { return (f1 <= f2);
-						} else if (op === '>=') { return (f1 >= f2);
-						} else { return false;
-                        }
-					} else {
-						f1 = fieldValue;
-						f2 = rValue;
-						if (op === '<') { return (f1 < f2);
-						} else if (op === '>') { return (f1 > f2);
-						} else if (op === '<=') { return (f1 <= f2);
-						} else if (op === '>=') { return (f1 >= f2);
-						} else { return false;
-                        }
-					}
-				}
-			};
-		}
-	);
-
-	var inTerm = action(
-		whitespaceSeparatedSequence([
-			quotedFieldName,
-			caseInsensitiveToken('IN'),
-			token('('),
-			whitespaceSeparatedList(0, literal, token(',')),
-			token(')')
-		]),
-		function(state) {
-			// Linked list contains fieldname and multiple values
-			//   (in reverse order).
-
-			var node = state;
-			while (node.tail != null) {
-				node = node.tail;
-			}
-            var fieldName = node.head;
-
-			return function(props, indexes) {
-				var value = props[indexes[fieldName]];
-				if (value == null) { return false; }
-				var node = state;
-				while (node.tail !== null) {
-					if (node.head === value) { return true; }
-					node = node.tail;
-				}
-				return false;
-			};
-		}
-	);
-
-	// Forward declarations to allow mutually recursive grammar definitions.
-	var term = function(s, state) { return term(s, state); };
-	var expression = function(s, state) { return expression(s, state); };
-
-	var notTerm = action(
-		whitespaceSeparatedSequence([caseInsensitiveToken('NOT'), term]),
-		function(state) {
-			// Linked list contains only processed inner term.
-			var innerTerm = state.head;
-			return function(props, indexes, types) {
-				return !innerTerm(props, indexes, types);
-			};
-		}
-	);
-
-	term = choice([
-		notTerm,
-		opTerm,
-		inTerm,
-		whitespaceSeparatedSequence([token('('), expression, token(')')])
-	]);
-
-	// AND and OR expressions must have at least 2 terms,
-	//   to disambiguate them from a single term.
-
-	var andExpression = action(
-		whitespaceSeparatedList(2, term, caseInsensitiveToken('AND')),
-		function(state) {
-			// Linked list contains multiple processed inner terms
-			//   (in reverse order).
-			return function(props, indexes, types) {
-				var flag = true;
-				var node = state;
-				while (node != null) {
-					flag = flag && node.head(props, indexes, types);
-					node = node.tail;
-				}
-				return flag;
-			};
-		}
-	);
-
-	var orExpression = action(
-		whitespaceSeparatedList(2, term, caseInsensitiveToken('OR')),
-		function(state) {
-			// Linked list contains multiple processed inner terms
-			//   (in reverse order).
-			return function(props, indexes, types) {
-				var flag = false;
-				var node = state;
-				while (node != null) {
-					flag = flag || node.head(props, indexes, types);
-					node = node.tail;
-				}
-				return flag;
-			};
-		}
-	);
-
-	// Order is important here: term should be tried last,
-	//   because andExpression and orExpression start with it.
-	expression = choice([
-		andExpression,
-		orExpression,
-		term
-	]);
-
-	var whereClause = sequence([whitespace, expression, whitespace]);
-
-	Parsers.parseSQL = function(str) {
-		var result = applyParser(str, whereClause);
-		return result.head === str.length ?
-			result.tail.head :
-            (applyParser(str, whitespace).head === str.length) ?
-				function(/*props*/) { return true; } :
-				null;
-	};
-
-	var additiveExpression = function(s, state) { return additiveExpression(s, state); };
-	var multiplicativeExpression = function(s, state) { return multiplicativeExpression(s, state); };
-	additiveExpression = action(
-		whitespaceSeparatedList(
-			1,
-			multiplicativeExpression,
-			capture(choice([token('+'), token('-')]))
-		),
-		function(state)
-		{
-			return function(props, indexes, types)
-			{
-				var pos = state;
-				var term = 0.0;
-				while (pos !== null) {
-					term += pos.head(props, indexes, types);
-					if (pos.tail === null) {
-						return term;
-					} else {
-						if (pos.tail.head === '-') { term = -term; }
-						pos = pos.tail.tail;
-					}
-				}
-				return term;
-			};
-		}
-	);
-
-	var multiplicativeTerm = choice([
-		action(
-			numberLiteral,
-			function(state) {
-				return function(/*props, indexes, types*/) {
-					return parseFloat(state.head);
-				};
-			}
-		),
-		action(
-			sequence([token('floor('), additiveExpression, token(')')]),
-			function(state) {
-				return function(props, indexes, types) {
-					var res = state.head(props, indexes, types);
-					return Math.floor(res);
-				};
-			}
-		),
-		action(
-			sequence([token('['), fieldName, token(']')]),
-			function(state) {
-				return function(props, indexes) {
-					return parseFloat(props[indexes[state.head]]);
-				};
-			}
-		),
-		whitespaceSeparatedSequence([
-			token('('),
-			additiveExpression,
-			token(')')
-		])
-	]);
-	multiplicativeTerm = choice([
-		multiplicativeTerm,
-		action(
-			whitespaceSeparatedSequence([token('-'), multiplicativeTerm]),
-			function(state) {
-				return function(props, indexes, types) {
-					return -state.head(props, indexes, types);
-				};
-			}
-		)
-	]);
-	multiplicativeExpression = action(
-		whitespaceSeparatedList(
-			1,
-			multiplicativeTerm,
-			capture(choice([token('*'), token('/')]))
-		),
-		function(state)
-		{
-			return function(props, indexes, types) {
-				var pos = state;
-				var term = 1.0;
-				while (pos !== null) {
-					term *= pos.head(props, indexes, types);
-					if (pos.tail === null) {
-						return term;
-					} else {
-						if (pos.tail.head === '/') { term = 1.0 / term; }
-						pos = pos.tail.tail;
-					}
-				}
-				return term;
-			};
-		}
-	);
-
-	multiplicativeTerm = choice([
-		multiplicativeTerm,
-		action(
-			whitespaceSeparatedSequence([token('-'), multiplicativeTerm]),
-			function(state) {
-				return function(props, indexes, types) {
-					return -state.head(props, indexes, types);
-				};
-			}
-		)
-	]);
-
-	var arithmeticExpression = sequence([whitespace, additiveExpression, whitespace]);
-	Parsers.parseExpression = function(s) {
-		var result = applyParser(s, arithmeticExpression);
-        return result.head === s.length ? result.tail.head : null;
-        // return result.head === s.length ? Parsers.functionFromExpression(s) : null;
-	};
-
-	var svgPath = action(
-		repeat(0, choice([
-			numberLiteral,
-			token(','),
-			token('M'),
-			token('C'),
-			repeat(1, choice([
-				token(' '),
-				token('\t'),
-				token('\r'),
-				token('\n')
-			]))
-		])),
-		function(state) {
-			var coords = [];
-			while (state !== null) {
-				coords.push(parseFloat(state.head));
-				state = state.tail;
-			}
-			coords.reverse();
-			return coords;
-		}
-	);
-
-	Parsers.parseSVGPath = function(s) {
-		var result = applyParser(s, svgPath);
-		if (result.head === s.length) {
-			return result.tail.head;
-		} else {
-			return [];
-        }
-	};
-
-	//extend L.gmx namespace
-    L.gmx = L.gmx || {};
-	L.gmx.Parsers = Parsers;
-})();
-
-
-//all the methods can be called without instance itself
-//For example:
-//
-// var def = new Deferred();
-// doSomething(def.resolve) (instead of doSomething(def.resolve.bind(def))
-var Deferred = function(cancelFunc) {
-    var resolveCallbacks = [],
-        rejectCallbacks = [],
-        isFulfilled = false,
-        isResolved = false,
-        fulfilledData,
-        onceAdded = false,
-        isCancelled = false;
-
-    var fulfill = this._fulfill = function(resolved /*, data*/) {
-        if (isFulfilled) {
-            return;
-        }
-        var callbacks = resolved ? resolveCallbacks : rejectCallbacks;
-        fulfilledData = [].slice.call(arguments, 1);
-        isFulfilled = true;
-        isResolved = resolved;
-
-        callbacks.forEach(function(callback) { callback.apply(null, fulfilledData); });
-        resolveCallbacks = rejectCallbacks = [];
-    };
-
-    this.resolve = function(/*data*/) {
-        isCancelled || fulfill.apply(null, [true].concat([].slice.call(arguments)));
-    };
-
-    this.reject = function(/*data*/) {
-        isCancelled || fulfill.apply(null, [false].concat([].slice.call(arguments)));
-    };
-
-    var cancel = this.cancel = function() {
-        if (!isCancelled && !isFulfilled) {
-            isCancelled = true;
-            cancelFunc && cancelFunc();
-        }
-    };
-
-    var then = this.then = function(resolveCallback, rejectCallback) {
-        if (isCancelled) {
-            return null;
-        }
-
-        var userFuncDef = null;
-        var def = new Deferred(function() {
-            cancel();
-            userFuncDef && userFuncDef.cancel();
-        });
-
-        var fulfillFunc = function(func, resolved) {
-            return function(/*data*/) {
-                if (!func) {
-                    def._fulfill.apply(null, [resolved].concat([].slice.call(arguments)));
-                } else {
-                    var res = func.apply(null, arguments);
-                    if (res instanceof Deferred) {
-                        userFuncDef = res;
-                        res.then(def.resolve, def.reject);
-                    } else {
-                        def.resolve(res);
-                    }
-                }
-            };
-        };
-
-        if (isFulfilled) {
-            fulfillFunc(isResolved ? resolveCallback : rejectCallback, isResolved).apply(null, fulfilledData);
-        } else {
-            resolveCallbacks.push(fulfillFunc(resolveCallback, true));
-            rejectCallbacks.push(fulfillFunc(rejectCallback, false));
-        }
-        return def;
-    };
-
-    this.once = function(onceResolveCallback) {
-        if (!onceAdded) {
-            onceAdded = true;
-            then(onceResolveCallback);
-        }
-    };
-
-    this.always = function(callback) {
-        then(callback, callback);
-    };
-
-    this.getFulfilledData = function() {
-        return fulfilledData;
-    };
-};
-
-Deferred.all = function() {
-    var defArray = [].slice.apply(arguments);
-    var resdef = new Deferred();
-    var left = defArray.length;
-    var results = new Array(defArray.length);
-
-    if (left) {
-        defArray.forEach(function(def, i) {
-            def.then(function(res) {
-                results[i] = res;
-                left--;
-                if (left === 0) {
-                    resdef.resolve.apply(resdef, results);
-                }
-            }, function() {
-                resdef.reject();
-            });
-        });
-    } else {
-        resdef.resolve();
-    }
-
-    return resdef;
-};
-
-L.gmx = L.gmx || {};
-L.gmx.Deferred = Deferred;
-
-
-(function() {
-'use strict';
-
-	var worker;
-	if ('createImageBitmap' in window && 'Worker' in window && location.protocol !== 'file:') {
-		worker = new Worker(location.href.replace(/[^/]*$/, 'ImageBitmapLoader-worker.js'));
-	}
-	if (!worker) {
-		return;
-	}
-
-	var ImageBitmapLoader = function() {
-		this.jobs = {};
-		this.worker = worker;
-		this.worker.onmessage = this.chkMessage.bind(this);
-	}
-
-	ImageBitmapLoader.prototype = {
-		chkMessage: function(evt) {
-			var message = evt.data,
-				url = message.url;
-			// console.log('ImageBitmapLoader ', message, evt);
-
-			for (var i = 0, it, arr = this.jobs[url] || [], len = arr.length; i < len; i++) {
-				it = arr[i];
-				if (message.load) { it.resolve(message); }
-				else { it.reject(message); }
-			}
-			this.jobs[url].length = 0;
-			L.gmxUtil.loaderStatus(url, true);
-		},
-
-		push: function(url, options) {	// добавить запрос в worker
-			var attr = {
-					options: options
-				},
-				src = url;		// Ensure the URL is absolute.
-			if (typeof this.jobs[src] === 'undefined') { this.jobs[src] = []; }
-
-			this.jobs[src].push(attr);
-			this.worker.postMessage({src: src, options: options});
-			L.gmxUtil.loaderStatus(src);
-			return new Promise(function(resolve, reject) {
-				attr.resolve = resolve;
-				attr.reject = reject;
-			});
-		}
-	};
-
-	var imageBitmapLoader = new ImageBitmapLoader();
-	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
-	L.gmx.getJSON = imageBitmapLoader.push.bind(imageBitmapLoader);
-	worker.onerror = function(ev) {
-		console.warn('Error: Worker init: ImageBitmapLoader-worker.js', ev);
-		ev.target.terminate();
-		delete L.gmx.getBitmap;
-		delete L.gmx.getJSON;
-	};
-})();
-
-
-(function() {
-
-var ImageRequest = function(id, url, options) {
-    this._id = id;
-    this.def = new L.gmx.Deferred(L.gmx.imageLoader._cancelRequest.bind(L.gmx.imageLoader, this));
-    this.remove = L.gmx.imageLoader._removeRequestFromCache.bind(L.gmx.imageLoader, this);
-    this.url = url;
-    this.options = options || {};
-};
-
-var GmxImageLoader = L.Class.extend({
-    includes: L.Evented ? L.Evented.prototype : L.Mixin.Events,
-    statics: {
-        MAX_COUNT: 20 // max number of parallel requests
-    },
-
-    initialize: function() {
-        this.curCount = 0;        // number of currently processing requests (number of items in "inProgress")
-        this.requests = [];       // not yet processed image requests
-        this.inProgress = {};     // hash of in progress image loadings
-        this.requestsCache = {};  // for requests cache by uniqueID
-        this.uniqueID = 0;
-    },
-
-    _checkIE11bugFix: function(def, image) {
-		if (!this.divIE11bugFix) {
-			var div = document.createElement('div');
-			this.divIE11bugFix = div;
-			div.style.visibility = 'hidden';
-			div.style.position = 'absolute';
-			document.body.insertBefore(div, document.body.childNodes[0]);
-		}
-		var ieResolve = function() {
-			def.resolve(image);
-			// if (image.parentNode) {
-				// image.parentNode.removeChild(image);
-			// }
-		};
-		this.divIE11bugFix.appendChild(image);
-		setTimeout(ieResolve, 0);
-    },
-
-    _resolveRequest: function(request, image, canceled) {
-        var def = request.def;
-        if (image) {
-            if (!canceled && request.options.cache) {
-                var url = request.url,
-                    cacheItem = this.requestsCache[url],
-                    cacheKey = request._id;
-                if (!cacheItem) { cacheItem = this.requestsCache[url] = {image: image, requests:{}}; }
-                if (!cacheItem.requests[cacheKey]) { cacheItem.requests[cacheKey] = request; }
-            }
-			if (L.gmxUtil.isIE11 && /\.svg/.test(request.url)) {   // skip bug in IE11
-				this._checkIE11bugFix(def, image);
-			} else {
-				def.resolve(image);
-			}
-        } else if (!canceled) {
-            def.reject();
-        }
-        this.fire('requestdone', {request: request});
-    },
-
-    _imageLoaded: function(url, image, canceled) {
-        if (url in this.inProgress) {
-            var resolveRequest = function(it) {
-                this._resolveRequest(it, image, canceled);
-            };
-            this.inProgress[url].requests.forEach(resolveRequest.bind(this));
-            --this.curCount;
-            delete this.inProgress[url];
-        }
-        L.gmxUtil.loaderStatus(url, true);
-        this.fire('imageloaded', {url: url});
-        this._nextLoad();
-    },
-
-    _nextLoad: function() {  // загрузка следующего
-        if (this.curCount >= GmxImageLoader.MAX_COUNT || !this.requests.length) {
-            return;
-        }
-
-        var request = this.requests.shift(),
-            url = request.url;
-
-        if (url in this.inProgress) {
-            this.inProgress[url].requests.push(request);
-        } else {
-            var requests = [request];
-            this.inProgress[url] = {requests: requests};
-            ++this.curCount;
-
-            for (var k = this.requests.length - 1; k >= 0; k--) {
-                if (this.requests[k].url === url) {
-                    requests.push(this.requests[k]);
-                    this.requests.splice(k, 1);
-                }
-            }
-
-            var image = this._loadImage(request);
-            if (!image.width) {
-                L.gmxUtil.loaderStatus(url);
-            }
-
-            //theoretically image loading can be synchronous operation
-            if (this.inProgress[url]) {
-                this.inProgress[url].image = image;
-            }
-        }
-    },
-
-    _loadImage: function(request) {
-        var imageObj = new Image(),
-            url = request.url,
-            _this = this;
-
-        if (request.options.crossOrigin) {
-            imageObj.crossOrigin = request.options.crossOrigin;
-        }
-
-        imageObj.onload = this._imageLoaded.bind(this, url, imageObj, false);
-        imageObj.onerror = function() {
-            _this._imageLoaded(url);
-        };
-		if (L.gmxUtil.isIEOrEdge) {
-			setTimeout(function() { imageObj.src = url; }, 0);
-		} else {
-            imageObj.src = url;
-		}
-
-        this.fire('imageloadstart', {url: url});
-
-        return imageObj;
-    },
-
-    _cancelRequest: function(request) {
-        var id = request._id,
-            url = request.url,
-            i = 0, len;
-        if (url in this.inProgress) {
-            var loadingImg = this.inProgress[url],
-                requests = loadingImg.requests;
-
-            len = requests.length;
-            if (len === 1 && requests[0]._id === id) {
-                loadingImg.image.onload = L.Util.falseFn;
-                loadingImg.image.onerror = L.Util.falseFn;
-                loadingImg.image.src = L.Util.emptyImageUrl;
-                this._imageLoaded(url, null, true);
-            } else {
-                for (i = 0; i < len; i++) {
-                    if (requests[i]._id === id) {
-                        requests.splice(i, 1);
-                        break;
-                    }
-                }
-            }
-        } else {
-            for (i = 0, len = this.requests.length; i < len; i++) {
-                if (this.requests[i]._id === id) {
-                    this.requests.splice(i, 1);
-                    break;
-                }
-            }
-        }
-
-        this.fire('requestdone', {request: request});
-    },
-
-    _removeRequestFromCache: function(request) {    // remove request from cache
-        this._cancelRequest(request);
-        this._clearCacheItem(request.url, request._id);
-    },
-
-    _clearCacheItem: function(url, cacheKey) {    // remove cache item
-        if (this.requestsCache[url]) {
-            var cacheItem = this.requestsCache[url];
-            delete cacheItem.requests[cacheKey];
-            if (Object.keys(cacheItem.requests).length === 0) {
-                delete this.requestsCache[url];
-            }
-        }
-    },
-    _add: function(atBegin, url, options) {
-		url = url.replace(/^http:/, L.gmxUtil.protocol);
-
-		var id = 'id' + (++this.uniqueID),
-            request = new ImageRequest(id, url, options);
-
-        if (url in this.inProgress) {
-            this.inProgress[url].requests.push(request);
-        } else {
-            atBegin ? this.requests.unshift(request) : this.requests.push(request);
-            this._nextLoad();
-        }
-
-        this.fire('request', {request: request});
-
-        return request;
-    },
-
-    push: function(url, options) {  // добавить запрос в конец очереди
-        return this._add(false, url, options);
-    },
-
-    unshift: function(url, options) {   // добавить запрос в начало очереди
-        return this._add(true, url, options);
-    }
-});
-
-L.gmx.imageLoader = new GmxImageLoader();
-
-})();
-
-
 /**
 * @name L.gmxUtil
 * @namespace
 */
 var gmxAPIutils = {
     lastMapId: 0,
+	debug: /\bdebug=1\b/.test(location.search),
 	fromWebMercY: function(y) {
 		return 90 * (4 * Math.atan(Math.exp(y / gmxAPIutils.rMajor)) / Math.PI - 1);
 	},
@@ -1022,6 +38,7 @@ var gmxAPIutils = {
         return id;
     },
 
+    apiLoadedFrom: document.currentScript.src.substring(0, document.currentScript.src.lastIndexOf('/')),
     isPageHidden: function()	{		// Видимость окна браузера
         return document.hidden || document.msHidden || document.webkitHidden || document.mozHidden || false;
     },
@@ -3949,6 +2966,8 @@ if (!L.gmxUtil) { L.gmxUtil = {}; }
 
 //public interface
 L.extend(L.gmxUtil, {
+	debug: gmxAPIutils.debug,
+	apiLoadedFrom: gmxAPIutils.apiLoadedFrom,
     newId: gmxAPIutils.newId,
 	isPageHidden: gmxAPIutils.isPageHidden,
     protocol: location.protocol !== 'https:' ? 'http:' : location.protocol,
@@ -4173,6 +3192,995 @@ if (!('requestIdleCallback' in window)) {
     }
     //расширяем namespace
     L.gmxUtil.sendCrossDomainPostRequest = gmxAPIutils.sendCrossDomainPostRequest = sendCrossDomainPostRequest;
+})();
+
+
+/*
+   Single-pass recursive descent PEG parser library:
+      http://en.wikipedia.org/wiki/Parsing_expression_grammar
+   Inspired by Chris Double's parser combinator library in JavaScript:
+      http://www.bluishcoder.co.nz/2007/10/javascript-packrat-parser.html
+	+ Добавлены функции: Math.floor
+*/
+(function() {
+    var regexExpression = /\[(.+?)\]/g,
+        regexMath = /(floor\()/g;
+	var Parsers = {						// Парсеры
+        functionFromExpression: function(s) {
+/*eslint-disable no-new-func*/
+            return new Function(
+/*eslint-enable */
+                'props',
+                'indexes',
+                'return ' +
+                    s
+                     .replace(regexExpression, 'props[indexes["$1"]]')
+                     .replace(regexMath, 'Math.$1')
+                    + ';'
+            );
+        }
+    };
+
+	var makePair = function(t1, t2) {
+		return {head: t1, tail: t2};
+	};
+
+// C-style linked list via recursive typedef.
+//   Used purely functionally to get shareable sublists.
+//typedef LinkedList = Pair<Dynamic, LinkedList>;
+	var LinkedList = function(t1, t2) {
+		return makePair(t1, t2);
+	};
+
+// Parser state contains position in string and some accumulated data.
+//typedef ParserState = Pair<Int, LinkedList>;
+	var ParserState = function(t1, t2) {
+		return makePair(t1, t2);
+	};
+
+// Parser accepts string and state, returns another state.
+//typedef Parser = String->ParserState->ParserState;
+
+	// A parser state that indicates failure.
+	var fail = new ParserState(-1, null);
+
+	// Check for failure.
+	var failed = function(state) {
+		return (state.head === -1);
+	};
+
+	// Advance a parser state by n characters.
+	var advance = function(state, n) {
+		return new ParserState(state.head + n, state.tail);
+	};
+
+	// Match a specified string.
+	var token = function(tok) {
+		var len = tok.length;
+		return function(s, state) {
+			return (s.substr(state.head, len) === tok) ? advance(state, len) : fail;
+		};
+	};
+
+	// Match a string without regard to case.
+	var caseInsensitiveToken = function(tok) {
+		var len = tok.length;
+		tok = tok.toLowerCase();
+		return function(s, state) {
+			return (s.substr(state.head, len).toLowerCase() === tok) ? advance(state, len) : fail;
+		};
+	};
+
+	// Match a single character in a specified range.
+	var range = function(startChar, endChar) {
+		var startCode = startChar.charCodeAt(0);
+		var endCode = endChar.charCodeAt(0);
+		return function(s, state) {
+			var code = s.charCodeAt(state.head);
+			return ((code >= startCode) && (code <= endCode)) ? advance(state, 1) : fail;
+		};
+	};
+
+	// Match any character outside a certain set.
+	//   This combinator is intended only for single character parsers.
+	var anythingExcept = function(parser) {
+		return function(s, state) {
+			return ((s.length > state.head) && failed(parser(s, state))) ? advance(state, 1) : fail;
+		};
+	};
+
+	// Match thing1, then thing2, ..., then thingN.
+	var sequence = function(parsers) {
+		return function(s, state) {
+			for (var i = 0; i < parsers.length; i++) {
+				state = parsers[i](s, state);
+				if (failed(state)) {
+					return fail;
+                }
+			}
+			return state;
+		};
+	};
+
+	// Match thing1, or thing2, ..., or thingN.
+	var choice = function(parsers) {
+		return function(s, state) {
+			for (var i = 0; i < parsers.length; i++) {
+				var newState = parsers[i](s, state);
+				if (!failed(newState)) {
+					return newState;
+                }
+			}
+			return fail;
+		};
+	};
+
+	// Match immediately, without regard to what's in the string.
+	var nothing = function(s, state) {
+		return state;
+	};
+
+	// Match this thing or nothing.
+	var maybe = function(parser) {
+		return choice([parser, nothing]);
+	};
+
+	// Match minCount or more repetitions of this thing.
+	var repeat = function(minCount, parser) {
+		return function(s, state) {
+			var count = 0;
+			while (true) {
+				var newState = parser(s, state);
+				if (failed(newState)) {
+					return (count >= minCount) ? state : fail;
+				} else {
+					count += 1;
+					state = newState;
+				}
+			}
+			// return fail;
+		};
+	};
+
+	// Match a list of minCount or more instances of thing1, separated by thing2.
+	var separatedList = function(minCount, parser, separator) {
+		var parser1 = sequence([parser, repeat(minCount - 1, sequence([separator, parser]))]);
+		return (minCount > 0) ? parser1 : choice([parser1, nothing]);
+	};
+
+	var whitespace = repeat(0, choice([
+		token(' '),
+		token('\t'),
+		token('\n')
+	]));
+
+	// Same as separatedList, but can have whitespace between items and separators.
+	var whitespaceSeparatedList = function(minCount, parser, separator) {
+		return separatedList(minCount, parser, sequence([whitespace, separator, whitespace]));
+	};
+
+	// Same as sequence, but can have whitespace between items.
+	var whitespaceSeparatedSequence = function(parsers) {
+		var newParsers = [];
+		for (var i = 0; i < parsers.length; i++) {
+			if (newParsers.length > 0) { newParsers.push(whitespace); }
+			newParsers.push(parsers[i]);
+		}
+		return sequence(newParsers);
+	};
+
+	// This combinator captures the string that the parser matched
+	//   and adds it to the current parser state, consing a new state.
+	var capture = function(parser) {
+		return function(s, state) {
+			var newState = parser(s, state);
+			return failed(newState) ? fail : new ParserState(newState.head, new LinkedList(s.substr(state.head, newState.head - state.head), newState.tail));
+		};
+	};
+
+	// This combinator passes the accumulated parser state to a given
+	//  function for processing. The result goes into the new state.
+	var action = function(parser, func) {
+		return function(s, state) {
+			var oldState = state;
+			var newState = parser(s, new ParserState(oldState.head, null));
+			return failed(newState) ? fail : new ParserState(newState.head, new LinkedList(func(newState.tail), oldState.tail));
+		};
+	};
+
+	// Define a syntactic subset of SQL WHERE clauses.
+	var fieldName = capture(repeat(1, choice([
+		range('a', 'z'),
+		range('A', 'Z'),
+		range('а', 'я'),
+		range('А', 'Я'),
+		range('0', '9'),
+		token('_')
+	])));
+
+	var fieldNameWithSpaces = capture(repeat(1, choice([
+		range('a', 'z'),
+		range('A', 'Z'),
+		range('а', 'я'),
+		range('А', 'Я'),
+		range('0', '9'),
+		token('_'),
+		token(' ')
+	])));
+
+	var quotedFieldName = choice([
+		fieldName,
+		sequence([token('"'), fieldNameWithSpaces, token('"')]),
+		sequence([token('`'), fieldNameWithSpaces, token('`')])
+	]);
+
+	var stringLiteral = sequence([
+		token('\''),
+		capture(repeat(0, anythingExcept(token('\'')))),
+		token('\'')
+	]);
+
+	var digits = repeat(1, range('0', '9'));
+
+	var numberLiteral = capture(sequence([
+		maybe(token('-')),
+		digits,
+		maybe(sequence([token('.'), digits]))
+	]));
+
+	var literal = choice([numberLiteral, stringLiteral]);
+
+	var applyParser = function(s, parser) {
+		return parser(s, new ParserState(0, null));
+	};
+
+	// Order is important here: longer ops should be tried first.
+	var opTerm = action(
+		whitespaceSeparatedSequence([
+			quotedFieldName,
+			capture(choice([
+				token('=='),
+				token('!='),
+				token('<>'),
+				token('<='),
+				token('>='),
+				token('='),
+				token('<'),
+				token('>'),
+				caseInsensitiveToken('LIKE')
+			])),
+            choice([literal, quotedFieldName])
+		]),
+		function(state) {
+			// Linked list contains fieldname, operation, value
+			// (in reverse order).
+
+			var fieldName = state.tail.tail.head;
+			var op = state.tail.head;
+			var referenceValue = state.head;
+
+			var matchPattern = null;
+			if (op.toUpperCase() === 'LIKE') {
+				matchPattern = function(fieldValue) {
+					var matchFrom = null;
+					matchFrom = function(referenceIdx, fieldIdx) {
+						var referenceChar = referenceValue.charAt(referenceIdx);
+						var fieldChar = fieldValue.charAt(fieldIdx);
+						if (referenceChar === '') {
+							return (fieldChar === '');
+						} else if (referenceChar === '%') {
+							return matchFrom(referenceIdx + 1, fieldIdx) || ((fieldChar !== '') && matchFrom(referenceIdx, fieldIdx + 1));
+						} else {
+							return (referenceChar === fieldChar) && matchFrom(referenceIdx + 1, fieldIdx + 1);
+                        }
+					};
+					return matchFrom(0, 0);
+				};
+			}
+
+			return function(props, indexes, types) {
+				var fieldValue = props[indexes[fieldName]],
+                    rValue = referenceValue;
+                if (referenceValue in indexes) { rValue = props[indexes[rValue]]; }
+                if ((types[fieldName] === 'date' || types[fieldName] === 'datetime') && typeof rValue === 'string') { rValue = L.gmxUtil.getUnixTimeFromStr(rValue); }
+                if (typeof fieldValue === 'boolean' && typeof rValue === 'string') {
+                    fieldValue = fieldValue ? 'True' : 'False';
+                }
+				if (fieldValue === null) { return false; }
+				if (matchPattern !== null) { return matchPattern(fieldValue);
+/*eslint-disable eqeqeq */
+                } else if ((op === '=') || (op === '==')) { return (fieldValue == rValue);
+				} else if ((op === '!=') || (op === '<>')) { return (fieldValue != rValue);
+/*eslint-enable */
+                } else {
+                    var f1, f2;
+					if (!(referenceValue in indexes) && typeof rValue === 'string' && applyParser(rValue, numberLiteral).head === rValue.length) {
+						f1 = parseFloat(fieldValue);
+						f2 = parseFloat(rValue);
+						if (op === '<') { return (f1 < f2);
+						} else if (op === '>') { return (f1 > f2);
+						} else if (op === '<=') { return (f1 <= f2);
+						} else if (op === '>=') { return (f1 >= f2);
+						} else { return false;
+                        }
+					} else {
+						f1 = fieldValue;
+						f2 = rValue;
+						if (op === '<') { return (f1 < f2);
+						} else if (op === '>') { return (f1 > f2);
+						} else if (op === '<=') { return (f1 <= f2);
+						} else if (op === '>=') { return (f1 >= f2);
+						} else { return false;
+                        }
+					}
+				}
+			};
+		}
+	);
+
+	var inTerm = action(
+		whitespaceSeparatedSequence([
+			quotedFieldName,
+			caseInsensitiveToken('IN'),
+			token('('),
+			whitespaceSeparatedList(0, literal, token(',')),
+			token(')')
+		]),
+		function(state) {
+			// Linked list contains fieldname and multiple values
+			//   (in reverse order).
+
+			var node = state;
+			while (node.tail != null) {
+				node = node.tail;
+			}
+            var fieldName = node.head;
+
+			return function(props, indexes) {
+				var value = props[indexes[fieldName]];
+				if (value == null) { return false; }
+				var node = state;
+				while (node.tail !== null) {
+					if (node.head === value) { return true; }
+					node = node.tail;
+				}
+				return false;
+			};
+		}
+	);
+
+	// Forward declarations to allow mutually recursive grammar definitions.
+	var term = function(s, state) { return term(s, state); };
+	var expression = function(s, state) { return expression(s, state); };
+
+	var notTerm = action(
+		whitespaceSeparatedSequence([caseInsensitiveToken('NOT'), term]),
+		function(state) {
+			// Linked list contains only processed inner term.
+			var innerTerm = state.head;
+			return function(props, indexes, types) {
+				return !innerTerm(props, indexes, types);
+			};
+		}
+	);
+
+	term = choice([
+		notTerm,
+		opTerm,
+		inTerm,
+		whitespaceSeparatedSequence([token('('), expression, token(')')])
+	]);
+
+	// AND and OR expressions must have at least 2 terms,
+	//   to disambiguate them from a single term.
+
+	var andExpression = action(
+		whitespaceSeparatedList(2, term, caseInsensitiveToken('AND')),
+		function(state) {
+			// Linked list contains multiple processed inner terms
+			//   (in reverse order).
+			return function(props, indexes, types) {
+				var flag = true;
+				var node = state;
+				while (node != null) {
+					flag = flag && node.head(props, indexes, types);
+					node = node.tail;
+				}
+				return flag;
+			};
+		}
+	);
+
+	var orExpression = action(
+		whitespaceSeparatedList(2, term, caseInsensitiveToken('OR')),
+		function(state) {
+			// Linked list contains multiple processed inner terms
+			//   (in reverse order).
+			return function(props, indexes, types) {
+				var flag = false;
+				var node = state;
+				while (node != null) {
+					flag = flag || node.head(props, indexes, types);
+					node = node.tail;
+				}
+				return flag;
+			};
+		}
+	);
+
+	// Order is important here: term should be tried last,
+	//   because andExpression and orExpression start with it.
+	expression = choice([
+		andExpression,
+		orExpression,
+		term
+	]);
+
+	var whereClause = sequence([whitespace, expression, whitespace]);
+
+	Parsers.parseSQL = function(str) {
+		var result = applyParser(str, whereClause);
+		return result.head === str.length ?
+			result.tail.head :
+            (applyParser(str, whitespace).head === str.length) ?
+				function(/*props*/) { return true; } :
+				null;
+	};
+
+	var additiveExpression = function(s, state) { return additiveExpression(s, state); };
+	var multiplicativeExpression = function(s, state) { return multiplicativeExpression(s, state); };
+	additiveExpression = action(
+		whitespaceSeparatedList(
+			1,
+			multiplicativeExpression,
+			capture(choice([token('+'), token('-')]))
+		),
+		function(state)
+		{
+			return function(props, indexes, types)
+			{
+				var pos = state;
+				var term = 0.0;
+				while (pos !== null) {
+					term += pos.head(props, indexes, types);
+					if (pos.tail === null) {
+						return term;
+					} else {
+						if (pos.tail.head === '-') { term = -term; }
+						pos = pos.tail.tail;
+					}
+				}
+				return term;
+			};
+		}
+	);
+
+	var multiplicativeTerm = choice([
+		action(
+			numberLiteral,
+			function(state) {
+				return function(/*props, indexes, types*/) {
+					return parseFloat(state.head);
+				};
+			}
+		),
+		action(
+			sequence([token('floor('), additiveExpression, token(')')]),
+			function(state) {
+				return function(props, indexes, types) {
+					var res = state.head(props, indexes, types);
+					return Math.floor(res);
+				};
+			}
+		),
+		action(
+			sequence([token('['), fieldName, token(']')]),
+			function(state) {
+				return function(props, indexes) {
+					return parseFloat(props[indexes[state.head]]);
+				};
+			}
+		),
+		whitespaceSeparatedSequence([
+			token('('),
+			additiveExpression,
+			token(')')
+		])
+	]);
+	multiplicativeTerm = choice([
+		multiplicativeTerm,
+		action(
+			whitespaceSeparatedSequence([token('-'), multiplicativeTerm]),
+			function(state) {
+				return function(props, indexes, types) {
+					return -state.head(props, indexes, types);
+				};
+			}
+		)
+	]);
+	multiplicativeExpression = action(
+		whitespaceSeparatedList(
+			1,
+			multiplicativeTerm,
+			capture(choice([token('*'), token('/')]))
+		),
+		function(state)
+		{
+			return function(props, indexes, types) {
+				var pos = state;
+				var term = 1.0;
+				while (pos !== null) {
+					term *= pos.head(props, indexes, types);
+					if (pos.tail === null) {
+						return term;
+					} else {
+						if (pos.tail.head === '/') { term = 1.0 / term; }
+						pos = pos.tail.tail;
+					}
+				}
+				return term;
+			};
+		}
+	);
+
+	multiplicativeTerm = choice([
+		multiplicativeTerm,
+		action(
+			whitespaceSeparatedSequence([token('-'), multiplicativeTerm]),
+			function(state) {
+				return function(props, indexes, types) {
+					return -state.head(props, indexes, types);
+				};
+			}
+		)
+	]);
+
+	var arithmeticExpression = sequence([whitespace, additiveExpression, whitespace]);
+	Parsers.parseExpression = function(s) {
+		var result = applyParser(s, arithmeticExpression);
+        return result.head === s.length ? result.tail.head : null;
+        // return result.head === s.length ? Parsers.functionFromExpression(s) : null;
+	};
+
+	var svgPath = action(
+		repeat(0, choice([
+			numberLiteral,
+			token(','),
+			token('M'),
+			token('C'),
+			repeat(1, choice([
+				token(' '),
+				token('\t'),
+				token('\r'),
+				token('\n')
+			]))
+		])),
+		function(state) {
+			var coords = [];
+			while (state !== null) {
+				coords.push(parseFloat(state.head));
+				state = state.tail;
+			}
+			coords.reverse();
+			return coords;
+		}
+	);
+
+	Parsers.parseSVGPath = function(s) {
+		var result = applyParser(s, svgPath);
+		if (result.head === s.length) {
+			return result.tail.head;
+		} else {
+			return [];
+        }
+	};
+
+	//extend L.gmx namespace
+    L.gmx = L.gmx || {};
+	L.gmx.Parsers = Parsers;
+})();
+
+
+//all the methods can be called without instance itself
+//For example:
+//
+// var def = new Deferred();
+// doSomething(def.resolve) (instead of doSomething(def.resolve.bind(def))
+var Deferred = function(cancelFunc) {
+    var resolveCallbacks = [],
+        rejectCallbacks = [],
+        isFulfilled = false,
+        isResolved = false,
+        fulfilledData,
+        onceAdded = false,
+        isCancelled = false;
+
+    var fulfill = this._fulfill = function(resolved /*, data*/) {
+        if (isFulfilled) {
+            return;
+        }
+        var callbacks = resolved ? resolveCallbacks : rejectCallbacks;
+        fulfilledData = [].slice.call(arguments, 1);
+        isFulfilled = true;
+        isResolved = resolved;
+
+        callbacks.forEach(function(callback) { callback.apply(null, fulfilledData); });
+        resolveCallbacks = rejectCallbacks = [];
+    };
+
+    this.resolve = function(/*data*/) {
+        isCancelled || fulfill.apply(null, [true].concat([].slice.call(arguments)));
+    };
+
+    this.reject = function(/*data*/) {
+        isCancelled || fulfill.apply(null, [false].concat([].slice.call(arguments)));
+    };
+
+    var cancel = this.cancel = function() {
+        if (!isCancelled && !isFulfilled) {
+            isCancelled = true;
+            cancelFunc && cancelFunc();
+        }
+    };
+
+    var then = this.then = function(resolveCallback, rejectCallback) {
+        if (isCancelled) {
+            return null;
+        }
+
+        var userFuncDef = null;
+        var def = new Deferred(function() {
+            cancel();
+            userFuncDef && userFuncDef.cancel();
+        });
+
+        var fulfillFunc = function(func, resolved) {
+            return function(/*data*/) {
+                if (!func) {
+                    def._fulfill.apply(null, [resolved].concat([].slice.call(arguments)));
+                } else {
+                    var res = func.apply(null, arguments);
+                    if (res instanceof Deferred) {
+                        userFuncDef = res;
+                        res.then(def.resolve, def.reject);
+                    } else {
+                        def.resolve(res);
+                    }
+                }
+            };
+        };
+
+        if (isFulfilled) {
+            fulfillFunc(isResolved ? resolveCallback : rejectCallback, isResolved).apply(null, fulfilledData);
+        } else {
+            resolveCallbacks.push(fulfillFunc(resolveCallback, true));
+            rejectCallbacks.push(fulfillFunc(rejectCallback, false));
+        }
+        return def;
+    };
+
+    this.once = function(onceResolveCallback) {
+        if (!onceAdded) {
+            onceAdded = true;
+            then(onceResolveCallback);
+        }
+    };
+
+    this.always = function(callback) {
+        then(callback, callback);
+    };
+
+    this.getFulfilledData = function() {
+        return fulfilledData;
+    };
+};
+
+Deferred.all = function() {
+    var defArray = [].slice.apply(arguments);
+    var resdef = new Deferred();
+    var left = defArray.length;
+    var results = new Array(defArray.length);
+
+    if (left) {
+        defArray.forEach(function(def, i) {
+            def.then(function(res) {
+                results[i] = res;
+                left--;
+                if (left === 0) {
+                    resdef.resolve.apply(resdef, results);
+                }
+            }, function() {
+                resdef.reject();
+            });
+        });
+    } else {
+        resdef.resolve();
+    }
+
+    return resdef;
+};
+
+L.gmx = L.gmx || {};
+L.gmx.Deferred = Deferred;
+
+
+(function() {
+'use strict';
+
+	var worker;
+	if ('createImageBitmap' in window && 'Worker' in window && location.protocol !== 'file:') {
+		worker = new Worker(location.href.replace(/[^/]*$/, 'ImageBitmapLoader-worker.js'));
+	}
+	if (!worker) {
+		return;
+	}
+
+	var ImageBitmapLoader = function() {
+		this.jobs = {};
+		this.worker = worker;
+		this.worker.onmessage = this.chkMessage.bind(this);
+	}
+
+	ImageBitmapLoader.prototype = {
+		chkMessage: function(evt) {
+			var message = evt.data,
+				url = message.url;
+			// console.log('ImageBitmapLoader ', message, evt);
+
+			for (var i = 0, it, arr = this.jobs[url] || [], len = arr.length; i < len; i++) {
+				it = arr[i];
+				if (message.load) { it.resolve(message); }
+				else { it.reject(message); }
+			}
+			this.jobs[url].length = 0;
+			L.gmxUtil.loaderStatus(url, true);
+		},
+
+		push: function(url, options) {	// добавить запрос в worker
+			var attr = {
+					options: options
+				},
+				src = url || L.gmxUtil.newId();		// Ensure the URL is absolute.
+			if (typeof this.jobs[src] === 'undefined') { this.jobs[src] = []; }
+
+			this.jobs[src].push(attr);
+			this.worker.postMessage({src: src, options: options});
+			L.gmxUtil.loaderStatus(src);
+			return new Promise(function(resolve, reject) {
+				attr.resolve = resolve;
+				attr.reject = reject;
+			});
+		}
+	};
+
+	var imageBitmapLoader = new ImageBitmapLoader();
+	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
+	L.gmx.getJSON = imageBitmapLoader.push.bind(imageBitmapLoader);
+	if (L.gmxUtil.debug) {
+		L.gmx.sendCmd = imageBitmapLoader.push.bind(imageBitmapLoader);
+	}
+	worker.onerror = function(ev) {
+		console.warn('Error: Worker init: ImageBitmapLoader-worker.js', ev);
+		ev.target.terminate();
+		delete L.gmx.getBitmap;
+		delete L.gmx.getJSON;
+		delete L.gmx.sendCmd;
+	};
+})();
+
+
+(function() {
+
+var ImageRequest = function(id, url, options) {
+    this._id = id;
+    this.def = new L.gmx.Deferred(L.gmx.imageLoader._cancelRequest.bind(L.gmx.imageLoader, this));
+    this.remove = L.gmx.imageLoader._removeRequestFromCache.bind(L.gmx.imageLoader, this);
+    this.url = url;
+    this.options = options || {};
+};
+
+var GmxImageLoader = L.Class.extend({
+    includes: L.Evented ? L.Evented.prototype : L.Mixin.Events,
+    statics: {
+        MAX_COUNT: 20 // max number of parallel requests
+    },
+
+    initialize: function() {
+        this.curCount = 0;        // number of currently processing requests (number of items in "inProgress")
+        this.requests = [];       // not yet processed image requests
+        this.inProgress = {};     // hash of in progress image loadings
+        this.requestsCache = {};  // for requests cache by uniqueID
+        this.uniqueID = 0;
+    },
+
+    _checkIE11bugFix: function(def, image) {
+		if (!this.divIE11bugFix) {
+			var div = document.createElement('div');
+			this.divIE11bugFix = div;
+			div.style.visibility = 'hidden';
+			div.style.position = 'absolute';
+			document.body.insertBefore(div, document.body.childNodes[0]);
+		}
+		var ieResolve = function() {
+			def.resolve(image);
+			// if (image.parentNode) {
+				// image.parentNode.removeChild(image);
+			// }
+		};
+		this.divIE11bugFix.appendChild(image);
+		setTimeout(ieResolve, 0);
+    },
+
+    _resolveRequest: function(request, image, canceled) {
+        var def = request.def;
+        if (image) {
+            if (!canceled && request.options.cache) {
+                var url = request.url,
+                    cacheItem = this.requestsCache[url],
+                    cacheKey = request._id;
+                if (!cacheItem) { cacheItem = this.requestsCache[url] = {image: image, requests:{}}; }
+                if (!cacheItem.requests[cacheKey]) { cacheItem.requests[cacheKey] = request; }
+            }
+			if (L.gmxUtil.isIE11 && /\.svg/.test(request.url)) {   // skip bug in IE11
+				this._checkIE11bugFix(def, image);
+			} else {
+				def.resolve(image);
+			}
+        } else if (!canceled) {
+            def.reject();
+        }
+        this.fire('requestdone', {request: request});
+    },
+
+    _imageLoaded: function(url, image, canceled) {
+        if (url in this.inProgress) {
+            var resolveRequest = function(it) {
+                this._resolveRequest(it, image, canceled);
+            };
+            this.inProgress[url].requests.forEach(resolveRequest.bind(this));
+            --this.curCount;
+            delete this.inProgress[url];
+        }
+        L.gmxUtil.loaderStatus(url, true);
+        this.fire('imageloaded', {url: url});
+        this._nextLoad();
+    },
+
+    _nextLoad: function() {  // загрузка следующего
+        if (this.curCount >= GmxImageLoader.MAX_COUNT || !this.requests.length) {
+            return;
+        }
+
+        var request = this.requests.shift(),
+            url = request.url;
+
+        if (url in this.inProgress) {
+            this.inProgress[url].requests.push(request);
+        } else {
+            var requests = [request];
+            this.inProgress[url] = {requests: requests};
+            ++this.curCount;
+
+            for (var k = this.requests.length - 1; k >= 0; k--) {
+                if (this.requests[k].url === url) {
+                    requests.push(this.requests[k]);
+                    this.requests.splice(k, 1);
+                }
+            }
+
+            var image = this._loadImage(request);
+            if (!image.width) {
+                L.gmxUtil.loaderStatus(url);
+            }
+
+            //theoretically image loading can be synchronous operation
+            if (this.inProgress[url]) {
+                this.inProgress[url].image = image;
+            }
+        }
+    },
+
+    _loadImage: function(request) {
+        var imageObj = new Image(),
+            url = request.url,
+            _this = this;
+
+        if (request.options.crossOrigin) {
+            imageObj.crossOrigin = request.options.crossOrigin;
+        }
+
+        imageObj.onload = this._imageLoaded.bind(this, url, imageObj, false);
+        imageObj.onerror = function() {
+            _this._imageLoaded(url);
+        };
+		if (L.gmxUtil.isIEOrEdge) {
+			setTimeout(function() { imageObj.src = url; }, 0);
+		} else {
+            imageObj.src = url;
+		}
+
+        this.fire('imageloadstart', {url: url});
+
+        return imageObj;
+    },
+
+    _cancelRequest: function(request) {
+        var id = request._id,
+            url = request.url,
+            i = 0, len;
+        if (url in this.inProgress) {
+            var loadingImg = this.inProgress[url],
+                requests = loadingImg.requests;
+
+            len = requests.length;
+            if (len === 1 && requests[0]._id === id) {
+                loadingImg.image.onload = L.Util.falseFn;
+                loadingImg.image.onerror = L.Util.falseFn;
+                loadingImg.image.src = L.Util.emptyImageUrl;
+                this._imageLoaded(url, null, true);
+            } else {
+                for (i = 0; i < len; i++) {
+                    if (requests[i]._id === id) {
+                        requests.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        } else {
+            for (i = 0, len = this.requests.length; i < len; i++) {
+                if (this.requests[i]._id === id) {
+                    this.requests.splice(i, 1);
+                    break;
+                }
+            }
+        }
+
+        this.fire('requestdone', {request: request});
+    },
+
+    _removeRequestFromCache: function(request) {    // remove request from cache
+        this._cancelRequest(request);
+        this._clearCacheItem(request.url, request._id);
+    },
+
+    _clearCacheItem: function(url, cacheKey) {    // remove cache item
+        if (this.requestsCache[url]) {
+            var cacheItem = this.requestsCache[url];
+            delete cacheItem.requests[cacheKey];
+            if (Object.keys(cacheItem.requests).length === 0) {
+                delete this.requestsCache[url];
+            }
+        }
+    },
+    _add: function(atBegin, url, options) {
+		url = url.replace(/^http:/, L.gmxUtil.protocol);
+
+		var id = 'id' + (++this.uniqueID),
+            request = new ImageRequest(id, url, options);
+
+        if (url in this.inProgress) {
+            this.inProgress[url].requests.push(request);
+        } else {
+            atBegin ? this.requests.unshift(request) : this.requests.push(request);
+            this._nextLoad();
+        }
+
+        this.fire('request', {request: request});
+
+        return request;
+    },
+
+    push: function(url, options) {  // добавить запрос в конец очереди
+        return this._add(false, url, options);
+    },
+
+    unshift: function(url, options) {   // добавить запрос в начало очереди
+        return this._add(true, url, options);
+    }
+});
+
+L.gmx.imageLoader = new GmxImageLoader();
+
 })();
 
 
@@ -4533,24 +4541,49 @@ var gmxMapManager = {
 				ModeKey: 'map'
 			};
 			var promise = new Promise(function(resolve, reject) {
-				gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
-					opt.key = sessionKey;
-
-					gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/TileSender.ashx', opt).then(function(json) {
-						if (json && json.Status === 'ok' && json.Result) {
-							json.Result.properties.hostName = serverHost;
-							json.Result.properties.sessionKey = sessionKey;
+				if (L.gmx.sendCmd) {
+					L.gmx.sendCmd('mapProperties', {
+						serverHost: serverHost,
+						apiKey: options.apiKey,
+						WrapStyle: 'func',
+						skipTiles: options.skipTiles || 'None', // All, NotVisible, None
+						MapName: mapName,
+						srs: options.srs || 3857,
+						ftc: options.ftc || 'osm',
+						ModeKey: 'map'
+					}).then(function(json) {
+						if (json && json.load && json.res) {
+							// json.res.properties.hostName = serverHost;
+							// json.res.properties.sessionKey = sessionKey;
 							L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
 							L.gmx._maps[serverHost][mapName] = {
-								_rawTree: json.Result,
+								_rawTree: json.res,
 								_nodes: {}
 							};
-							resolve(json.Result);
+							resolve(json.res);
 						} else {
 							reject(json);
 						}
+					}).catch(reject);
+				} else {
+					gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
+						opt.key = sessionKey;
+						gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/TileSender.ashx', opt).then(function(json) {
+							if (json && json.Status === 'ok' && json.Result) {
+								json.Result.properties.hostName = serverHost;
+								json.Result.properties.sessionKey = sessionKey;
+								L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
+								L.gmx._maps[serverHost][mapName] = {
+									_rawTree: json.Result,
+									_nodes: {}
+								};
+								resolve(json.Result);
+							} else {
+								reject(json);
+							}
+						}, reject);
 					}, reject);
-				}, reject);
+				}
 			});
             maps[serverHost] = maps[serverHost] || {};
             maps[serverHost][mapName] = {promise: promise};
@@ -7296,6 +7329,15 @@ var ext = L.extend({
         var owner = {
 			dateIntervalChanged: function() {
 				this._onmoveend({repaint: true});
+				if (L.gmx.sendCmd) {
+					var interval = gmx.dataManager.getMaxDateInterval();
+					L.gmx.sendCmd('dateIntervalChanged', {
+						layerID: gmx.layerID,
+						mapID: gmx.mapName,
+						hostName: gmx.hostName,
+						dInterval: [Math.floor(interval.beginDate.getTime() / 1000), Math.floor(interval.endDate.getTime() / 1000)]
+					});
+				}
 			},
 			load: function() {				// Fired when the grid layer starts loading tiles.
 				// if (gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
@@ -7458,7 +7500,8 @@ var ext = L.extend({
 
 				this._onmoveend();
 			}
-			L.gmx.layersVersion.add(this);
+			this._addLayerVersion();
+			// L.gmx.layersVersion.add(this);
 			this.fire('add');
 		}.bind(this));
 		requestIdleCallback(L.bind(gmx.styleManager.initStyles, gmx.styleManager), {timeout: 25});
@@ -7583,7 +7626,8 @@ var ext = L.extend({
 
         gmx.dataManager.on('observeractivate', function() {
             if (gmx.dataManager.getActiveObserversCount()) {
-                L.gmx.layersVersion.add(this);
+				this._addLayerVersion();
+                //L.gmx.layersVersion.add(this);
             } else {
                 L.gmx.layersVersion.remove(this);
             }
@@ -7615,6 +7659,11 @@ var ext = L.extend({
 
         this._resolve();
         return this;
+    },
+
+    _addLayerVersion: function () {
+		if (this._onVersionTimer) { cancelIdleCallback(this._onVersionTimer); }
+		this._onVersionTimer = requestIdleCallback(L.gmx.layersVersion.add.bind(L.gmx.layersVersion, this), {timeout: 0});
     },
 
     getDataManager: function () {
@@ -11199,6 +11248,14 @@ var layersVersion = {
     },
 
     remove: function(layer) {
+		if (L.gmx.sendCmd) {
+			L.gmx.sendCmd('toggleDataSource', {
+				active: false,		// включить/выключить контроль источников
+				hostName: layer.options.hostName,
+				mapID: layer.options.mapID,
+				layerID: layer.options.layerID
+			});
+		}
         delete layers[layer._gmx.layerID];
         var _gmx = layer._gmx,
 			pOptions = layer.options.parentOptions;
@@ -11218,6 +11275,19 @@ var layersVersion = {
 
     add: function(layer) {
         var id = layer._gmx.layerID;
+		if (L.gmx.sendCmd) {
+			var opt = {
+				active: true,		// включить/выключить контроль источников
+				hostName: layer.options.hostName,
+				mapID: layer.options.mapID,
+				layerID: layer.options.layerID
+			};
+			var interval = layer._gmx.dataManager.getMaxDateInterval();
+			if (interval.beginDate && interval.endDate) {
+				opt.dInterval = [Math.floor(interval.beginDate.getTime() / 1000), Math.floor(interval.endDate.getTime() / 1000)];
+			}
+			L.gmx.sendCmd('toggleDataSource', opt);
+		}
         if (id in layers) {
             return;
 		}
@@ -11305,6 +11375,18 @@ L.Map.addInitHook(function () {
 			chkVersion();
 			prev.z = z;
 			prev.center = center;
+			if (L.gmx.sendCmd) {
+				var bbox = map.getBounds(),
+					crs = L.CRS.EPSG3857,
+					min = crs.project(bbox.getSouthWest()),
+					max = crs.project(bbox.getNorthEast()),
+					bboxArr = [min.x, min.y, max.x, max.y];
+
+				L.gmx.sendCmd('onmoveend', {
+					zoom: z,
+					bbox: bboxArr
+				});
+			}
 		}
 	});
 });
@@ -11765,13 +11847,13 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
             layeradd: this._layeradd,
             layerremove: this._layerremove
         });
-        // if (map.options.zoomAnimation && L.Browser.any3d) {
-            // map.on('zoomanim', this._animateZoom, this);
+        if (map.options.zoomAnimation && L.Browser.any3d) {
+            map.on('zoomanim', this._animateZoom, this);
         // } else {
 			// map.on('zoomstart', function() {
 				// if (this._canvas.parentNode) { this._canvas.parentNode.removeChild(this._canvas); }
 			// }, this);
-		// }
+		}
 
         this._reset();
     },
@@ -11785,9 +11867,9 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
         map.off('layeradd', this._layeradd);
         map.off('layerremove', this._layerremove);
 
-        // if (map.options.zoomAnimation) {
-            // map.off('zoomanim', this._animateZoom, this);
-		// }
+        if (map.options.zoomAnimation && L.Browser.any3d) {
+            map.off('zoomanim', this._animateZoom, this);
+		}
     },
 
     addTo: function (map) {
@@ -11952,20 +12034,12 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
         }
 
         this._frame = null;
+    },
+    _animateZoom: function (e) {
+		var scale = this._map.getZoomScale(e.zoom),
+		    offset = this._map._latLngBoundsToNewLayerBounds(this._map.getBounds(), e.zoom, e.center).min;
+		L.DomUtil.setTransform(this._canvas, offset, scale);
     }
-	// ,
-
-    // _animateZoom: function (e) {
-        // var scale = this._map.getZoomScale(e.zoom),
-            // pixelBoundsMin = this._map.getPixelBounds().min;
-
-        // var offset = this._map._getCenterOffset(e.center)._multiplyBy(-scale).subtract(this._map._getMapPanePos());
-        // if (pixelBoundsMin.y < 0) {
-            // offset.y += pixelBoundsMin.multiplyBy(-scale).y;
-        // }
-
-        // this._canvas.style[L.DomUtil.TRANSFORM] = L.DomUtil.getTranslateString(offset) + ' scale(' + scale + ')';
-    // }
 });
 
 L.labelsLayer = function (map, options) {

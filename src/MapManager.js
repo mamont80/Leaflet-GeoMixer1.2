@@ -17,10 +17,6 @@ var gmxMapManager = {
 			serverHost = options.hostName || options.serverHost,
 			mapName = options.mapName;
 
-		if (!L.gmxUtil.debug) {
-			delete L.gmx.sendCmd;
-		}
-
         if (!maps[serverHost] || !maps[serverHost][mapName]) {
 			var opt = {
 				WrapStyle: 'func',
@@ -32,7 +28,7 @@ var gmxMapManager = {
 			};
 			var promise = new Promise(function(resolve, reject) {
 				if (L.gmx.sendCmd) {
-					L.gmx.sendCmd(null, {
+					L.gmx.sendCmd('mapProperties', {
 						serverHost: serverHost,
 						apiKey: options.apiKey,
 						WrapStyle: 'func',
@@ -40,8 +36,7 @@ var gmxMapManager = {
 						MapName: mapName,
 						srs: options.srs || 3857,
 						ftc: options.ftc || 'osm',
-						ModeKey: 'map',
-						cmd: 'mapProperties'
+						ModeKey: 'map'
 					}).then(function(json) {
 						if (json && json.load && json.res) {
 							// json.res.properties.hostName = serverHost;

@@ -1,10 +1,10 @@
 ﻿var depsJS = [
     "commonjs.js",
+    "Utils.js",
     "Parsers.js",
     "Deferred.js",
     "ImageBitmapLoader.js",
     "ImageLoader.js",
-    "Utils.js",
     "DrawCanvas.js",
     "SessionManager.js",
     "MapManager.js",

@@ -133,6 +133,15 @@ var ext = L.extend({
         var owner = {
 			dateIntervalChanged: function() {
 				this._onmoveend({repaint: true});
+				if (L.gmx.sendCmd) {
+					var interval = gmx.dataManager.getMaxDateInterval();
+					L.gmx.sendCmd('dateIntervalChanged', {
+						layerID: gmx.layerID,
+						mapID: gmx.mapName,
+						hostName: gmx.hostName,
+						dInterval: [Math.floor(interval.beginDate.getTime() / 1000), Math.floor(interval.endDate.getTime() / 1000)]
+					});
+				}
 			},
 			load: function() {				// Fired when the grid layer starts loading tiles.
 				// if (gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
@@ -295,7 +304,8 @@ var ext = L.extend({
 
 				this._onmoveend();
 			}
-			L.gmx.layersVersion.add(this);
+			this._addLayerVersion();
+			// L.gmx.layersVersion.add(this);
 			this.fire('add');
 		}.bind(this));
 		requestIdleCallback(L.bind(gmx.styleManager.initStyles, gmx.styleManager), {timeout: 25});
@@ -420,7 +430,8 @@ var ext = L.extend({
 
         gmx.dataManager.on('observeractivate', function() {
             if (gmx.dataManager.getActiveObserversCount()) {
-                L.gmx.layersVersion.add(this);
+				this._addLayerVersion();
+                //L.gmx.layersVersion.add(this);
             } else {
                 L.gmx.layersVersion.remove(this);
             }
@@ -452,6 +463,11 @@ var ext = L.extend({
 
         this._resolve();
         return this;
+    },
+
+    _addLayerVersion: function () {
+		if (this._onVersionTimer) { cancelIdleCallback(this._onVersionTimer); }
+		this._onVersionTimer = requestIdleCallback(L.gmx.layersVersion.add.bind(L.gmx.layersVersion, this), {timeout: 0});
     },
 
     getDataManager: function () {

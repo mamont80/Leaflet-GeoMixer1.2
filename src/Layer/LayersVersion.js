@@ -211,6 +211,14 @@ var layersVersion = {
     },
 
     remove: function(layer) {
+		if (L.gmx.sendCmd) {
+			L.gmx.sendCmd('toggleDataSource', {
+				active: false,		// включить/выключить контроль источников
+				hostName: layer.options.hostName,
+				mapID: layer.options.mapID,
+				layerID: layer.options.layerID
+			});
+		}
         delete layers[layer._gmx.layerID];
         var _gmx = layer._gmx,
 			pOptions = layer.options.parentOptions;
@@ -230,6 +238,19 @@ var layersVersion = {
 
     add: function(layer) {
         var id = layer._gmx.layerID;
+		if (L.gmx.sendCmd) {
+			var opt = {
+				active: true,		// включить/выключить контроль источников
+				hostName: layer.options.hostName,
+				mapID: layer.options.mapID,
+				layerID: layer.options.layerID
+			};
+			var interval = layer._gmx.dataManager.getMaxDateInterval();
+			if (interval.beginDate && interval.endDate) {
+				opt.dInterval = [Math.floor(interval.beginDate.getTime() / 1000), Math.floor(interval.endDate.getTime() / 1000)];
+			}
+			L.gmx.sendCmd('toggleDataSource', opt);
+		}
         if (id in layers) {
             return;
 		}
@@ -317,6 +338,18 @@ L.Map.addInitHook(function () {
 			chkVersion();
 			prev.z = z;
 			prev.center = center;
+			if (L.gmx.sendCmd) {
+				var bbox = map.getBounds(),
+					crs = L.CRS.EPSG3857,
+					min = crs.project(bbox.getSouthWest()),
+					max = crs.project(bbox.getNorthEast()),
+					bboxArr = [min.x, min.y, max.x, max.y];
+
+				L.gmx.sendCmd('onmoveend', {
+					zoom: z,
+					bbox: bboxArr
+				});
+			}
 		}
 	});
 });

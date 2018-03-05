@@ -22,7 +22,7 @@ var gmxAPIutils = {
         return id;
     },
 
-    apiLoadedFrom: document.currentScript.src.substring(0, document.currentScript.src.lastIndexOf('/')),
+    apiLoadedFrom: document.currentScript ? document.currentScript.src.substring(0, document.currentScript.src.lastIndexOf('/')) : '',
     isPageHidden: function()	{		// Видимость окна браузера
         return document.hidden || document.msHidden || document.webkitHidden || document.mozHidden || false;
     },
@@ -3038,6 +3038,8 @@ if (!('requestIdleCallback' in window)) {
 	}
 	window.cancelIdleCallback = window.clearTimeout;
 }
+L.gmx = L.gmx || {};
+L.gmx.gmxProxy = '//maps.kosmosnimki.ru/ApiSave.ashx';
 
 (function() {
     var requests = {};

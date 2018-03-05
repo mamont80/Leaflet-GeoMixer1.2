@@ -54,8 +54,9 @@ var getRequestParams = function(layer) {
 				gmx = isDataManager ? obj : obj._gmx;
                 hostName = prop.hostName || obj._gmx.hostName;
                 var pt = getParams(prop, dm, gmx),
-                    key = pt.Name + pt.Version;
-                if (!skipItems[key]) {
+                    key = pt.Name + pt.Version,
+					valid = !skipItems[key] && (!prop.Temporal || pt.dateBegin);
+                if (valid) {
                     if (hosts[hostName]) { hosts[hostName].push(pt); }
                     else { hosts[hostName] = [pt]; }
                 }

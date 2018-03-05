@@ -38,7 +38,7 @@ var gmxAPIutils = {
         return id;
     },
 
-    apiLoadedFrom: document.currentScript.src.substring(0, document.currentScript.src.lastIndexOf('/')),
+    apiLoadedFrom: document.currentScript ? document.currentScript.src.substring(0, document.currentScript.src.lastIndexOf('/')) : '',
     isPageHidden: function()	{		// Видимость окна браузера
         return document.hidden || document.msHidden || document.webkitHidden || document.mozHidden || false;
     },
@@ -3054,6 +3054,8 @@ if (!('requestIdleCallback' in window)) {
 	}
 	window.cancelIdleCallback = window.clearTimeout;
 }
+L.gmx = L.gmx || {};
+L.gmx.gmxProxy = '//maps.kosmosnimki.ru/ApiSave.ashx';
 
 (function() {
     var requests = {};
@@ -8177,6 +8179,9 @@ var ext = L.extend({
             if ('quicklookX4' in meta) { gmx.quicklookX4 = meta.quicklookX4.Value; }
             if ('quicklookY4' in meta) { gmx.quicklookY4 = meta.quicklookY4.Value; }
 
+            if ('gmxProxy' in meta) {    // Установка прокачивалки
+                gmx.gmxProxy = meta.gmxProxy.Value.toLowerCase() === 'true' ? L.gmx.gmxProxy : meta.gmxProxy.Value;
+            }
             if ('multiFilters' in meta) {    // проверка всех фильтров для обьектов слоя
                 gmx.multiFilters = meta.multiFilters.Value === '1' ? true : false;
             }
@@ -9032,7 +9037,11 @@ ScreenVectorTile.prototype = {
 			if (gmx.quicklooksCache && gmx.quicklooksCache[url]) {
 				done(gmx.quicklooksCache[url]);
 			} else if (L.gmx.getBitmap) {
-				L.gmx.getBitmap(url, fetchOptions).then(
+				var urlProxy = url;
+				if (gmx.gmxProxy) {
+					urlProxy = gmx.gmxProxy + '?WrapStyle=none&get=' + encodeURIComponent(url);
+				}
+				L.gmx.getBitmap(urlProxy, fetchOptions).then(
 					function(res) {
 						var imageObj = res.imageBitmap,
 							canvas_ = document.createElement('canvas');
@@ -11088,8 +11097,9 @@ var getRequestParams = function(layer) {
 				gmx = isDataManager ? obj : obj._gmx;
                 hostName = prop.hostName || obj._gmx.hostName;
                 var pt = getParams(prop, dm, gmx),
-                    key = pt.Name + pt.Version;
-                if (!skipItems[key]) {
+                    key = pt.Name + pt.Version,
+					valid = !skipItems[key] && (!prop.Temporal || pt.dateBegin);
+                if (valid) {
                     if (hosts[hostName]) { hosts[hostName].push(pt); }
                     else { hosts[hostName] = [pt]; }
                 }

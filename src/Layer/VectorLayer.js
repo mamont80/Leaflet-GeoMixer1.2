@@ -981,6 +981,9 @@ var ext = L.extend({
             if ('quicklookX4' in meta) { gmx.quicklookX4 = meta.quicklookX4.Value; }
             if ('quicklookY4' in meta) { gmx.quicklookY4 = meta.quicklookY4.Value; }
 
+            if ('gmxProxy' in meta) {    // Установка прокачивалки
+                gmx.gmxProxy = meta.gmxProxy.Value.toLowerCase() === 'true' ? L.gmx.gmxProxy : meta.gmxProxy.Value;
+            }
             if ('multiFilters' in meta) {    // проверка всех фильтров для обьектов слоя
                 gmx.multiFilters = meta.multiFilters.Value === '1' ? true : false;
             }

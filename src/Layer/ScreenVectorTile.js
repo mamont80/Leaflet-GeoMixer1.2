@@ -465,7 +465,11 @@ ScreenVectorTile.prototype = {
 			if (gmx.quicklooksCache && gmx.quicklooksCache[url]) {
 				done(gmx.quicklooksCache[url]);
 			} else if (L.gmx.getBitmap) {
-				L.gmx.getBitmap(url, fetchOptions).then(
+				var urlProxy = url;
+				if (gmx.gmxProxy) {
+					urlProxy = gmx.gmxProxy + '?WrapStyle=none&get=' + encodeURIComponent(url);
+				}
+				L.gmx.getBitmap(urlProxy, fetchOptions).then(
 					function(res) {
 						var imageObj = res.imageBitmap,
 							canvas_ = document.createElement('canvas');

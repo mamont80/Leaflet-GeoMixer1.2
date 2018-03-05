@@ -286,7 +286,7 @@ var ext = L.extend({
 		this._tiles = {};
 		this._initContainer();
 
-		gmx.styleManager.promise.then(function () {
+		gmx.styleManager.initStyles().then(function () {
 			if (gmx.balloonEnable && !this._popup) { this.bindPopup(''); }
 
 			if (this._map) {
@@ -305,11 +305,8 @@ var ext = L.extend({
 				this._onmoveend();
 			}
 			this._addLayerVersion();
-			// L.gmx.layersVersion.add(this);
 			this.fire('add');
 		}.bind(this));
-		requestIdleCallback(L.bind(gmx.styleManager.initStyles, gmx.styleManager), {timeout: 25});
-        // gmx.styleManager.initStyles();
    },
 
     onRemove: function(map) {

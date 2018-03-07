@@ -1,6 +1,9 @@
 'use strict';
 
-var log = self.console.log.bind(self.console);
+var log = self.console.log.bind(self.console),
+	str = self.location.origin || '',
+	protocol = str.substring(0, str.indexOf('/'));
+
 var utils = {
 	extend: function (dest) {
 		var i, j, len, src;
@@ -42,10 +45,11 @@ var utils = {
 	getJson: function(queue) {
 // log('getJson', queue, Date.now())
 		var par = queue.params;
-		return fetch(queue.url, utils.extend({
+		return fetch(protocol + queue.url, utils.extend({
 			method: 'post',
 			headers: {'Content-type': 'application/x-www-form-urlencoded'},
 			mode: 'cors',
+			redirect: 'follow',
 			credentials: 'include'
 		}, queue.options, {
 			body: utils.getFormBody(par)
@@ -84,7 +88,7 @@ ImageHandler.prototype = {
 				options = queue.options || {},
 				type = options.type || 'bitmap',
 				out = {url: queue.src, type: type, load: false, loading: this.loading, queueLength: this.queue.length},
-				promise = fetch(out.url, options).then(function(resp) {
+				promise = fetch(protocol + out.url, options).then(function(resp) {
 					return utils.chkResponse(resp, type);
 				});
 

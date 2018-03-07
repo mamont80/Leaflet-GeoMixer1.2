@@ -93,6 +93,8 @@ var GmxEventsManager = L.Handler.extend({
 			map = this._map;
 
 		if (ev.originalEvent) {
+			var tagName = ev.originalEvent.target.tagName;
+			if (tagName === 'path') { return; }
 			map.gmxMouseDown = L.Browser.webkit && !L.gmxUtil.isIEOrEdge ? ev.originalEvent.which : ev.originalEvent.buttons;
 		}
 		if (map._animatingZoom ||

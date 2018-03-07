@@ -1,14 +1,7 @@
 (function() {
 'use strict';
-
-	var worker;
-	if ('createImageBitmap' in window && 'Worker' in window && location.protocol !== 'file:') {
-		worker = new Worker(location.href.replace(/[^/]*$/, 'ImageBitmapLoader-worker.js'));
-	}
-	if (!worker) {
-		return;
-	}
-
+L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js')
+.then(function(worker) {
 	var ImageBitmapLoader = function() {
 		this.jobs = {};
 		this.worker = worker;
@@ -60,4 +53,5 @@
 		delete L.gmx.getJSON;
 		delete L.gmx.sendCmd;
 	};
+});
 })();

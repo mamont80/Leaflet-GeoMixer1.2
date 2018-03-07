@@ -133,7 +133,7 @@ L.gmx.loadLayers = function(layers, globalOptions) {
 };
 
 L.gmx.loadMap = function(mapID, options) {
-	if (location.search.indexOf('debug=1') !== -1) console.warn('L.gmx.loadMap:', mapID, options);
+	if (L.gmxUtil.debug) console.warn('L.gmx.loadMap:', mapID, options);
     options = L.extend({}, options);
     options.hostName = gmxAPIutils.normalizeHostname(options.hostName || DEFAULT_HOSTNAME);
     options.mapName = mapID;

@@ -54,9 +54,6 @@ var ext = L.extend({
 		if (/\buseWebGL=1\b/.test(location.search)) {
 			this._gmx.useWebGL = true;
 		}
-		if (/\bdebug=1\b/.test(location.search)) {
-			this._gmx.debug = true;
-		}
         if (options.cacheQuicklooks) {			// cache quicklooks for CR
             this._gmx.quicklooksCache = {};
         }
@@ -181,7 +178,7 @@ var ext = L.extend({
 					tLink = this._tiles[key];
 
 				tLink.loaded = 0;
-				// if (gmx.debug) {
+				// if (L.gmxUtil.debug) {
 					// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
 				// }
 			},
@@ -213,12 +210,12 @@ var ext = L.extend({
 				// window.startTest = Date.now();
 				if (this._onmoveendTimer) { cancelIdleCallback(this._onmoveendTimer); }
 				this._onmoveendTimer = requestIdleCallback(L.bind(this._onmoveend, this), {timeout: 25});
-				if (gmx.debug) {
+				if (L.gmxUtil.debug) {
 				// if (gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
 					console.log('moveend ', this._tileZoom, gmx.layerID, this._loading, this._noTilesToLoad(), this._tileZoom, ev);
 				}
 			};
-			if (gmx.debug) {
+			if (L.gmxUtil.debug) {
 				// owner.load = function(ev) {
 					// var zoom = this._tileZoom,
 						// err = [],
@@ -1370,3 +1367,110 @@ L.Map.addInitHook(function () {
 	this.options.srs = this.options.srs || 3857;
 	this.options.skipTiles = this.options.skipTiles || 'All';
 });
+
+if (L.gmxUtil.debug) {
+	L.Map.prototype._catchTransitionEnd = function (e) {
+	// console.log('_catchTransitionEnd', this._animatingZoom, Date.now() - window.startTest, e)
+		if (this._animatingZoom && e.propertyName.indexOf('transform') >= 0) {
+			this._onZoomTransitionEnd();
+		}
+	};
+	L.Map.prototype._createAnimProxy = function () {
+		// console.log('_createAnimProxy', this._animatingZoom, Date.now() - window.startTest)
+
+		var proxy = this._proxy = L.DomUtil.create('div', 'leaflet-proxy leaflet-zoom-animated');
+		this._panes.mapPane.appendChild(proxy);
+
+		this.on('zoomanim', function (e) {
+	window.startTest = Date.now();
+			var translate = this.project(this.unproject(this.getPixelOrigin()), e.zoom)
+					.subtract(this._getNewPixelOrigin(e.center, e.zoom)).round();
+
+			// var prop = L.DomUtil.TRANSFORM,
+				// transform = this._proxy.style[prop];
+
+	 console.log('zoomanim', translate, this._animatingZoom, Date.now() - window.startTest, this.project(e.center, e.zoom), this.getZoomScale(e.zoom, 1), e)
+			L.DomUtil.setTransform(this._proxy, this.project(e.center, e.zoom), this.getZoomScale(e.zoom, 1));
+
+			// workaround for case when transform is the same and so transitionend event is not fired
+			// if (transform === this._proxy.style[prop] && this._animatingZoom) {
+				// this._onZoomTransitionEnd();
+			// }
+		}, this);
+
+		this.on('load moveend', function () {
+			var c = this.getCenter(),
+				z = this.getZoom();
+		// console.log('_______', this._animatingZoom, Date.now() - window.startTest, this.project(c, z), this.getZoomScale(z, 1), ev.type, ev)
+			L.DomUtil.setTransform(this._proxy, this.project(c, z), this.getZoomScale(z, 1));
+		}, this);
+
+		this._on('unload', this._destroyAnimProxy, this);
+	};
+	L.Map.prototype._animateZoom = function (center, zoom, startAnim, noUpdate) {
+		if (!this._mapPane) { return; }
+
+		if (startAnim) {
+			this._animatingZoom = true;
+
+			// remember what center/zoom to set after animation
+			this._animateToCenter = center;
+			this._animateToZoom = zoom;
+
+			L.DomUtil.addClass(this._mapPane, 'leaflet-zoom-anim');
+		}
+
+		// @event zoomanim: ZoomAnimEvent
+		// Fired on every frame of a zoom animation
+		this.fire('zoomanim', {
+			center: center,
+			zoom: zoom,
+			noUpdate: noUpdate
+		});
+
+		// Work around webkit not firing 'transitionend', see https://github.com/Leaflet/Leaflet/issues/3689, 2693
+		// setTimeout(L.bind(this._onZoomTransitionEnd, this), 250);
+	};
+
+	L.Map.prototype._onZoomTransitionEnd = function () {
+		if (!this._animatingZoom) { return; }
+
+		if (this._mapPane) {
+			L.DomUtil.removeClass(this._mapPane, 'leaflet-zoom-anim');
+		}
+
+		this._animatingZoom = false;
+
+		this._move(this._animateToCenter, this._animateToZoom);
+
+		// This anim frame should prevent an obscure iOS webkit tile loading race condition.
+		L.Util.requestAnimFrame(function () {
+			this._moveEnd(true);
+		}, this);
+	};
+// function insertStyles (styles, options) {
+  // var id = options && options.id || styles
+
+  // var element = cache[id] = (cache[id] || createStyle(id))
+
+  // if ('textContent' in element) {
+    // element.textContent = styles
+  // } else {
+    // element.styleSheet.cssText = styles
+  // }
+// }
+
+// function createStyle (id) {
+  // var element = document.getElementById(id)
+
+  // if (element) return element
+
+  // element = document.createElement('style')
+  // element.setAttribute('type', 'text/css')
+
+  // document.head.appendChild(element)
+
+  // return element
+// }
+
+}

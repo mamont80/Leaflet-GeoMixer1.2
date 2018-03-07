@@ -15,14 +15,67 @@ var gmxAPIutils = {
         return '_' + gmxAPIutils.lastMapId;
     },
 
-    uniqueGlobalName: function(thing)
-    {
+    uniqueGlobalName: function(thing) {
         var id = gmxAPIutils.newId();
         window[id] = thing;
         return id;
     },
 
-    apiLoadedFrom: document.currentScript ? document.currentScript.src.substring(0, document.currentScript.src.lastIndexOf('/')) : '',
+    _apiLoadedFrom: null,
+    apiLoadedFrom: function(scr) {
+		if (gmxAPIutils._apiLoadedFrom === null) {
+			var str = document.currentScript ? document.currentScript.src : gmxAPIutils._searchApiScriptUrl(scr);
+			gmxAPIutils._apiLoadedFrom = str ? str.substring(0, str.lastIndexOf('/')) : '';
+		}
+		return gmxAPIutils._apiLoadedFrom;
+	},
+    _searchApiScriptUrl: function(scr) {
+		var scriptRegexp = scr ? [
+			new RegExp('\b'+ scr + '\b')
+		] : [
+			/\bleaflet-geomixer(-\w*)?\.js\b/,
+			/\bgeomixer(-\w*)?\.js\b/
+		];
+
+        var scripts = document.getElementsByTagName('script');
+        for (var i = 0, len = scripts.length; i < len; i++) {
+            var src = scripts[i].getAttribute('src');
+			for (var j = 0, len1 = scriptRegexp.length; j < len1; j++) {
+				if (scriptRegexp[j].exec(src)) {
+					gmxAPIutils._apiLoadedFrom = src.split('?')[0];
+					break;
+				}
+            }
+			if (gmxAPIutils._apiLoadedFrom) {
+				break;
+			}
+        }
+        return gmxAPIutils._apiLoadedFrom || '';
+    },
+    searchScriptAPIKey: function() {
+		for (var i = 0, params = gmxAPIutils._searchApiScriptUrl(), len = params.length; i < len; i++) {
+			var parsedParam = params[i].split('=');
+			if (parsedParam[0] === 'key') {
+				return parsedParam[1];
+			}
+		}
+        return '';
+    },
+
+    createWorker: function(url)	{		// Создание Worker-а
+        return new Promise(function(resolve, reject) {
+			if ('createImageBitmap' in window && 'Worker' in window) {
+				fetch(url, {mode: 'cors'})
+				.then(function(resp) { return resp.blob(); })
+				.then(function(blob) {
+					resolve(new Worker(window.URL.createObjectURL(blob, {type: 'application/javascript; charset=utf-8'})));
+				});
+			} else {
+				reject({error: 'Browser don`t support `createImageBitmap` or `Worker`'});
+			}
+		});
+    },
+
     isPageHidden: function()	{		// Видимость окна браузера
         return document.hidden || document.msHidden || document.webkitHidden || document.mozHidden || false;
     },
@@ -2951,6 +3004,7 @@ if (!L.gmxUtil) { L.gmxUtil = {}; }
 //public interface
 L.extend(L.gmxUtil, {
 	debug: gmxAPIutils.debug,
+	createWorker: gmxAPIutils.createWorker,
 	apiLoadedFrom: gmxAPIutils.apiLoadedFrom,
     newId: gmxAPIutils.newId,
 	isPageHidden: gmxAPIutils.isPageHidden,

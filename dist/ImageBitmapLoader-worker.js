@@ -2,7 +2,14 @@
 
 var log = self.console.log.bind(self.console),
 	str = self.location.origin || '',
-	protocol = str.substring(0, str.indexOf('/'));
+	_protocol = str.substring(0, str.indexOf('/')),
+	fetchOptions = {
+		// method: 'post',
+		// headers: {'Content-type': 'application/x-www-form-urlencoded'},
+		mode: 'cors',
+		redirect: 'follow',
+		credentials: 'include'
+	};
 
 var utils = {
 	extend: function (dest) {
@@ -15,6 +22,9 @@ var utils = {
 			}
 		}
 		return dest;
+	},
+	chkProtocol: function(url) {
+		return url.substr(0, _protocol.length) === _protocol ? url : _protocol + url;
 	},
 	getFormBody: function(par) {
 		return Object.keys(par).map(function(key) { return encodeURIComponent(key) + '=' + encodeURIComponent(par[key]); }).join('&');
@@ -43,9 +53,9 @@ var utils = {
 	},
 	// getJson: function(url, params, options) {
 	getJson: function(queue) {
-// log('getJson', queue, Date.now())
+// log('getJson', _protocol, queue, Date.now())
 		var par = queue.params;
-		return fetch(protocol + queue.url, utils.extend({
+		return fetch(utils.chkProtocol(queue.url), utils.extend({
 			method: 'post',
 			headers: {'Content-type': 'application/x-www-form-urlencoded'},
 			mode: 'cors',
@@ -72,7 +82,6 @@ function ImageHandler(workerContext) {
 }
 ImageHandler.prototype = {
 	enqueue: function(evt) {
-// log('enqueue', evt);
 		var toEnqueue = evt.data;
 		if (this.queue.indexOf(toEnqueue) < 0) {
 			this.queue.push(toEnqueue);
@@ -84,11 +93,13 @@ ImageHandler.prototype = {
 		// log('processQueue', this.queue.length, this.loading, this.maxCount);
 		if (this.queue.length > 0 && this.loading < this.maxCount) {
 			this.loading++;
-			var queue = this.queue.shift(),
-				options = queue.options || {},
+			var it = this.queue.shift(),
+				options = it.options || {},
 				type = options.type || 'bitmap',
-				out = {url: queue.src, type: type, load: false, loading: this.loading, queueLength: this.queue.length},
-				promise = fetch(protocol + out.url, options).then(function(resp) {
+				out = {url: it.src, type: type, load: false, loading: this.loading, queueLength: this.queue.length};
+
+// log('processQueue', it.src.length, Date.now(), utils.chkProtocol(out.url))
+			var promise = fetch(utils.chkProtocol(out.url), utils.extend({}, fetchOptions, options)).then(function(resp) {
 					return utils.chkResponse(resp, type);
 				});
 

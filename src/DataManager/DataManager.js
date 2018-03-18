@@ -747,10 +747,10 @@ var DataManager = L.Class.extend({
 
     _waitCheckObservers: function() {
         //TODO: refactor
-        // if (this._checkObserversTimer) { clearTimeout(this._checkObserversTimer); }
-        // this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 25);
-		if (this._checkObserversTimer) { cancelIdleCallback(this._checkObserversTimer); }
-		this._checkObserversTimer = requestIdleCallback(L.bind(this.checkObservers, this), {timeout: 25});
+        if (this._checkObserversTimer) { clearTimeout(this._checkObserversTimer); }
+        this._checkObserversTimer = setTimeout(L.bind(this.checkObservers, this), 25);
+		// if (this._checkObserversTimer) { cancelIdleCallback(this._checkObserversTimer); }
+		// this._checkObserversTimer = requestIdleCallback(L.bind(this.checkObservers, this), {timeout: 25});
     },
 
     _triggerObservers: function(oKeys) {

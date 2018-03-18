@@ -56,10 +56,10 @@ var GmxEventsManager = L.Handler.extend({
 
     _onmousemove: function (ev) {
 		if (!this._map._animatingZoom) {
-			// if (this._onmousemoveTimer) { clearTimeout(this._onmousemoveTimer); }
-			// this._onmousemoveTimer = setTimeout(this._eventCheck.bind(this, ev), 50);
-			if (this._onmousemoveTimer) { cancelIdleCallback(this._onmousemoveTimer); }
-			this._onmousemoveTimer = requestIdleCallback(this._eventCheck.bind(this, ev), {timeout: 50});
+			if (this._onmousemoveTimer) { clearTimeout(this._onmousemoveTimer); }
+			this._onmousemoveTimer = setTimeout(this._eventCheck.bind(this, ev), 50);
+			// if (this._onmousemoveTimer) { cancelIdleCallback(this._onmousemoveTimer); }
+			// this._onmousemoveTimer = requestIdleCallback(this._eventCheck.bind(this, ev), {timeout: 50});
 		}
 	},
 	_isDrawing: function () {

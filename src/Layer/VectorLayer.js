@@ -88,13 +88,20 @@ var ext = L.extend({
     },
 
 	_onmoveend: function () {
+		if (L.gmxUtil.debug) {
+			console.log('_onmoveend ', this._tileZoom, this._loading, this._noTilesToLoad(), this._tileZoom);
+		}
 		var zoom = this._tileZoom,
 			key, tile;
 
 		for (key in this._tiles) {
 			tile = this._tiles[key];
-			if (tile.coords.z == zoom && !tile.promise) {	// данный тайл еще не рисовался
-				this.__drawTile(tile);
+			if (tile.coords.z == zoom) {
+				if (!tile.promise) {							// данный тайл еще не рисовался
+					this.__drawTile(tile);
+				} else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
+					this._level.el.appendChild(tile.el);
+				}
 			}
 		}
 		this._removeScreenObservers(zoom, true);
@@ -110,22 +117,47 @@ var ext = L.extend({
 		}
 	},
 
+	_clearOldLevels: function (z) {
+		// if (this._gmx && this._gmx.dataManager) {
+			// this._gmx.dataManager.removeScreenObservers(z);
+		// }
+		var key, tile;
+		for (key in this._tiles) {
+			tile = this._tiles[key];
+			if (tile.coords.z !== z) {
+				this._removeTile(key);
+			// } else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
+				// this._level.el.appendChild(tile.el);
+			}
+		}
+
+		for (key in this._levels) {
+			var zz = Number(key);
+			if (zz !== z) {
+				L.DomUtil.remove(this._levels[key].el);
+				this._removeTilesAtZoom(zz);
+				this._onRemoveLevel(zz);
+				delete this._levels[key];
+			}
+		}
+	},
+
 	_getEvents: function () {
 		var events = L.GridLayer.prototype.getEvents.call(this);
-		L.extend(events, {
-			zoomstart: function() {
-				// console.log('zoomstart', this._gmx.layerID, arguments);
-				this._gmx.zoomstart = true;
-				this._removeScreenObservers();
-			},
-			zoomanim: function(ev) {
-				this._setZoomTransforms(ev.center, ev.zoom);
+		// L.extend(events, {
+			// zoomstart: function() {
+				// console.log('zoomstart', this._map._zoom, this._gmx.layerID, arguments);
 				// this._gmx.zoomstart = true;
-			},
-			zoomend: function() {
-				this._gmx.zoomstart = false;
-			}
-		});
+				// this._removeScreenObservers();
+			// },
+			// zoomanim: function(ev) {
+				// this._setZoomTransforms(ev.center, ev.zoom);
+				// this._gmx.zoomstart = true;
+			// },
+			// zoomend: function() {
+				// this._gmx.zoomstart = false;
+			// }
+		// });
         var gmx = this._gmx;
         var owner = {
 			dateIntervalChanged: function() {
@@ -141,33 +173,8 @@ var ext = L.extend({
 				}
 			},
 			load: function() {				// Fired when the grid layer starts loading tiles.
-				// if (gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
-					// console.log('load ', this._tileZoom, this._loading, this._noTilesToLoad(), Object.keys(this._levels), Date.now() - window.startTest);
-				// }
 				if (this._tileZoom) {
-					var z = this._tileZoom,
-						key, tile;
-					if (this._gmx && this._gmx.dataManager) {
-						this._gmx.dataManager.removeScreenObservers(z);
-					}
-					for (key in this._tiles) {
-						tile = this._tiles[key];
-						if (tile.coords.z !== z) {
-							this._removeTile(key);
-						// } else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
-							// this._level.el.appendChild(tile.el);
-						}
-					}
-
-					for (key in this._levels) {
-						var zz = Number(key);
-						if (zz !== z) {
-							L.DomUtil.remove(this._levels[key].el);
-							this._removeTilesAtZoom(zz);
-							this._onRemoveLevel(zz);
-							delete this._levels[key];
-						}
-					}
+					this._clearOldLevels(this._tileZoom);
 				} else {
 					console.warn('load event without tileZoom on layer:', gmx.layerID);
 				}
@@ -178,9 +185,6 @@ var ext = L.extend({
 					tLink = this._tiles[key];
 
 				tLink.loaded = 0;
-				// if (L.gmxUtil.debug) {
-					// console.log('tileloadstart ', this._loading, this._tileZoom, ev);
-				// }
 			},
 			stylechange: function() {
 				// var gmx = this._gmx;
@@ -205,15 +209,13 @@ var ext = L.extend({
 			},
 			versionchange: this._onVersionChange
 		};
-		if (gmx.properties.type === 'Vector') {
-			events.moveend = function(ev) {
+		//if (gmx.properties.type === 'Vector') {
+			events.moveend = function() {
 				// window.startTest = Date.now();
+				// if (this._onmoveendTimer) { clearTimeout(this._onmoveendTimer); }
+				// this._onmoveendTimer = setTimeout(L.bind(this._onmoveend, this), 5750);
 				if (this._onmoveendTimer) { cancelIdleCallback(this._onmoveendTimer); }
 				this._onmoveendTimer = requestIdleCallback(L.bind(this._onmoveend, this), {timeout: 25});
-				if (L.gmxUtil.debug) {
-				// if (gmx.layerID === '47DFB999E03141C3A5367B514C673102') {
-					console.log('moveend ', this._tileZoom, gmx.layerID, this._loading, this._noTilesToLoad(), this._tileZoom, ev);
-				}
 			};
 			if (L.gmxUtil.debug) {
 				// owner.load = function(ev) {
@@ -252,7 +254,7 @@ var ext = L.extend({
 					// console.log('tileunload ', ev);
 				// };
 			}
-		}
+		//}
 
 		return {
 			map: events,
@@ -295,8 +297,8 @@ var ext = L.extend({
 					this.off(events.owner, this);
 				}, this);
 
+				this._invalidateAll();
 				this._resetView();
-				this._update();
 				gmx.dataManager.fire('moveend');
 
 				this._onmoveend();
@@ -312,11 +314,13 @@ var ext = L.extend({
         if (dm) {
 			dm.removeScreenObservers();
 		}
-		this._removeAllTiles();
-		if (this._container) { L.DomUtil.remove(this._container); }
-		map._removeZoomLimit(this);
-		this._container = null;
-		this._tileZoom = undefined;
+
+		// this._removeAllTiles();
+		// if (this._container) { L.DomUtil.remove(this._container); }
+		// map._removeZoomLimit(this);
+		// this._invalidateAll();
+		// this._tileZoom = undefined;
+		// this._container = null;
 
 		if (gmx.labelsLayer) {	// удалить из labelsLayer
 			map._labelsLayer.remove(this);
@@ -325,11 +329,12 @@ var ext = L.extend({
 		//gmx.badTiles = {};
         gmx.quicklooksCache = {};
         gmx.rastersCache = {};
-        this._map = null;
         delete gmx.map;
         if (dm && !dm.getActiveObserversCount()) {
 			L.gmx.layersVersion.remove(this);
         }
+        L.GridLayer.prototype.onRemove.call(this, map);
+        this._map = null;
         this.fire('remove');
     },
 	_removeTile: function (key) {
@@ -1131,6 +1136,23 @@ var ext = L.extend({
     }
 },
 {
+	_setZoomTransform: function (level, center, zoom) {	// Add by Geomixer (for cache levels transform)
+		var key = level.zoom + '_' + zoom,
+			cache = L.gmx._zoomLevelsCache[key] || {},
+			translate = cache.translate,
+			scale = cache.scale;
+		if (!translate) {
+			scale = this._map.getZoomScale(zoom, level.zoom);
+		    translate = level.origin.multiplyBy(scale).subtract(this._map._getNewPixelOrigin(center, zoom))._round();
+			L.gmx._zoomLevelsCache[key] = {translate: translate, scale: scale};
+			// console.log('_setZoomTransform', key, zoom, translate, scale);
+		}
+		if (L.Browser.any3d) {
+			L.DomUtil.setTransform(level.el, translate, scale);
+		} else {
+			L.DomUtil.setPosition(level.el, translate);
+		}
+	},
 	_updateLevels: function () {		// Add by Geomixer (coords.z is Number however _levels keys is String)
 
 		var zoom = this._tileZoom,
@@ -1184,7 +1206,7 @@ var ext = L.extend({
 			this._removeTile(key);
 		}
 	},
-	// Private method to load tiles in the grid's active zoom level according to map bounds
+
 	_update: function (center) {				// Add by Geomixer (для события update _tiles + не добавлять пустые тайлы)
 		var map = this._map;
 		if (!map) { return; }
@@ -1318,6 +1340,18 @@ var ext = L.extend({
 		}
 	},
 
+	// stops loading all tiles in the background layer
+	_abortLoading: function () {
+		this._removeScreenObservers();
+	},
+
+	// _noTilesToLoad: function () {
+		// for (var key in this._tiles) {
+			// if (!this._tiles[key].loaded) { return false; }
+		// }
+		// return true;
+	// },
+
 	_updateOpacity: function () {		// Add by Geomixer (нет возможности отключения fade-anim)
 		if (!this._map) { return; }
 
@@ -1366,6 +1400,12 @@ L.Map.addInitHook(function () {
 	this.options.ftc = this.options.ftc || 'osm';
 	this.options.srs = this.options.srs || 3857;
 	this.options.skipTiles = this.options.skipTiles || 'All';
+
+	L.gmx._zoomLevelsCache = {};
+	this.on('zoomstart', function() {
+		// console.log('map zoomstart', this._zoom, arguments);
+		L.gmx._zoomLevelsCache = {};
+	}, this);
 });
 
 if (L.gmxUtil.debug) {

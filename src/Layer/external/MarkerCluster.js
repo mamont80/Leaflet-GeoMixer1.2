@@ -24,6 +24,7 @@
                 filters: ['clipFilter', 'styleFilter', 'userFilter', 'clipPointsFilter']
             },
             spiderfyOnMaxZoom: true,
+			animate: false,
             minZoom: 1,
             maxZoom: 6
         },

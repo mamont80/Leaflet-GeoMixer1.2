@@ -229,21 +229,18 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
 		}
 
         // this._addToPane();
-
-        map.on('moveend', this._reset, this);
         map.on({
+            moveend: this._reset,
+            zoomstart: this._hideMe,
             layeradd: this._layeradd,
             layerremove: this._layerremove
-        });
-        if (this.options.animate && map.options.zoomAnimation && L.Browser.any3d) {
-            map.on('zoomanim', this._animateZoom, this);
-        // } else {
-			// map.on('zoomstart', function() {
-				// if (this._canvas.parentNode) { this._canvas.parentNode.removeChild(this._canvas); }
-			// }, this);
-		}
+        }, this);
 
         this._reset();
+    },
+
+    _hideMe: function () {
+		this._canvas.style.visibility = 'hidden';
     },
 
     onRemove: function (map) {
@@ -251,13 +248,12 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
             this._canvas.parentNode.removeChild(this._canvas);
         }
 
-        map.off('moveend', this._reset, this);
-        map.off('layeradd', this._layeradd);
-        map.off('layerremove', this._layerremove);
-
-        if (this.options.animate && map.options.zoomAnimation && L.Browser.any3d) {
-            map.off('zoomanim', this._animateZoom, this);
-		}
+        map.off({
+            moveend: this._reset,
+            zoomstart: this._hideMe,
+            layeradd: this._layeradd,
+            layerremove: this._layerremove
+        }, this);
     },
 
     addTo: function (map) {
@@ -266,14 +262,11 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
     },
 
     _initCanvas: function () {
-        var canvas = L.DomUtil.create('canvas', 'leaflet-labels-layer leaflet-layer'),
+        var canvas = L.DomUtil.create('canvas', 'leaflet-labels-layer leaflet-layer leaflet-zoom-hide'),
             size = this._map.getSize();
         canvas.width  = size.x; canvas.height = size.y;
         canvas.style.pointerEvents = 'none';
         this._canvas = canvas;
-
-        var animated = this.options.animate && this._map.options.zoomAnimation && L.Browser.any3d;
-        L.DomUtil.addClass(canvas, 'leaflet-zoom-' + (animated ? 'animated' : 'hide'));
     },
 
     _updateBbox: function () {
@@ -311,6 +304,9 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
             }
             observer.fire('update');
         }
+		setTimeout(function() {
+			this._canvas.style.visibility = '';
+		}.bind(this), 200);
     },
 
     _redraw: function () {

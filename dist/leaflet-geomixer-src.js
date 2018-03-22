@@ -7255,14 +7255,13 @@ var VectorGridLayer = L.GridLayer.extend({
 
 		if (type === 'zoom') {
 			// this._clearOldLevels(zoom);
-			if (this._tileZoom !== zoom) {		// отмена при зуме
+			// if (this._tileZoom !== zoom) {		// отмена при зуме
 				this._map.fire('zoomanim', {
 					center: center,
 					zoom: zoom
 				});
-			}
+			// }
 		}
-// console.log('_resetView', type, this._tileZoom, zoom, this._map._animatingZoom, animating, e)
 		this._setView(center, zoom, animating, animating);
 	},
 
@@ -7371,25 +7370,20 @@ var VectorGridLayer = L.GridLayer.extend({
 	_updateLevels: function () {		// Add by Geomixer (coords.z is Number however _levels keys is String)
 
 		var zoom = this._tileZoom,
+			map = this._map,
 		    maxZoom = this.options.maxZoom;
 
 		if (zoom === undefined) { return undefined; }
 
 		for (var z in this._levels) {
 			var delta = zoom - z;
-			if (this._levels[z].el.children.length || delta === 0) {
-				//this._levels[z].el.style.zIndex = maxZoom - Math.abs(delta);
-				this._onUpdateLevel(z);
-			// } else {
-				// L.DomUtil.remove(this._levels[z].el);
-				// this._removeTilesAtZoom(z);
-				// this._onRemoveLevel(z);
-				// delete this._levels[z];
+			if (delta === 0) {
+				this._levels[z].origin = map.project(map.unproject(map.getPixelOrigin()), zoom).round();
+				this._onUpdateLevel(zoom);
 			}
 		}
 
-		var level = this._levels[zoom],
-		    map = this._map;
+		var level = this._levels[zoom];
 
 		if (!level) {
 			level = this._levels[zoom] = {};
@@ -7675,7 +7669,8 @@ var ext = L.extend({
 
 	// extended from L.GridLayer
     initialize: function(options) {
-        options = L.setOptions(this, L.extend(this.options, options));
+        // options = L.setOptions(this, L.extend(this.options, options));
+        options = L.setOptions(this, options);
 
         this._initPromise = new Promise(function(resolve, reject) {
 			this._resolve = resolve;
@@ -7752,6 +7747,7 @@ var ext = L.extend({
 		for (key in this._tiles) {
 			tile = this._tiles[key];
 			if (tile.coords.z == zoom) {
+				L.DomUtil.setPosition(tile.el, this._getTilePos(tile.coords));	// позиции тайлов
 				if (!tile.promise) {							// данный тайл еще не рисовался
 					this.__drawTile(tile);
 				} else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode

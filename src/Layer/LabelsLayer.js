@@ -2,16 +2,16 @@
  (c) 2014, Sergey Alekseev
  Leaflet.LabelsLayer, plugin for Gemixer layers.
 */
-// L.LabelsLayer = L.Class.extend({
 L.LabelsLayer = (L.Layer || L.Class).extend({
 
     options: {
+		animate: false,
 		labels: 'default',
         pane: 'overlayPane'
     },
 
     initialize: function (map, options) {
-        L.setOptions(this, options);
+        L.setOptions(this, L.extend(this.options, options));
         this._observers = {};
         this._styleManagers = {};
         this._labels = {};
@@ -235,7 +235,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
             layeradd: this._layeradd,
             layerremove: this._layerremove
         });
-        if (map.options.zoomAnimation && L.Browser.any3d) {
+        if (this.options.animate && map.options.zoomAnimation && L.Browser.any3d) {
             map.on('zoomanim', this._animateZoom, this);
         // } else {
 			// map.on('zoomstart', function() {
@@ -255,7 +255,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
         map.off('layeradd', this._layeradd);
         map.off('layerremove', this._layerremove);
 
-        if (map.options.zoomAnimation && L.Browser.any3d) {
+        if (this.options.animate && map.options.zoomAnimation && L.Browser.any3d) {
             map.off('zoomanim', this._animateZoom, this);
 		}
     },
@@ -272,7 +272,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
         canvas.style.pointerEvents = 'none';
         this._canvas = canvas;
 
-        var animated = this._map.options.zoomAnimation && L.Browser.any3d;
+        var animated = this.options.animate && this._map.options.zoomAnimation && L.Browser.any3d;
         L.DomUtil.addClass(canvas, 'leaflet-zoom-' + (animated ? 'animated' : 'hide'));
     },
 

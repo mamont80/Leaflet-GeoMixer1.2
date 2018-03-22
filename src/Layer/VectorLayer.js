@@ -119,6 +119,13 @@ var VectorGridLayer = L.GridLayer.extend({
 */
 		}
 	},
+	_noTilesToLoad: function () {
+		var zoom = this._tileZoom || this._map.getZoom();
+		for (var key in this._tiles) {
+			if (this._tiles[key].coords.z === zoom && !this._tiles[key].loaded) { return false; }
+		}
+		return true;
+	},
 	_updateLevels: function () {		// Add by Geomixer (coords.z is Number however _levels keys is String)
 
 		var zoom = this._tileZoom,
@@ -565,12 +572,12 @@ var ext = L.extend({
 				this._clearOldLevels();
 			},
 
-			// tileloadstart: function(ev) {				// тайл (ev.coords) загружается
-				// var key = ev.key || this._tileCoordsToKey(ev.coords),
-					// tLink = this._tiles[key];
+			tileloadstart: function(ev) {				// тайл (ev.coords) загружается
+				var key = ev.key || this._tileCoordsToKey(ev.coords),
+					tLink = this._tiles[key];
 
-				// tLink.loaded = 0;
-			// },
+				tLink.loaded = 0;
+			},
 			stylechange: function() {
 				// var gmx = this._gmx;
 				if (!gmx.balloonEnable && this._popup) {

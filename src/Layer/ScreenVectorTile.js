@@ -618,6 +618,9 @@ ScreenVectorTile.prototype = {
     },
 
     destructor: function () {
+		if (this.drawReject) {
+			this.drawReject('отмена');
+		}
 		if (this._preRenderPromise) {
 			this._preRenderPromise.reject();        // cancel preRenderHooks chain if exists
 		}
@@ -647,6 +650,7 @@ ScreenVectorTile.prototype = {
     drawTile: function (data) {
 		this.destructor();
 		return new Promise(function(resolve, reject) {
+			this.drawReject = reject;
 			var geoItems = this._chkItems(data);
 			var result = function() {
 				resolve({count: geoItems.length});
@@ -744,8 +748,8 @@ ScreenVectorTile.prototype = {
 			} else {
 				resolve();
 			}
-		}.bind(this)).catch(function(e) {
-			console.warn('catch1:', e);
+		}.bind(this)).catch(function() {
+			//console.warn('catch1:', e);
 		});
     },
 

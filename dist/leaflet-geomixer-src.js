@@ -7367,6 +7367,13 @@ var VectorGridLayer = L.GridLayer.extend({
 */
 		}
 	},
+	_noTilesToLoad: function () {
+		var zoom = this._tileZoom || this._map.getZoom();
+		for (var key in this._tiles) {
+			if (this._tiles[key].coords.z === zoom && !this._tiles[key].loaded) { return false; }
+		}
+		return true;
+	},
 	_updateLevels: function () {		// Add by Geomixer (coords.z is Number however _levels keys is String)
 
 		var zoom = this._tileZoom,
@@ -7813,12 +7820,12 @@ var ext = L.extend({
 				this._clearOldLevels();
 			},
 
-			// tileloadstart: function(ev) {				// тайл (ev.coords) загружается
-				// var key = ev.key || this._tileCoordsToKey(ev.coords),
-					// tLink = this._tiles[key];
+			tileloadstart: function(ev) {				// тайл (ev.coords) загружается
+				var key = ev.key || this._tileCoordsToKey(ev.coords),
+					tLink = this._tiles[key];
 
-				// tLink.loaded = 0;
-			// },
+				tLink.loaded = 0;
+			},
 			stylechange: function() {
 				// var gmx = this._gmx;
 				if (!gmx.balloonEnable && this._popup) {
@@ -9347,6 +9354,9 @@ ScreenVectorTile.prototype = {
     },
 
     destructor: function () {
+		if (this.drawReject) {
+			this.drawReject('отмена');
+		}
 		if (this._preRenderPromise) {
 			this._preRenderPromise.reject();        // cancel preRenderHooks chain if exists
 		}
@@ -9376,6 +9386,7 @@ ScreenVectorTile.prototype = {
     drawTile: function (data) {
 		this.destructor();
 		return new Promise(function(resolve, reject) {
+			this.drawReject = reject;
 			var geoItems = this._chkItems(data);
 			var result = function() {
 				resolve({count: geoItems.length});
@@ -9473,8 +9484,8 @@ ScreenVectorTile.prototype = {
 			} else {
 				resolve();
 			}
-		}.bind(this)).catch(function(e) {
-			console.warn('catch1:', e);
+		}.bind(this)).catch(function() {
+			//console.warn('catch1:', e);
 		});
     },
 

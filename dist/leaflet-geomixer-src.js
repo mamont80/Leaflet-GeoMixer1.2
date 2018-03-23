@@ -7570,11 +7570,11 @@ L.extend(L.Map.prototype, {
 			// remember what center/zoom to set after animation
 			this._animateToCenter = center;
 			this._animateToZoom = zoom;
-			this.fire('beforezoomanim', {
-				center: center,
-				zoom: zoom,
-				noUpdate: noUpdate
-			});
+			// this.fire('beforezoomanim', {
+				// center: center,
+				// zoom: zoom,
+				// noUpdate: noUpdate
+			// });
 
 			L.DomUtil.addClass(this._mapPane, 'leaflet-zoom-anim');
 		}
@@ -7651,8 +7651,8 @@ L.Map.addInitHook(function () {
 // console.log('load', ev);
 	// }, this);
 });
-
-var ext = L.extend({
+L.gmx.VectorLayer = VectorGridLayer.extend({
+// var ext = L.extend({
     options: {
 		tilesCRS: L.CRS.EPSG3395,
         openPopups: [],
@@ -7757,12 +7757,12 @@ var ext = L.extend({
 				L.DomUtil.setPosition(tile.el, this._getTilePos(tile.coords));	// позиции тайлов
 				if (!tile.promise) {							// данный тайл еще не рисовался
 					this.__drawTile(tile);
-				} else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
+				} else if (tile.loded && !tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
 					this._level.el.appendChild(tile.el);
 				}
 			}
 		}
-		this._removeScreenObservers(zoom, true);
+		//this._removeScreenObservers(zoom, true);
 	},
 
 	_removeScreenObservers: function (z, flag) {
@@ -7816,8 +7816,10 @@ var ext = L.extend({
 				}
 			},
 			load: function() {				// Fired when the grid layer starts loading tiles.
-				//console.log('load layer ', this._tileZoom, this._map._zoom, Date.now() - window.startTest, gmx.layerID)
-				this._clearOldLevels();
+				//console.log('load layer ', this._tileZoom, this._map._zoom, Date.now() - window.startTest)
+				this._clearOldLevels(this._tileZoom);
+				if (this._onloadTimer) { clearTimeout(this._onloadTimer); }
+				this._onloadTimer = setTimeout(L.bind(this.repaint, this), 150);
 			},
 
 			tileloadstart: function(ev) {				// тайл (ev.coords) загружается
@@ -8724,14 +8726,13 @@ var ext = L.extend({
 		} else {
 			tileElem.resolve();
 		}
-    },
+    // },
 
-	// stops loading all tiles in the background layer
-	_abortLoading: function () {
-		this._removeScreenObservers();
+	// _abortLoading: function () {	// stops loading all tiles in the background layer
+		// this._removeScreenObservers();
 	}
 });
-L.gmx.VectorLayer = VectorGridLayer.extend(ext);
+// L.gmx.VectorLayer = VectorGridLayer.extend(ext);
 
 
 // Single tile on screen with vector data
@@ -9354,9 +9355,9 @@ ScreenVectorTile.prototype = {
     },
 
     destructor: function () {
-		if (this.drawReject) {
-			this.drawReject('отмена');
-		}
+		// if (this.drawReject) {
+			// this.drawReject('отмена');
+		// }
 		if (this._preRenderPromise) {
 			this._preRenderPromise.reject();        // cancel preRenderHooks chain if exists
 		}
@@ -11496,12 +11497,12 @@ var layersVersion = {
     chkVersion: chkVersion,
 
     now: function() {
-		if (timeoutID) { cancelIdleCallback(timeoutID); }
-		timeoutID = requestIdleCallback(function() {
-			chkVersion();
-		}, {timeout: 25});
-		// if (timeoutID) { clearTimeout(timeoutID); }
-		// timeoutID = setTimeout(chkVersion, 0);
+		// if (timeoutID) { cancelIdleCallback(timeoutID); }
+		// timeoutID = requestIdleCallback(function() {
+			// chkVersion();
+		// }, {timeout: 25});
+		if (timeoutID) { clearTimeout(timeoutID); }
+		timeoutID = setTimeout(chkVersion, 0);
     },
 
     stop: function() {

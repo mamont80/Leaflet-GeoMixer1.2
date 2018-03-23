@@ -618,9 +618,9 @@ ScreenVectorTile.prototype = {
     },
 
     destructor: function () {
-		if (this.drawReject) {
-			this.drawReject('отмена');
-		}
+		// if (this.drawReject) {
+			// this.drawReject('отмена');
+		// }
 		if (this._preRenderPromise) {
 			this._preRenderPromise.reject();        // cancel preRenderHooks chain if exists
 		}

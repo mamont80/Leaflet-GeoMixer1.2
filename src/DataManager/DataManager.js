@@ -7,7 +7,7 @@ var ObserverTileLoader = L.Class.extend({
     },
 
     addObserver: function(observer) {
-        this._observerData[observer.id] = {
+		this._observerData[observer.id] = {
             observer: observer,
             tiles: {},
             leftToLoad: 0,
@@ -451,7 +451,7 @@ var DataManager = L.Class.extend({
             }
         }
 
-        return resArr;
+       return resArr;
     },
 
     _updateItemsFromTile: function(tile) {
@@ -964,8 +964,9 @@ var DataManager = L.Class.extend({
 
     _resetTilesTree: function() {
         this._tilesTree = null;
-        this._needCheckActiveTiles = true;
-        this._getActiveTileKeys(); //force list update
+		this._reCheckActiveTileKeys();
+        // this._needCheckActiveTiles = true;
+        // this._getActiveTileKeys(); //force list update
     },
 
     updateVersion: function(options, tiles) {
@@ -1181,12 +1182,19 @@ var DataManager = L.Class.extend({
     //Can be used to prevent loading data from some spatial-temporal region
     setTileFilteringHook: function(filteringHook) {
         this._tileFilteringHook = filteringHook;
-        this._needCheckActiveTiles = true;
-        this._getActiveTileKeys(); //force list update
+		this._reCheckActiveTileKeys();
+        // this._needCheckActiveTiles = true;
+        // this._getActiveTileKeys(); //force list update
     },
 
     removeTileFilteringHook: function() {
         this._tileFilteringHook = null;
+		this._reCheckActiveTileKeys();
+        // this._needCheckActiveTiles = true;
+        // this._getActiveTileKeys(); //force list update
+    },
+
+    _reCheckActiveTileKeys: function() {
         this._needCheckActiveTiles = true;
         this._getActiveTileKeys(); //force list update
     }

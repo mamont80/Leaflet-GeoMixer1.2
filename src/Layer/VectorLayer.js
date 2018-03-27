@@ -1,31 +1,42 @@
-var VectorGridLayer = L.GridLayer.extend({
+L.extend(L.GridLayer.prototype, {
+	_animateZoom: function (e) {
+		this.options.updateWhenZooming = false;
+		this._setView(e.center, e.zoom, true, true);
+//	console.log('_setView _animateZoom', e.zoom, e.center, Date.now() - window.startTest, this)
+	},
+
+	_setZoomTransform: function (level, center, zoom) {	// Add by Geomixer (for cache levels transform)
+		var key = level.zoom + '_' + zoom,
+			cache = L.gmx._zoomLevelsCache[key] || {},
+			translate = cache.translate,
+			scale = cache.scale;
+		if (!translate) {
+			scale = this._map.getZoomScale(zoom, level.zoom);
+			translate = level.origin.multiplyBy(scale).subtract(this._map._getNewPixelOrigin(center, zoom))._round();
+			L.gmx._zoomLevelsCache[key] = {translate: translate, scale: scale};
+			// console.log('_setZoomTransform', key, zoom, translate, scale);
+		}
+		if (L.Browser.any3d) {
+			L.DomUtil.setTransform(level.el, translate, scale);
+		} else {
+			L.DomUtil.setPosition(level.el, translate);
+		}
+	},
 	_clearOldLevels: function (z) {
 		if (this._map) {
+// console.log('_clearOldLevels', z, Date.now() - window.startTest, this)
 			z = z || this._map.getZoom();
-
-			var key, tile;
-			for (key in this._tiles) {
-				tile = this._tiles[key];
-				if (tile.coords.z !== z) {
-					this._removeTile(key);
-				// } else if (!tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
-					// this._level.el.appendChild(tile.el);
-				}
-			}
-
-			for (key in this._levels) {
-				var zz = Number(key);
+			for (var key in this._levels) {
+				var el = this._levels[key].el,
+					zz = Number(key);
 				if (zz !== z) {
-					L.DomUtil.remove(this._levels[key].el);
+					L.DomUtil.remove(el);
 					this._removeTilesAtZoom(zz);
 					this._onRemoveLevel(zz);
 					delete this._levels[key];
 				}
 			}
 		}
-	},
-	_animateZoom: function (e) {
-		this._setView(e.center, e.zoom, true, true);
 	},
 	_noTilesToLoad: function () {
 		var zoom = this._tileZoom || this._map.getZoom();
@@ -37,6 +48,8 @@ var VectorGridLayer = L.GridLayer.extend({
 
 	_tileReady: function (coords, err, tile) {
 		if (!this._map) { return; }				// Add by Geomixer (нет возможности отключения fade-anim)
+// if (this._map._animatingZoom)
+// console.log('_tileReady _animateZoom', coords, err, tile, Date.now() - window.startTest, this)
 
 		if (err) {
 			// @event tileerror: TileErrorEvent
@@ -65,50 +78,18 @@ var VectorGridLayer = L.GridLayer.extend({
 
 		if (this._noTilesToLoad()) {
 			this._loading = false;
+			this._clearOldLevels(this._tileZoom);
 			this.fire('load');			// @event load: Event // Fired when the grid layer loaded all visible tiles.
 		}
 	}
-/*
-	_resetView: function (e) {
-		var animating = e && (e.pinch || e.flyTo),
-			type = e ? e.type : '',
-			zoom = this._map.getZoom(),
-			center = this._map.getCenter();
-
-		if (type === 'zoom') {
-			// this._clearOldLevels(zoom);
-			// if (this._tileZoom !== zoom) {		// отмена при зуме
-				this._map.fire('zoomanim', {
-					center: center,
-					zoom: zoom
-				});
-			// }
-		}
-		this._setView(center, zoom, animating, animating);
-	},
-
-	_setZoomTransform: function (level, center, zoom) {	// Add by Geomixer (for cache levels transform)
-		var key = level.zoom + '_' + zoom,
-			cache = L.gmx._zoomLevelsCache[key] || {},
-			translate = cache.translate,
-			scale = cache.scale;
-		if (!translate) {
-			scale = this._map.getZoomScale(zoom, level.zoom);
-			translate = level.origin.multiplyBy(scale).subtract(this._map._getNewPixelOrigin(center, zoom))._round();
-			L.gmx._zoomLevelsCache[key] = {translate: translate, scale: scale};
-			// console.log('_setZoomTransform', key, zoom, translate, scale);
-		}
-		if (L.Browser.any3d) {
-			L.DomUtil.setTransform(level.el, translate, scale);
-		} else {
-			L.DomUtil.setPosition(level.el, translate);
-		}
-	},
+});
+var VectorGridLayer = L.GridLayer.extend({
 	_updateLevels: function () {		// Add by Geomixer (coords.z is Number however _levels keys is String)
 
 		var zoom = this._tileZoom,
-			map = this._map,
-		    maxZoom = this.options.maxZoom;
+			map = this._map;
+			// ,
+		    // maxZoom = this.options.maxZoom;
 
 		if (zoom === undefined) { return undefined; }
 
@@ -125,8 +106,9 @@ var VectorGridLayer = L.GridLayer.extend({
 		if (!level) {
 			level = this._levels[zoom] = {};
 
-			level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated ' + zoom, this._container);
-			level.el.style.zIndex = maxZoom;
+			level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated', this._container);
+			// level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated ' + zoom, this._container);
+			// level.el.style.zIndex = maxZoom;
 
 			level.origin = map.project(map.unproject(map.getPixelOrigin()), zoom).round();
 			level.zoom = zoom;
@@ -134,7 +116,7 @@ var VectorGridLayer = L.GridLayer.extend({
 			this._setZoomTransform(level, map.getCenter(), map.getZoom());
 
 			// force the browser to consider the newly added element for transition
-			L.Util.falseFn(level.el.offsetWidth);
+			// L.Util.falseFn(level.el.offsetWidth);
 
 			this._onCreateLevel(level);
 		}
@@ -142,15 +124,6 @@ var VectorGridLayer = L.GridLayer.extend({
 		this._level = level;
 
 		return level;
-	},
-	_removeTilesAtZoom: function (zoom) {		// Add by Geomixer (coords.z is Number however _levels keys is String)
-		zoom = Number(zoom);
-		for (var key in this._tiles) {
-			if (this._tiles[key].coords.z !== zoom) {
-				continue;
-			}
-			this._removeTile(key);
-		}
 	},
 
 	_update: function (center) {				// Add by Geomixer (для события update _tiles + не добавлять пустые тайлы)
@@ -197,6 +170,10 @@ var VectorGridLayer = L.GridLayer.extend({
 				var tile = this._tiles[this._tileCoordsToKey(coords)];
 				if (tile) {
 					tile.current = true;
+					if (tile.el.parentNode !== this._level.el) {
+						this._level.el.appendChild(tile.el);
+// console.log('update _________', this._level.zoom, tile.coords.z)
+					}
 				} else {
 					queue.push(coords);
 				}
@@ -230,77 +207,6 @@ var VectorGridLayer = L.GridLayer.extend({
 		}
 		this.fire('update');
 	}
-*/
-	/*
-	_startUpdate: function (center, tileZoom) {
-		this._tileZoom = tileZoom;
-
-		if (this._abortLoading) {
-			this._abortLoading();
-		}
-
-		this._updateLevels();
-		this._resetGrid();
-		this._update(center);
-	},
-	_setView: function (center, zoom, noUpdate, noPrune) {
-	//_setView: function (center, zoom, noPrune, noUpdate) {
-		var tileZoom = this._clampZoom(Math.round(zoom));
-		if ((this.options.maxZoom !== undefined && tileZoom > this.options.maxZoom) ||
-		    (this.options.minZoom !== undefined && tileZoom < this.options.minZoom)) {
-			tileZoom = undefined;
-		}
-
-		var tileZoomChanged = this.options.updateWhenZooming && (tileZoom !== this._tileZoom);
-console.log('_setView', !noUpdate || tileZoomChanged, noUpdate, tileZoomChanged, tileZoom, this._tileZoom, this._map._zoom, this.options.updateWhenZooming)
-
-		if (tileZoom !== undefined && (!noUpdate || tileZoomChanged)) {
-			if (this._startUpdateTimer) { clearTimeout(this._startUpdateTimer); }
-			this._startUpdateTimer = setTimeout(L.bind(this._startUpdate, this, center, tileZoom), 150);
-		}
-
-		this._setZoomTransforms(center, zoom);
-	},
-	_updateLevels: function () {		// Add by Geomixer (coords.z is Number however _levels keys is String)
-
-		var zoom = this._tileZoom,
-			map = this._map,
-		    maxZoom = this.options.maxZoom;
-
-		if (zoom === undefined) { return undefined; }
-
-		// for (var z in this._levels) {
-			// var delta = zoom - z;
-			// if (delta === 0) {
-				// this._levels[z].origin = map.project(map.unproject(map.getPixelOrigin()), zoom).round();
-				// this._onUpdateLevel(zoom);
-			// }
-		// }
-
-		var level = this._levels[zoom];
-
-		if (!level) {
-			level = this._levels[zoom] = {};
-
-			level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated ' + zoom, this._container);
-			level.el.style.zIndex = maxZoom;
-
-			level.origin = map.project(map.unproject(map.getPixelOrigin()), zoom).round();
-			level.zoom = zoom;
-
-			this._setZoomTransform(level, map.getCenter(), map.getZoom());
-
-			// force the browser to consider the newly added element for transition
-			L.Util.falseFn(level.el.offsetWidth);
-
-			this._onCreateLevel(level);
-		}
-
-		this._level = level;
-
-		return level;
-	},
-	*/
 });
 
 L.gmx.VectorLayer = VectorGridLayer.extend({
@@ -467,12 +373,12 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 					});
 				}
 			},
-			load: function() {				// Fired when the grid layer starts loading tiles.
+			// load: function() {				// Fired when the grid layer starts loading tiles.
 				// console.log('load layer ', this._tileZoom, this._map._zoom, Date.now() - window.startTest)
-				this._clearOldLevels(this._tileZoom);
+				// this._clearOldLevels(this._tileZoom);
 				// if (this._onloadTimer) { clearTimeout(this._onloadTimer); }
 				// this._onloadTimer = setTimeout(L.bind(this.repaint, this), 150);
-			},
+			// },
 
 			tileloadstart: function(ev) {				// тайл (ev.coords) загружается
 				var key = ev.key || this._tileCoordsToKey(ev.coords),
@@ -956,6 +862,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 				zKeys[it] = true;
 			}
             this._gmx.dataManager._triggerObservers(zKeys);
+// console.log('repaint', Date.now() - window.startTest, zKeys)
 			//this._onmoveend();
        }
     },
@@ -1323,6 +1230,12 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 			zoom = this._tileZoom,
             gmx = this._gmx;
 
+        // if (tileElem.observer) {
+			// gmx.dataManager.removeObserver(tileElem.observer.id);
+			// tileElem.reject();
+			//this._tileReady(coords, null, tileElem.el);
+		// }
+
         if (!tileElem.promise) {
 			tileElem.loaded = 0;
 			tileElem.key = zKey;
@@ -1351,7 +1264,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                     bbox: gmx.styleManager.getStyleBounds(coords),
                     filters: ['clipFilter', 'userFilter_' + gmx.layerID, 'styleFilter', 'userFilter'].concat(filters),
                     callback: function(data) {
-                        if (myLayer._tiles[zKey]) {
+                        if (myLayer._tiles[zKey] && !myLayer._map._animatingZoom) {
 							myLayer._tiles[zKey].loaded = 0;
 
 							if (!tileElem.screenTile) {
@@ -1384,160 +1297,6 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 		// this._removeScreenObservers();
 	}
 });
-// L.gmx.VectorLayer = VectorGridLayer.extend(ext);
-/*
-L.extend(L.Map.prototype, {
-	_reCheckLayersZoomAnim: function (ev) {
-		L.gmx._zoomLevelsCache = {};
-		L.gmx._zoomAnimCache = {
-			zoom: ev.zoom,
-			center: ev.center
-		};
-		var delta = ev.zoom - this._zoom,
-			cnt = 0,
-			maxZoomAnimGmxLayers = this.options.maxZoomAnimGmxLayers || 5;
-		for (var key in this._layers) {
-			var it = this._layers[key];
-			if (it._map && it instanceof L.gmx.VectorLayer) {
-				var func = L.DomUtil.removeClass;
-				if (it._drawnObjectsCount === 0 || (delta > 0 && cnt > maxZoomAnimGmxLayers)) {func = L.DomUtil.addClass;}
-				else {cnt++;}
-				// console.log('__', delta, this._zoom, ev.zoom, it._drawDoneObjectsCount);
-				func(it._container, 'leaflet-zoom-hide');
-				it._drawnObjectsCount = 0;
-
-			}
-		}
-		// console.log('map _reCheckLayersZoomAnim', delta, this._zoom, ev.zoom, ev);
-	},
-
-	_tryAnimatedZoom: function (center, zoom, options) {
-		// console.log('_tryAnimatedZoom', this._animatingZoom, center, zoom, options, Date.now() - window.startTest)
-
-		if (this._animatingZoom) {
-			this._onZoomTransitionEnd();
-			return true;
-		}
-		// window.startTest = Date.now();
-
-		options = options || {};
-
-		// don't animate if disabled, not supported or zoom difference is too large
-		if (!this._zoomAnimated || options.animate === false || this._nothingToAnimate() ||
-				Math.abs(zoom - this._zoom) > this.options.zoomAnimationThreshold) { return false; }
-
-		// offset is the pixel coords of the zoom origin relative to the current center
-		var scale = this.getZoomScale(zoom),
-			offset = this._getCenterOffset(center)._divideBy(1 - 1 / scale);
-
-		// don't animate if the zoom origin isn't within one screen from the current center, unless forced
-		if (options.animate !== true && !this.getSize().contains(offset)) { return false; }
-
-		// setTimeout(function () {
-			// this._animateZoom(center, zoom, true);
-		// }.bind(this), 0);
-		L.Util.requestAnimFrame(function () {
-			this
-				._moveStart(true, false)
-				._animateZoom(center, zoom, true);
-		}, this);
-		return true;
-	},
-	_onZoomTransitionEnd: function () {
-		if (!this._animatingZoom) { return; }
-
-		if (this._mapPane) {
-			L.DomUtil.removeClass(this._mapPane, 'leaflet-zoom-anim');
-		}
-
-		this._animatingZoom = false;
-
-		this._move(this._animateToCenter, this._animateToZoom);
-		// console.log('_onZoomTransitionEnd', this._animateToCenter, this._animateToZoom, Date.now() - window.startTest)
-
-		// This anim frame should prevent an obscure iOS webkit tile loading race condition.
-		L.Util.requestAnimFrame(function () {
-			this._moveEnd(true);
-		}, this);
-	},
-
-	_animateZoom: function (center, zoom, startAnim, noUpdate) {
-		if (!this._mapPane) { return; }
-
-		if (startAnim) {
-			this._animatingZoom = true;
-			// console.log('_animateZoom', Date.now() - window.startTest)
-
-			// remember what center/zoom to set after animation
-			this._animateToCenter = center;
-			this._animateToZoom = zoom;
-			// this.fire('beforezoomanim', {
-				// center: center,
-				// zoom: zoom,
-				// noUpdate: noUpdate
-			// });
-
-			L.DomUtil.addClass(this._mapPane, 'leaflet-zoom-anim');
-		// console.log('_animateZoom', this._animateToCenter, this._animateToZoom, Date.now() - window.startTest)
-		}
-
-		// @event zoomanim: ZoomAnimEvent
-		// Fired on every frame of a zoom animation
-		this.fire('zoomanim', {
-			center: center,
-			zoom: zoom,
-			noUpdate: noUpdate
-		});
-
-		// Work around webkit not firing 'transitionend', see https://github.com/Leaflet/Leaflet/issues/3689, 2693
-		// setTimeout(L.bind(this._onZoomTransitionEnd, this), 250);
-	},
-	initialize: function (id, options) { // (HTMLElement or String, Object)
-		options = L.setOptions(this, options);
-
-		this._initContainer(id);
-		this._initLayout();
-
-		// hack for https://github.com/Leaflet/Leaflet/issues/1980
-		this._onResize = L.bind(this._onResize, this);
-
-		this._initEvents();
-
-		if (options.maxBounds) {
-			this.setMaxBounds(options.maxBounds);
-		}
-
-		if (options.zoom !== undefined) {
-			this._zoom = this._limitZoom(options.zoom);
-		}
-
-		if (options.center && options.zoom !== undefined) {
-			this.setView(L.latLng(options.center), options.zoom, {reset: true});
-		}
-
-		this._handlers = [];
-		this._layers = {};
-		this._zoomBoundLayers = {};
-		this._sizeChanged = true;
-
-		this.callInitHooks();
-
-		// don't animate on browsers without hardware-accelerated transitions or old Android/Opera
-		this._zoomAnimated = L.DomUtil.TRANSITION && L.Browser.any3d && !L.Browser.mobileOpera &&
-				this.options.zoomAnimation;
-
-		// zoom transitions run with the same duration for all layers, so if one of transitionend events
-		// happens after starting zoom animation (propagating to the map pane), we know that it ended globally
-		if (this._zoomAnimated) {
-			L.DomEvent.on(this._mapPane, L.DomUtil.TRANSITION_END, this._catchTransitionEnd, this);
-			//this._createAnimProxy();
-			// L.DomEvent.on(this._proxy, L.DomUtil.TRANSITION_END, this._catchTransitionEnd, this);
-		}
-
-		this._addLayers(this.options.layers);
-	}
-});
-*/
 L.Map.addInitHook(function () {
     if (L.Mixin.ContextMenu) {
 		L.gmx.VectorLayer.include(L.Mixin.ContextMenu);
@@ -1547,9 +1306,21 @@ L.Map.addInitHook(function () {
 	this.options.skipTiles = this.options.skipTiles || 'All';
 
 	L.gmx._zoomLevelsCache = {};
-	L.gmx._zoomAnimCache = {};
-//	this.on('zoomanim viewprereset', this._reCheckLayersZoomAnim, this);
-	// this.on('zoomanim viewprereset load moveend', function(ev) {
-// console.log('load', ev);
-	// }, this);
+	// L.gmx._zoomAnimCache = {};
+	this.on('zoomstart', function(ev) {
+		L.gmx._zoomLevelsCache = {};
+		L.gmx._zoomLevelsCount = 0;
+		var cnt = 0,
+			maxZoomAnimGmxLayers = this.options.maxZoomAnimGmxLayers || 5;
+		for (var key in this._layers) {
+			var it = this._layers[key];
+			if (it._map && it instanceof L.gmx.VectorLayer) {
+				var func = L.DomUtil.removeClass;
+				if (ev.zoom > this._zoom && (it._drawnObjectsCount === 0 || (cnt > maxZoomAnimGmxLayers))) {func = L.DomUtil.addClass;}
+				else {cnt++;}
+				func(it._container, 'leaflet-zoom-hide');
+				it._drawnObjectsCount = 0;
+			}
+		}
+	}, this);
 });

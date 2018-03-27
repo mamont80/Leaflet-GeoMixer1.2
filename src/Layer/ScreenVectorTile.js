@@ -620,6 +620,7 @@ ScreenVectorTile.prototype = {
     destructor: function () {
 		// if (this.drawReject) {
 			// this.drawReject('отмена');
+			// this.drawReject = null;
 		// }
 		if (this._preRenderPromise) {
 			this._preRenderPromise.reject();        // cancel preRenderHooks chain if exists
@@ -674,8 +675,9 @@ ScreenVectorTile.prototype = {
 							tpx: _this.tpx,
 							tpy: _this.tpy,
 							ctx: ctx
-						};
-					L.DomUtil.addClass(tile, 'zKey:' + _this.zKey + ' count: ' + geoItems.length);
+						},
+						tinfo = 'zKey:' + _this.zKey + ' count: ' + geoItems.length;
+					L.DomUtil.addClass(tile, tinfo);
 
 					ctx.clearRect(0, 0, 256, 256);
 					if (gmx.showScreenTiles) {
@@ -733,7 +735,7 @@ ScreenVectorTile.prototype = {
 							}
 						}
 						//ctx.restore();
-						_this.rasters = {}; // clear rasters
+						//_this.rasters = {}; // clear rasters		TODO: растры пропадают из-за быстрых перерисовок permalink=C2YMI
 						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
 					}, reject);
 					// _this.layer.appendTileToContainer(_this.tileElem);

@@ -405,6 +405,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 						this._map._labelsLayer.remove(this);
 					}
 					this.redraw();
+					this._onmoveend();
 				}
 			},
 			versionchange: this._onVersionChange
@@ -637,6 +638,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                 // this._clearAllSubscriptions();
                 this._gmx.dataManager.enableGeneralization();
                 this.redraw();
+				this._onmoveend();
             }
         }
     },
@@ -648,6 +650,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                 // this._clearAllSubscriptions();
                 this._gmx.dataManager.disableGeneralization();
                 this.redraw();
+				this._onmoveend();
             }
         }
     },

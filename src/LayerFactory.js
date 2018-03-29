@@ -179,7 +179,8 @@ L.gmx.loadMap = function(mapID, options) {
 		function(response) {
 			var errorMessage = (response && response.ErrorInfo && response.ErrorInfo.ErrorMessage) || 'Server error';
 			reject('Can\'t load map ' + mapID + ' from ' + options.hostName + ': ' + errorMessage);
-		});
+		})
+		.catch(console.log);
     });
 };
 

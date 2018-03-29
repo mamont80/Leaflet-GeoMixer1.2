@@ -19,7 +19,7 @@ L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js
 				if (message.load) { it.resolve(message); }
 				else { it.reject(message); }
 			}
-			this.jobs[url].length = 0;
+			delete this.jobs[url];
 			L.gmxUtil.loaderStatus(url, true);
 		},
 
@@ -36,7 +36,7 @@ L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js
 			return new Promise(function(resolve, reject) {
 				attr.resolve = resolve;
 				attr.reject = reject;
-			});
+			}).catch(console.log);
 		}
 	};
 
@@ -44,7 +44,11 @@ L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js
 	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
 	L.gmx.getJSON = imageBitmapLoader.push.bind(imageBitmapLoader);
 	if (L.gmxUtil.debug) {
-		L.gmx.sendCmd = imageBitmapLoader.push.bind(imageBitmapLoader);
+		L.gmx.sendCmd = function(cmd, options) {
+			options.cmd = cmd;
+			options.syncParams = L.gmx.gmxMapManager.syncParams;
+			return imageBitmapLoader.push(null, options);
+		};
 	}
 	worker.onerror = function(ev) {
 		console.warn('Error: Worker init: ImageBitmapLoader-worker.js', ev);

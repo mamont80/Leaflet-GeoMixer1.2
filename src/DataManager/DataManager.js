@@ -72,12 +72,21 @@ var ObserverTileLoader = L.Class.extend({
         return this;
     },
 
+    _isLeftToLoad: function(obsData) {
+		var cnt = 0;
+		for (var tileId in obsData.tiles) {
+			if (this._tileData[tileId].tile.state !== 'loaded') {cnt++;}
+		}
+		return cnt;
+    },
+
     startLoadTiles: function(observer) {
         //force active tile list update
         this._dataManager._getActiveTileKeys();
 
         var obsData = this._observerData[observer.id];
         if (obsData) {
+			obsData.leftToLoad = this._isLeftToLoad(obsData);
 			if (obsData.leftToLoad < 1) {
 				this.fire('observertileload', {observer: observer});
 				return this;
@@ -140,7 +149,8 @@ var ObserverTileLoader = L.Class.extend({
     _tileLoadedCallback: function(tile) {
         this.fire('tileload', {tile: tile});
 
-        if (!(tile.vectorTileKey in this._tileData)) {
+        if (!(tile.vectorTileKey in this._tileData)) {		// TODO: проверка загружаемого тайла
+			//console.log('tileload', tile, this._tileData)
             return;
         }
 
@@ -585,31 +595,31 @@ var DataManager = L.Class.extend({
         return this._observers[id];
     },
 
-    removeScreenObservers: function(z) {
-        for (var k in this._observers) {
-            var observer = this._observers[k];
-            if (observer.target === 'screen') {
-				if (z && observer.z === z) {
-					continue;
-				}
-				observer.deactivate(true);
-				this.removeObserver(k);
-			}
-        }
-    },
+    // removeScreenObservers: function(z) {
+        // for (var k in this._observers) {
+            // var observer = this._observers[k];
+            // if (observer.target === 'screen') {
+				// if (z && observer.z === z) {
+					// continue;
+				// }
+				// observer.deactivate(true);
+				// this.removeObserver(k);
+			// }
+        // }
+    // },
 
-    toggleScreenObservers: function(flag, z) {
-        for (var k in this._observers) {
-            var observer = this._observers[k];
-            if (observer.target === 'screen' && observer.z === z) {
-				if (flag) {
-					observer.activate();
-				} else {
-					observer.deactivate();
-				}
-			}
-        }
-    },
+    // toggleScreenObservers: function(flag, z) {
+        // for (var k in this._observers) {
+            // var observer = this._observers[k];
+            // if (observer.target === 'screen' && observer.z === z) {
+				// if (flag) {
+					// observer.activate();
+				// } else {
+					// observer.deactivate();
+				// }
+			// }
+        // }
+    // },
 
     removeObserver: function(id) {
         if (this._observers[id]) {

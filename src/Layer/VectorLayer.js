@@ -1,3 +1,4 @@
+/*
 L.extend(L.GridLayer.prototype, {
 	_animateZoom: function (e) {
 		this.options.updateWhenZooming = false;
@@ -83,7 +84,92 @@ L.extend(L.GridLayer.prototype, {
 		}
 	}
 });
+*/
 var VectorGridLayer = L.GridLayer.extend({
+	_animateZoom: function (e) {
+		this.options.updateWhenZooming = false;
+		this._setView(e.center, e.zoom, true, true);
+//	console.log('_setView _animateZoom', e.zoom, e.center, Date.now() - window.startTest, this)
+	},
+
+	_setZoomTransform: function (level, center, zoom) {	// Add by Geomixer (for cache levels transform)
+		var key = level.zoom + '_' + zoom,
+			cache = L.gmx._zoomLevelsCache[key] || {},
+			translate = cache.translate,
+			scale = cache.scale;
+		if (!translate) {
+			scale = this._map.getZoomScale(zoom, level.zoom);
+			translate = level.origin.multiplyBy(scale).subtract(this._map._getNewPixelOrigin(center, zoom))._round();
+			L.gmx._zoomLevelsCache[key] = {translate: translate, scale: scale};
+			// console.log('_setZoomTransform', key, zoom, translate, scale);
+		}
+		if (L.Browser.any3d) {
+			L.DomUtil.setTransform(level.el, translate, scale);
+		} else {
+			L.DomUtil.setPosition(level.el, translate);
+		}
+	},
+	_clearOldLevels: function (z) {
+		if (this._map) {
+// console.log('_clearOldLevels', z, Date.now() - window.startTest, this)
+			z = z || this._map.getZoom();
+			for (var key in this._levels) {
+				var el = this._levels[key].el,
+					zz = Number(key);
+				if (zz !== z) {
+					L.DomUtil.remove(el);
+					this._removeTilesAtZoom(zz);
+					this._onRemoveLevel(zz);
+					delete this._levels[key];
+				}
+			}
+		}
+	},
+	_noTilesToLoad: function () {
+		var zoom = this._tileZoom || this._map.getZoom();
+		for (var key in this._tiles) {
+			if (this._tiles[key].coords.z === zoom && !this._tiles[key].loaded) { return false; }
+		}
+		return true;
+	},
+
+	_tileReady: function (coords, err, tile) {
+		if (!this._map) { return; }				// Add by Geomixer (нет возможности отключения fade-anim)
+// if (this._map._animatingZoom)
+// console.log('_tileReady _animateZoom', coords, err, tile, Date.now() - window.startTest, this)
+
+		if (err) {
+			// @event tileerror: TileErrorEvent
+			// Fired when there is an error loading a tile.
+			this.fire('tileerror', {
+				error: err,
+				tile: tile,
+				coords: coords
+			});
+		}
+
+		var key = this._tileCoordsToKey(coords);
+
+		tile = this._tiles[key];
+		if (!tile) { return; }
+
+		tile.loaded = +new Date();
+
+		if (!err) {
+			L.DomUtil.addClass(tile.el, 'leaflet-tile-loaded');
+			this.fire('tileload', {		// @event tileload: TileEvent // Fired when a tile loads.
+				tile: tile.el,
+				coords: coords
+			});
+		}
+
+		if (this._noTilesToLoad()) {
+			this._loading = false;
+			this._clearOldLevels(this._tileZoom);
+			this.fire('load');			// @event load: Event // Fired when the grid layer loaded all visible tiles.
+		}
+	},
+	//////////////////
 	_updateLevels: function () {		// Add by Geomixer (coords.z is Number however _levels keys is String)
 
 		var zoom = this._tileZoom,
@@ -300,13 +386,18 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
     _onVersionChange: function () {
         this._updateProperties(this._gmx.rawProperties);
-		this._onmoveend({repaint: true});
+		this._chkTiles({repaint: true});
     },
 
-	_onmoveend: function () {
+	_waitOnMoveEnd: function () {
+		if (this._onmoveendTimer) { clearTimeout(this._onmoveendTimer); }
+		this._onmoveendTimer = setTimeout(this._chkTiles.bind(this), 250);
+    },
+
+	_chkTiles: function () {
 		//return;
 		// console.log('_onmoveend ', this._tileZoom, this._loading, this._noTilesToLoad(), this._tileZoom, Date.now());
-		var zoom = this._tileZoom,
+		var zoom = this._tileZoom || this._map._zoom,
 			key, tile;
 
 		for (key in this._tiles) {
@@ -320,18 +411,19 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 				}
 			}
 		}
+		this.repaint();
 		//this._removeScreenObservers(zoom, true);
 	},
 
-	_removeScreenObservers: function (z, flag) {
-        if (this._gmx && this._gmx.dataManager) {
-			var dm = this._gmx.dataManager;
-			dm.removeScreenObservers(z);
-			if (flag) {
-				dm.fire('moveend');
-			}
-		}
-	},
+	// _removeScreenObservers: function (z, flag) {
+        // if (this._gmx && this._gmx.dataManager) {
+			// var dm = this._gmx.dataManager;
+			// dm.removeScreenObservers(z);
+			// if (flag) {
+				// dm.fire('moveend');
+			// }
+		// }
+	// },
 
 	_getEvents: function () {
 		var events = L.GridLayer.prototype.getEvents.call(this);
@@ -362,7 +454,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         var gmx = this._gmx;
         var owner = {
 			dateIntervalChanged: function() {
-				this._onmoveend({repaint: true});
+				this._chkTiles({repaint: true});
 				if (L.gmx.sendCmd) {
 					var interval = gmx.dataManager.getMaxDateInterval();
 					L.gmx.sendCmd('dateIntervalChanged', {
@@ -405,17 +497,13 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 						this._map._labelsLayer.remove(this);
 					}
 					this.redraw();
-					this._onmoveend();
+					this._chkTiles();
 				}
 			},
 			versionchange: this._onVersionChange
 		};
-		events.moveend = function() {
-			if (this._onmoveendTimer) { clearTimeout(this._onmoveendTimer); }
-			this._onmoveendTimer = setTimeout(L.bind(this._onmoveend, this), 250);
-			// if (this._onmoveendTimer) { cancelIdleCallback(this._onmoveendTimer); }
-			// this._onmoveendTimer = requestIdleCallback(L.bind(this._onmoveend, this), {timeout: 25});
-		};
+		events.moveend = this._waitOnMoveEnd.bind(this);
+		events.zoomend = this._waitOnMoveEnd.bind(this);
 
 		return {
 			map: events,
@@ -464,7 +552,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 				this._resetView();
 				gmx.dataManager.fire('moveend');
 
-				this._onmoveend();
+				this._chkTiles();
 			}
 			this._addLayerVersion();
 			this.fire('add');
@@ -474,9 +562,9 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
     onRemove: function(map) {
         var gmx = this._gmx,
 			dm = gmx.dataManager;
-        if (dm) {
-			dm.removeScreenObservers();
-		}
+        // if (dm) {
+			// dm.removeScreenObservers();
+		// }
 
 		if (gmx.labelsLayer) {	// удалить из labelsLayer
 			map._labelsLayer.remove(this);
@@ -489,15 +577,17 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         if (dm && !dm.getActiveObserversCount()) {
 			L.gmx.layersVersion.remove(this);
         }
-        L.GridLayer.prototype.onRemove.call(this, map);
+        if (this._map) {
+			L.GridLayer.prototype.onRemove.call(this, map);
+		}
         this._map = null;
         this.fire('remove');
     },
 	_removeTile: function (key) {
-		if (!this._map || this._map._animatingZoom) { return; }
         if (this._gmx && this._gmx.dataManager) {
 			this._gmx.dataManager.removeObserver(key);		// TODO: про active
 		}
+		if (!this._map || this._map._animatingZoom) { return; }
         L.GridLayer.prototype._removeTile.call(this, key);
 	},
 
@@ -638,7 +728,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                 // this._clearAllSubscriptions();
                 this._gmx.dataManager.enableGeneralization();
                 this.redraw();
-				this._onmoveend();
+				this._chkTiles();
             }
         }
     },
@@ -650,7 +740,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                 // this._clearAllSubscriptions();
                 this._gmx.dataManager.disableGeneralization();
                 this.redraw();
-				this._onmoveend();
+				this._chkTiles();
             }
         }
     },
@@ -1242,6 +1332,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         if (!tileElem.promise) {
 			tileElem.loaded = 0;
 			tileElem.key = zKey;
+			tileElem.screenTile = new ScreenVectorTile(myLayer, tileElem);
 			tileElem.promise = new Promise(function(resolve, reject) {
 				tileElem.resolve = resolve;
 				tileElem.reject = reject;
@@ -1267,12 +1358,13 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                     bbox: gmx.styleManager.getStyleBounds(coords),
                     filters: ['clipFilter', 'userFilter_' + gmx.layerID, 'styleFilter', 'userFilter'].concat(filters),
                     callback: function(data) {
-                        if (myLayer._tiles[zKey] && !myLayer._map._animatingZoom) {
+                        // if (myLayer._tiles[zKey] && !myLayer._map._animatingZoom) {
+                        if (myLayer._tiles[zKey]) {
 							myLayer._tiles[zKey].loaded = 0;
 
-							if (!tileElem.screenTile) {
-								tileElem.screenTile = new ScreenVectorTile(myLayer, tileElem);
-							}
+							// if (!tileElem.screenTile) {
+								// tileElem.screenTile = new ScreenVectorTile(myLayer, tileElem);
+							// }
 
 							tileElem.screenTile.drawTile(data).then(function(res) {
 								// console.log('resolve', zKey, res, data);
@@ -1310,7 +1402,12 @@ L.Map.addInitHook(function () {
 
 	L.gmx._zoomLevelsCache = {};
 	// L.gmx._zoomAnimCache = {};
+
+	// this.on('zoomend', function(ev) {
+			// console.log('zoomend ', ev);
+	// }, this);
 	this.on('zoomstart', function(ev) {
+			// console.log('zoomstart ', ev);
 		L.gmx._zoomLevelsCache = {};
 		L.gmx._zoomLevelsCount = 0;
 		var cnt = 0,

@@ -93,7 +93,7 @@ var VectorGridLayer = L.GridLayer.extend({
 	},
 
 	_setZoomTransform: function (level, center, zoom) {	// Add by Geomixer (for cache levels transform)
-		var key = level.zoom + '_' + zoom,
+		var key = level.zoom + '_' + zoom + '_' + level.origin.x + '_' + level.origin.y,
 			cache = L.gmx._zoomLevelsCache[key] || {},
 			translate = cache.translate,
 			scale = cache.scale;
@@ -101,7 +101,6 @@ var VectorGridLayer = L.GridLayer.extend({
 			scale = this._map.getZoomScale(zoom, level.zoom);
 			translate = level.origin.multiplyBy(scale).subtract(this._map._getNewPixelOrigin(center, zoom))._round();
 			L.gmx._zoomLevelsCache[key] = {translate: translate, scale: scale};
-			// console.log('_setZoomTransform', key, zoom, translate, scale);
 		}
 		if (L.Browser.any3d) {
 			L.DomUtil.setTransform(level.el, translate, scale);
@@ -256,10 +255,9 @@ var VectorGridLayer = L.GridLayer.extend({
 				var tile = this._tiles[this._tileCoordsToKey(coords)];
 				if (tile) {
 					tile.current = true;
-					if (tile.el.parentNode !== this._level.el) {
-						this._level.el.appendChild(tile.el);
-// console.log('update _________', this._level.zoom, tile.coords.z)
-					}
+					// if (tile.el.parentNode !== this._level.el) {
+						// this._level.el.appendChild(tile.el);
+					// }
 				} else {
 					queue.push(coords);
 				}
@@ -287,9 +285,9 @@ var VectorGridLayer = L.GridLayer.extend({
 				this._addTile(queue[i], fragment);
 			}
 
-			if (!(this instanceof L.gmx.VectorLayer)) {
-				this._level.el.appendChild(fragment);
-			}
+			// if (!(this instanceof L.gmx.VectorLayer)) {
+				// this._level.el.appendChild(fragment);
+			// }
 		}
 		this.fire('update');
 	}
@@ -389,6 +387,26 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 		this._chkTiles({repaint: true});
     },
 
+	_waitCheckOldLevels: function () {
+		if (this._oldLevelsTimer) { clearTimeout(this._oldLevelsTimer); }
+		this._oldLevelsTimer = setTimeout(this._chkOldLevels.bind(this), 250);
+    },
+
+	_chkOldLevels: function () {
+		var zoom = this._map._zoom,
+			key, tile;
+
+		for (key in this._tiles) {
+			tile = this._tiles[key];
+			if (tile.coords.z === zoom && !tile.loaded) {
+				return;
+			}
+		}
+		this._loading = false;
+		this._clearOldLevels(zoom);
+		this.fire('load');			// @event load: Event // Fired when the grid layer loaded all visible tiles.
+	},
+
 	_waitOnMoveEnd: function () {
 		if (this._onmoveendTimer) { clearTimeout(this._onmoveendTimer); }
 		this._onmoveendTimer = setTimeout(this._chkTiles.bind(this), 250);
@@ -402,9 +420,10 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
 		for (key in this._tiles) {
 			tile = this._tiles[key];
-			if (tile.coords.z == zoom) {
+			if (tile.coords.z === zoom) {
 				L.DomUtil.setPosition(tile.el, this._getTilePos(tile.coords));	// позиции тайлов
 				if (!tile.promise) {							// данный тайл еще не рисовался
+// console.log('_chkTiles _______', key, zoom);
 					this.__drawTile(tile);
 				// } else if (tile.loded && !tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
 					// this._level.el.appendChild(tile.el);
@@ -412,6 +431,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 			}
 		}
 		this.repaint();
+		this._waitCheckOldLevels();
 		//this._removeScreenObservers(zoom, true);
 	},
 

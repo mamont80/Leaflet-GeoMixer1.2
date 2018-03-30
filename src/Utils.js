@@ -3009,6 +3009,7 @@ L.extend(L.gmxUtil, {
     newId: gmxAPIutils.newId,
 	isPageHidden: gmxAPIutils.isPageHidden,
     protocol: location.protocol !== 'https:' ? 'http:' : location.protocol,
+	prefixURL: location.href.substr(0, location.href.lastIndexOf('/') + 1),
     loaderStatus: function () {},
     isIE9: gmxAPIutils.isIE(9),
     isIE10: gmxAPIutils.isIE(10),

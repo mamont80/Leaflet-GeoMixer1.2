@@ -24,6 +24,9 @@ L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js
 		},
 
 		push: function(url, options) {	// добавить запрос в worker
+			if (url && url[0] === '.' && url.indexOf(L.gmxUtil.prefixURL) !== 0) {
+				url = L.gmxUtil.prefixURL + url;
+			}
 			var attr = {
 					options: options
 				},

@@ -2,6 +2,7 @@
 
 var log = self.console.log.bind(self.console),
 	str = self.location.origin || '',
+	syncParams = {},
 	_protocol = str.substring(0, str.indexOf('/')),
 	fetchOptions = {
 		// method: 'post',
@@ -54,23 +55,52 @@ var utils = {
 	// getJson: function(url, params, options) {
 	getJson: function(queue) {
 // log('getJson', _protocol, queue, Date.now())
-		var par = queue.params;
-		return fetch(utils.chkProtocol(queue.url), utils.extend({
-			method: 'post',
-			headers: {'Content-type': 'application/x-www-form-urlencoded'},
-			mode: 'cors',
-			redirect: 'follow',
-			credentials: 'include'
-		}, queue.options, {
-			body: utils.getFormBody(par)
-		}))
-		.then(utils.chkResponse)
+		var par = utils.extend({}, queue.params, syncParams),
+			options = queue.options || {},
+			opt = utils.extend({
+				method: 'post',
+				headers: {'Content-type': 'application/x-www-form-urlencoded'}
+				// mode: 'cors',
+				// redirect: 'follow',
+				// credentials: 'include'
+			}, fetchOptions, options, {
+				body: utils.getFormBody(par)
+			});
+		return fetch(utils.chkProtocol(queue.url), opt)
 		.then(function(res) {
-			return {
-				queue: queue,
-				res: res
-			};
+			return utils.chkResponse(res, options.type);
+		})
+		.then(function(res) {
+			var out = {url: queue.url, queue: queue, load: true, res: res};
+			if (queue.send) {
+				handler.workerContext.postMessage(out);
+			} else {
+				return out;
+			}
+		})
+		.catch(function(err) {
+			var out = {url: queue.url, queue: queue, load: false, error: err.toString()};
+			handler.workerContext.postMessage(out);
 		});
+    },
+
+    getTileAttributes: function(prop) {
+        var tileAttributeIndexes = {},
+            tileAttributeTypes = {};
+        if (prop.attributes) {
+            var attrs = prop.attributes,
+                attrTypes = prop.attrTypes || null;
+            if (prop.identityField) { tileAttributeIndexes[prop.identityField] = 0; }
+            for (var a = 0; a < attrs.length; a++) {
+                var key = attrs[a];
+                tileAttributeIndexes[key] = a + 1;
+                tileAttributeTypes[key] = attrTypes ? attrTypes[a] : 'string';
+            }
+        }
+        return {
+            tileAttributeTypes: tileAttributeTypes,
+            tileAttributeIndexes: tileAttributeIndexes
+        };
     }
 };
 
@@ -150,8 +180,9 @@ var gmxMapManager = {
         var maps = this._maps,
 			serverHost = options.hostName || options.serverHost,
 			mapName = options.MapName;
-
+log('loadMapProperties', mapName)
         if (!maps[serverHost] || !maps[serverHost][mapName]) {
+			var promise = new Promise(function(resolve, reject) {
 			var opt = {
 				WrapStyle: 'None',
 				skipTiles: options.skipTiles || 'None', // All, NotVisible, None
@@ -160,7 +191,6 @@ var gmxMapManager = {
 				ftc: options.ftc || 'osm',
 				ModeKey: 'map'
 			};
-			var promise = new Promise(function(resolve, reject) {
 				gmxMapManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
 					opt.key = sessionKey;
 					utils.getJson({
@@ -327,51 +357,6 @@ var gmx = self.gmx || {};
 gmx._maps = {};			// свойства слоев по картам
 gmx._clientLayers = {};	// свойства слоев без карт (клиентские слои)
 
-var handler = new ImageHandler(self);
-
-var cmdProxy = function(cmd, options) {
-// log('__ cmd _______', cmd, options);
-
-	if (cmd === 'mapProperties') {				// загрузка свойств карты
-		var out = {url: cmd, inp: options, load: false};
-		gmxMapManager.loadMapProperties(options)
-			.then(function(json) {
-				out.load = true;
-				out.res = json;
-				handler.workerContext.postMessage(out);
-				//log('__gmx_______', gmx);
-			})
-			.catch(function(err) {
-				out.error = err.toString();
-				handler.workerContext.postMessage(out);
-			});
-	} else if (cmd === 'onmoveend') {			// сменилось положение карты
-		handler.workerContext.postMessage({url: cmd, inp: options, load: true});
-		gmx._zoom = options.zoom;				// текущий zoom карты
-		gmx._bbox = options.bbox;				// текущий экран карты
-		layersVersion.now();
-	} else if (cmd === 'dateIntervalChanged') {
-		layersVersion.add(options);
-		handler.workerContext.postMessage({url: cmd, inp: options, load: true});
-	} else if (cmd === 'toggleDataSource') {	// включение/выключение контроль версионности источников
-		if (options.active) {
-			layersVersion.add(options);
-		} else {
-			layersVersion.remove(options);
-		}
-		handler.workerContext.postMessage({url: cmd, inp: options, load: true});
-	} else {
-		return true; //	this is`t commad - this is request
-	}
-
-};
-
-self.onmessage = function(evt) {
-	var data = evt.data;
-	if (cmdProxy(data.src, data.options)) {
-		handler.enqueue(evt);
-	}
-};
 /** загрузчик источников данных
 */
 var vectorTiles = {
@@ -387,15 +372,107 @@ var vectorTiles = {
 			var queue = req.queue,
 				layerID = queue.params.LayerName,
 				hostName = queue.hostName,
-				ds = gmx._maps[hostName][queue.mapID].dataSources,
-				vTiles = ds[layerID].vTiles;
+				ds = gmx._maps[hostName][queue.mapID].dataSources[layerID],
+				vTiles = ds.vTiles;
 
 			if (data.LayerName !== layerID) {
 				log('error', data.LayerName, layerID);
 			} else {
+				vectorTiles._flatTile(ds, data);
 				vTiles[queue.key].res = data;
 			}
 		}
+    },
+    _flatTile: function() {
+			/*
+    _flatTile: function(ds, data) {
+		var props = ds.info.properties,
+			attr = utils.getTileAttributes(props),
+			items = [],
+			stat = [],
+			out = { type: '', props: [], points: [], lines: [], interval: [], vert: []},
+			i, len, j, len1;
+
+		data.values.forEach(function(it) {
+			var len = it.length - 1,
+				vec = new Uint32Array(len);
+			vec[0] = it[0];
+			for (var i = 1; i < len; i++) {
+				if (!items[i]) { items[i] = {}; }
+				var tp = items[i],
+					zn = it[i];
+				if (!(zn in tp)) { tp[zn] = stat.length; stat.push(zn); }
+				vec[i] = tp[zn];
+			}
+			out.props.push(vec);
+			var geo = it[len],
+				type = geo.type.toLowerCase(),
+				coords = geo.coordinates;
+
+			if (type.indexOf('multi') === -1) {
+				coords = [coords];
+			}
+			if (type.indexOf('linestring') !== -1) {
+				for (i = 0, len = coords.length; i < len; i++) {
+					out.interval.push(out.vert.length);
+					var pt = vectorTiles.flattenRing(coords[i]);
+					out.vert = out.vert.concat(pt);
+					out.interval.push(out.vert.length);
+				}
+			} else {
+				log('______ ', type)
+			}
+			out.type = type;
+			//var flat = vectorTiles.geoFlatten(it[len]);
+			//out.type = flat.type;
+			// out.interval = out.interval.concat(flat.interval);
+			// out.vert = out.vert.concat(flat.vert);
+		});
+		out.stat = stat;
+		out.values = data.values;
+log('_flatTile', attr, out)
+			*/
+    },
+
+    geoFlatten: function() {  // get flatten geometry
+        /*
+		var type = geo.type.toLowerCase(),
+            coords = geo.coordinates,
+			out = {type: type, vert: [], rings: [], holes: []},
+			i, len, j, len1. pt;
+
+        if (type.indexOf('multi') === -1) {
+            coords = [coords];
+		}
+        //if (type.indexOf('point') !== -1) {
+        } else if (type.indexOf('linestring') !== -1) {
+            for (i = 0, len = coords.length; i < len; i++) {
+				out.interval.push(out.vert.length);
+				pt = vectorTiles.flattenRing(coords[i]);
+				out.vert = out.vert.concat(pt);
+				out.interval.push(out.vert.length);
+            }
+        } else if (type.indexOf('polygon') !== -1) {
+            for (i = 0, len = coords.length; i < len; i++) {
+                for (j = 0, len1 = coords[i].length; j < len1; j++) {
+                    pt = vectorTiles.flattenRing(coords[i][j]);
+                }
+            }
+        }
+		return out;
+		*/
+    },
+
+    flattenRing: function(arr) {
+        var len = arr.length,
+            cnt = 0,
+            res = new Array(2 * len);
+
+        for (var i = 0; i < len; i++) {
+            res[cnt++] = arr[i][0];
+            res[cnt++] = arr[i][1];
+        }
+        return res;
     },
 	addTilesToLoad: function(ds, inp) {
 		// options = options || {}; tilesOrder
@@ -490,7 +567,7 @@ var layersVersion = {
 					utils.extend(info.properties, inp.properties);
 					utils.extend(info.geometry, inp.geometry);
 					info.tiles = inp.tiles;
-					info.tilesOrder = inp.tilesOrder.map(function(it) {return it.toLowerCase();});
+					info.tilesOrder = inp.tilesOrder = inp.tilesOrder.map(function(it) {return it.toLowerCase();});
 					this._update(ds);
 					vectorTiles.addTilesToLoad(ds, inp);
 				}
@@ -571,4 +648,76 @@ var layersVersion = {
         this._intervalID = setInterval(this.chkVersion.bind(this), this._delay);
     }
 };
+
+var handler = new ImageHandler(self);
+
+var cmdProxy = function(data) {
+// log('__ cmd _______', cmd, options);
+	var options = data.options,
+		cmd = options.cmd,
+		out = {url: data.src, inp: options, load: false};
+
+	if (options.syncParams) {syncParams = options.syncParams;}
+
+	if (cmd === 'mapProperties') {				// загрузка свойств карты
+		// var out = {url: cmd, inp: options, load: false};
+		gmxMapManager.loadMapProperties(options)
+			.then(function(json) {
+				out.load = true;
+				out.res = json;
+// log('mapProperties', out)
+				handler.workerContext.postMessage(out);
+				//log('__gmx_______', gmx);
+			})
+			.catch(function(err) {
+				out.error = err.toString();
+				handler.workerContext.postMessage(out);
+			});
+	} else if (cmd === 'onmoveend') {			// сменилось положение карты
+		out.load = true;
+		handler.workerContext.postMessage(out);
+		gmx._zoom = options.zoom;				// текущий zoom карты
+		gmx._bbox = options.bbox;				// текущий экран карты
+		layersVersion.now();
+	} else if (cmd === 'dateIntervalChanged') {
+		out.load = true;
+		layersVersion.add(options);
+		handler.workerContext.postMessage(out);
+	} else if (cmd === 'toggleDataSource') {	// включение/выключение контроль версионности источников
+		if (options.active) {
+			layersVersion.add(options);
+		} else {
+			layersVersion.remove(options);
+		}
+		out.load = true;
+		handler.workerContext.postMessage(out);
+	} else {
+		log('warning: this is`t commad - this is request `', cmd, '`');
+		return true;
+	}
+
+};
+
+self.onmessage = function(evt) {
+	var data = evt.data;
+	if (data.src[0] === '_') {
+		cmdProxy(data)
+		//cmdProxy(data.options.cmd, data.options)
+	} else if (data.options && data.options.options && data.options.options.type === 'json') {
+		// utils.getJson(utils.extend({}, data.options, {
+			// url: data.src,
+			// options: data.options,
+			// params: data.params
+		// }));
+		utils.getJson({
+			url: data.src,
+			send: true,
+			options: data.options.options,
+			params: data.options.params
+		});
+	} else {
+		handler.enqueue(evt);
+	}
+};
+
 // https://github.com/bendrucker/insert-styles/blob/master/index.js

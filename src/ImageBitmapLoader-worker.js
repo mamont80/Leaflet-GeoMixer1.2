@@ -55,22 +55,32 @@ var utils = {
 	// getJson: function(url, params, options) {
 	getJson: function(queue) {
 // log('getJson', _protocol, queue, Date.now())
-		var par = utils.extend({}, queue.params, syncParams);
-		return fetch(utils.chkProtocol(queue.url), utils.extend({
-			method: 'post',
-			headers: {'Content-type': 'application/x-www-form-urlencoded'}
-			// mode: 'cors',
-			// redirect: 'follow',
-			// credentials: 'include'
-		}, fetchOptions, queue.options, {
-			body: utils.getFormBody(par)
-		}))
-		.then(utils.chkResponse)
+		var par = utils.extend({}, queue.params, syncParams),
+			options = queue.options || {},
+			opt = utils.extend({
+				method: 'post',
+				headers: {'Content-type': 'application/x-www-form-urlencoded'}
+				// mode: 'cors',
+				// redirect: 'follow',
+				// credentials: 'include'
+			}, fetchOptions, options, {
+				body: utils.getFormBody(par)
+			});
+		return fetch(utils.chkProtocol(queue.url), opt)
 		.then(function(res) {
-			return {
-				queue: queue,
-				res: res
-			};
+			return utils.chkResponse(res, options.type);
+		})
+		.then(function(res) {
+			var out = {url: queue.url, queue: queue, load: true, res: res};
+			if (queue.send) {
+				handler.workerContext.postMessage(out);
+			} else {
+				return out;
+			}
+		})
+		.catch(function(err) {
+			var out = {url: queue.url, queue: queue, load: false, error: err.toString()};
+			handler.workerContext.postMessage(out);
 		});
     },
 
@@ -347,64 +357,6 @@ var gmx = self.gmx || {};
 gmx._maps = {};			// свойства слоев по картам
 gmx._clientLayers = {};	// свойства слоев без карт (клиентские слои)
 
-var handler = new ImageHandler(self);
-
-var cmdProxy = function(data) {
-// log('__ cmd _______', cmd, options);
-	var options = data.options,
-		cmd = options.cmd,
-		out = {url: data.src, inp: options, load: false};
-
-	if (options.syncParams) {syncParams = options.syncParams;}
-
-	if (cmd === 'mapProperties') {				// загрузка свойств карты
-		// var out = {url: cmd, inp: options, load: false};
-		gmxMapManager.loadMapProperties(options)
-			.then(function(json) {
-				out.load = true;
-				out.res = json;
-// log('mapProperties', out)
-				handler.workerContext.postMessage(out);
-				//log('__gmx_______', gmx);
-			})
-			.catch(function(err) {
-				out.error = err.toString();
-				handler.workerContext.postMessage(out);
-			});
-	} else if (cmd === 'onmoveend') {			// сменилось положение карты
-		out.load = true;
-		handler.workerContext.postMessage(out);
-		gmx._zoom = options.zoom;				// текущий zoom карты
-		gmx._bbox = options.bbox;				// текущий экран карты
-		layersVersion.now();
-	} else if (cmd === 'dateIntervalChanged') {
-		out.load = true;
-		layersVersion.add(options);
-		handler.workerContext.postMessage(out);
-	} else if (cmd === 'toggleDataSource') {	// включение/выключение контроль версионности источников
-		if (options.active) {
-			layersVersion.add(options);
-		} else {
-			layersVersion.remove(options);
-		}
-		out.load = true;
-		handler.workerContext.postMessage(out);
-	} else {
-		log('warning: this is`t commad - this is request `', cmd, '`');
-		return true;
-	}
-
-};
-
-self.onmessage = function(evt) {
-	if ( evt.data.src[0] === '_') {
-	var data = evt.data;
-		cmdProxy(data)
-		//cmdProxy(data.options.cmd, data.options)
-	} else {
-		handler.enqueue(evt);
-	}
-};
 /** загрузчик источников данных
 */
 var vectorTiles = {
@@ -431,6 +383,8 @@ var vectorTiles = {
 			}
 		}
     },
+    _flatTile: function() {
+			/*
     _flatTile: function(ds, data) {
 		var props = ds.info.properties,
 			attr = utils.getTileAttributes(props),
@@ -477,33 +431,36 @@ var vectorTiles = {
 		out.stat = stat;
 		out.values = data.values;
 log('_flatTile', attr, out)
+			*/
     },
 
-    geoFlatten: function(arr) {  // get flatten geometry
-        var type = geo.type.toLowerCase(),
+    geoFlatten: function() {  // get flatten geometry
+        /*
+		var type = geo.type.toLowerCase(),
             coords = geo.coordinates,
 			out = {type: type, vert: [], rings: [], holes: []},
-			i, len, j, len1;
+			i, len, j, len1. pt;
 
         if (type.indexOf('multi') === -1) {
             coords = [coords];
 		}
-        if (type.indexOf('point') !== -1) {
+        //if (type.indexOf('point') !== -1) {
         } else if (type.indexOf('linestring') !== -1) {
             for (i = 0, len = coords.length; i < len; i++) {
 				out.interval.push(out.vert.length);
-				var pt = vectorTiles.flattenRing(coords[i]);
+				pt = vectorTiles.flattenRing(coords[i]);
 				out.vert = out.vert.concat(pt);
 				out.interval.push(out.vert.length);
             }
         } else if (type.indexOf('polygon') !== -1) {
             for (i = 0, len = coords.length; i < len; i++) {
                 for (j = 0, len1 = coords[i].length; j < len1; j++) {
-                    var pt = vectorTiles.flattenRing(coords[i][j]);
+                    pt = vectorTiles.flattenRing(coords[i][j]);
                 }
             }
         }
 		return out;
+		*/
     },
 
     flattenRing: function(arr) {
@@ -691,4 +648,76 @@ var layersVersion = {
         this._intervalID = setInterval(this.chkVersion.bind(this), this._delay);
     }
 };
+
+var handler = new ImageHandler(self);
+
+var cmdProxy = function(data) {
+// log('__ cmd _______', cmd, options);
+	var options = data.options,
+		cmd = options.cmd,
+		out = {url: data.src, inp: options, load: false};
+
+	if (options.syncParams) {syncParams = options.syncParams;}
+
+	if (cmd === 'mapProperties') {				// загрузка свойств карты
+		// var out = {url: cmd, inp: options, load: false};
+		gmxMapManager.loadMapProperties(options)
+			.then(function(json) {
+				out.load = true;
+				out.res = json;
+// log('mapProperties', out)
+				handler.workerContext.postMessage(out);
+				//log('__gmx_______', gmx);
+			})
+			.catch(function(err) {
+				out.error = err.toString();
+				handler.workerContext.postMessage(out);
+			});
+	} else if (cmd === 'onmoveend') {			// сменилось положение карты
+		out.load = true;
+		handler.workerContext.postMessage(out);
+		gmx._zoom = options.zoom;				// текущий zoom карты
+		gmx._bbox = options.bbox;				// текущий экран карты
+		layersVersion.now();
+	} else if (cmd === 'dateIntervalChanged') {
+		out.load = true;
+		layersVersion.add(options);
+		handler.workerContext.postMessage(out);
+	} else if (cmd === 'toggleDataSource') {	// включение/выключение контроль версионности источников
+		if (options.active) {
+			layersVersion.add(options);
+		} else {
+			layersVersion.remove(options);
+		}
+		out.load = true;
+		handler.workerContext.postMessage(out);
+	} else {
+		log('warning: this is`t commad - this is request `', cmd, '`');
+		return true;
+	}
+
+};
+
+self.onmessage = function(evt) {
+	var data = evt.data;
+	if (data.src[0] === '_') {
+		cmdProxy(data)
+		//cmdProxy(data.options.cmd, data.options)
+	} else if (data.options && data.options.options && data.options.options.type === 'json') {
+		// utils.getJson(utils.extend({}, data.options, {
+			// url: data.src,
+			// options: data.options,
+			// params: data.params
+		// }));
+		utils.getJson({
+			url: data.src,
+			send: true,
+			options: data.options.options,
+			params: data.options.params
+		});
+	} else {
+		handler.enqueue(evt);
+	}
+};
+
 // https://github.com/bendrucker/insert-styles/blob/master/index.js

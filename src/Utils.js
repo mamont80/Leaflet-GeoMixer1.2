@@ -65,11 +65,15 @@ var gmxAPIutils = {
     createWorker: function(url)	{		// Создание Worker-а
         return new Promise(function(resolve, reject) {
 			if ('createImageBitmap' in window && 'Worker' in window) {
-				fetch(url, {mode: 'cors'})
-				.then(function(resp) { return resp.blob(); })
-				.then(function(blob) {
-					resolve(new Worker(window.URL.createObjectURL(blob, {type: 'application/javascript; charset=utf-8'})));
-				});
+				if (url.indexOf(location.origin) === 0) {
+					resolve(new Worker(url));
+				} else {
+					fetch(url, {mode: 'cors'})
+					.then(function(resp) { return resp.blob(); })
+					.then(function(blob) {
+						resolve(new Worker(window.URL.createObjectURL(blob, {type: 'application/javascript; charset=utf-8'})));
+					});
+				}
 			} else {
 				reject({error: 'Browser don`t support `createImageBitmap` or `Worker`'});
 			}

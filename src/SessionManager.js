@@ -52,18 +52,30 @@ var gmxSessionManager = {
             apiKey = typeof apiKey === 'undefined' ? this._searchScriptAPIKey() : apiKey;
             keys[serverHost] = new Promise(function(resolve, reject) {
 				if (apiKey) {
-					gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/ApiKey.ashx',
-						{
-							WrapStyle: 'func',
-							Key: apiKey
-						}
-					).then(function(response) {
-						if (response && response.Status === 'ok') {
-							resolve(response.Result.Key);
-						} else {
-							reject();
-						}
-					}, reject);
+					var url = L.gmxUtil.protocol + '//' + serverHost + '/ApiKey.ashx?WrapStyle=None&Key=' + apiKey,
+						storeKey = function(json) {
+							if (json && json.Status === 'ok') {
+								var key = this._sessionKeysRes[serverHost] = json.Result.Key;
+								resolve(key);
+							} else {
+								reject();
+							}
+						}.bind(this);
+					fetch(url, {mode: 'cors'})
+					.then(function(resp) { return resp.json(); })
+					.then(storeKey);
+					// gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/ApiKey.ashx',
+						// {
+							// WrapStyle: 'func',
+							// Key: apiKey
+						// }
+					// ).then(function(response) {
+						// if (response && response.Status === 'ok') {
+							// resolve(response.Result.Key);
+						// } else {
+							// reject();
+						// }
+					// }, reject);
 				} else {
 					resolve('');
 				}
@@ -76,7 +88,11 @@ var gmxSessionManager = {
     getSessionKey: function(serverHost) {
 		return this._sessionKeys[serverHost];
     },
-    _sessionKeys: {} //deferred for each host
+    getSessionKeyRes: function(serverHost) {
+		return this._sessionKeysRes[serverHost];
+    },
+    _sessionKeysRes: {}, 	//key for each host
+    _sessionKeys: {} 		//promise for each host
 };
 L.gmx = L.gmx || {};
 L.gmx.gmxSessionManager = gmxSessionManager;

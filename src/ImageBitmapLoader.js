@@ -39,7 +39,7 @@ L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js
 			return new Promise(function(resolve, reject) {
 				attr.resolve = resolve;
 				attr.reject = reject;
-			}).catch(console.log);
+			}).catch(L.Util.falseFn);
 		}
 	};
 

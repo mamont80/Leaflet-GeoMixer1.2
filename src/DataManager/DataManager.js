@@ -211,10 +211,10 @@ var DataManager = L.Class.extend({
         this.temporalColumnType = tileAttributes.tileAttributeTypes[this.options.TemporalColumnName];
 
         var hostName = this.options.hostName,
-            sessionKey = this.options.sessionKey;
+            sessionKey = this.options.sessionKey || '';
 
         // if (!sessionKey) {
-            // sessionKey = L.gmx.gmxSessionManager.getSessionKey(hostName);
+            // sessionKey = L.gmx.gmxSessionManager.getSessionKeyRes(hostName);
         // }
         this.tileSenderPrefix = L.gmxUtil.protocol + '//' + hostName + '/' +
             'TileSender.ashx?WrapStyle=None' +

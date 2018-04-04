@@ -93,6 +93,10 @@ ScreenVectorTile.prototype = {
 						} else {
 							resolve({gtp: gtp});
 						}
+					},
+					skipUrl = function(res) {
+						_this.layer.fire('bitmap', {id: item.id, loaded: false, url: rUrl, result: res});
+						tryHigherLevelTile(rUrl);
 					};
 
 					if (gmx.badTiles[rUrl] || (gmx.maxNativeZoom && gmx.maxNativeZoom < gtp.z)) {
@@ -103,21 +107,26 @@ ScreenVectorTile.prototype = {
 					if (L.gmx.getBitmap) {
 						L.gmx.getBitmap(rUrl, fetchOptions).then(
 							function(res) {
-								var imageObj = res.imageBitmap,
-									canvas_ = document.createElement('canvas');
-								canvas_.width = imageObj.width;
-								canvas_.height = imageObj.height;
-								canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
-								if (gmx.rastersCache) {
-									gmx.rastersCache[rUrl] = canvas_;
+								if (res) {
+									var imageObj = res.imageBitmap,
+										canvas_ = document.createElement('canvas');
+									canvas_.width = imageObj.width;
+									canvas_.height = imageObj.height;
+									canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
+									if (gmx.rastersCache) {
+										gmx.rastersCache[rUrl] = canvas_;
+									}
+									resolve({gtp: gtp, image: canvas_});
+									_this.layer.fire('bitmap', {id: item.id, loaded: true, url: rUrl, result: res});
+								} else {
+									skipUrl();
 								}
-								resolve({gtp: gtp, image: canvas_});
-								_this.layer.fire('bitmap', {id: item.id, loaded: true, url: rUrl, result: res});
 							},
-							function(res) {
-								_this.layer.fire('bitmap', {id: item.id, loaded: false, url: rUrl, result: res});
-								tryHigherLevelTile(rUrl);
-							}
+							skipUrl
+							// function(res) {
+								// _this.layer.fire('bitmap', {id: item.id, loaded: false, url: rUrl, result: res});
+								// tryHigherLevelTile(rUrl);
+							// }
 						)
 						.catch(L.Util.falseFn);
 					} else {
@@ -164,6 +173,7 @@ ScreenVectorTile.prototype = {
         var source = attr.sourceTilePoint || attr.destinationTilePoint,
             info = {
                 geoItem: attr.geoItem,
+				zKey: attr.zKey,
                 destination: {
                     z: attr.destinationTilePoint.z,
                     x: attr.destinationTilePoint.x,
@@ -190,6 +200,7 @@ ScreenVectorTile.prototype = {
 			var ptx = res.getContext('2d');
 			ptx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
 		}
+		return res;
     },
 
     // get pixels parameters for shifted object
@@ -343,6 +354,7 @@ ScreenVectorTile.prototype = {
 						var info = {
 								geoItem: geo,
 								image: img,
+								zKey: _this.zKey,
 								destinationTilePoint: tilePoint,
 								sourceTilePoint: gtp,
 								sx: 0, sy: 0, sw: 256, sh: 256,
@@ -401,11 +413,15 @@ ScreenVectorTile.prototype = {
 							if (hookResult) {
 								if (hookResult.then) {
 									hookResult.then(then);
+								} else {
+									resCanvas = hookResult;
+									then();
 								}
 							} else if (hookResult === null) {
 								item.skipRasters = true;
 								skipRasterFunc();
 							} else {
+								resCanvas = img;
 								then();
 							}
 						}

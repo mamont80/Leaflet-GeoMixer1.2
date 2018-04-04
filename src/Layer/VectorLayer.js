@@ -1,90 +1,3 @@
-/*
-L.extend(L.GridLayer.prototype, {
-	_animateZoom: function (e) {
-		this.options.updateWhenZooming = false;
-		this._setView(e.center, e.zoom, true, true);
-//	console.log('_setView _animateZoom', e.zoom, e.center, Date.now() - window.startTest, this)
-	},
-
-	_setZoomTransform: function (level, center, zoom) {	// Add by Geomixer (for cache levels transform)
-		var key = level.zoom + '_' + zoom,
-			cache = L.gmx._zoomLevelsCache[key] || {},
-			translate = cache.translate,
-			scale = cache.scale;
-		if (!translate) {
-			scale = this._map.getZoomScale(zoom, level.zoom);
-			translate = level.origin.multiplyBy(scale).subtract(this._map._getNewPixelOrigin(center, zoom))._round();
-			L.gmx._zoomLevelsCache[key] = {translate: translate, scale: scale};
-			// console.log('_setZoomTransform', key, zoom, translate, scale);
-		}
-		if (L.Browser.any3d) {
-			L.DomUtil.setTransform(level.el, translate, scale);
-		} else {
-			L.DomUtil.setPosition(level.el, translate);
-		}
-	},
-	_clearOldLevels: function (z) {
-		if (this._map) {
-// console.log('_clearOldLevels', z, Date.now() - window.startTest, this)
-			z = z || this._map.getZoom();
-			for (var key in this._levels) {
-				var el = this._levels[key].el,
-					zz = Number(key);
-				if (zz !== z) {
-					L.DomUtil.remove(el);
-					this._removeTilesAtZoom(zz);
-					this._onRemoveLevel(zz);
-					delete this._levels[key];
-				}
-			}
-		}
-	},
-	_noTilesToLoad: function () {
-		var zoom = this._tileZoom || this._map.getZoom();
-		for (var key in this._tiles) {
-			if (this._tiles[key].coords.z === zoom && !this._tiles[key].loaded) { return false; }
-		}
-		return true;
-	},
-
-	_tileReady: function (coords, err, tile) {
-		if (!this._map) { return; }				// Add by Geomixer (нет возможности отключения fade-anim)
-// if (this._map._animatingZoom)
-// console.log('_tileReady _animateZoom', coords, err, tile, Date.now() - window.startTest, this)
-
-		if (err) {
-			// @event tileerror: TileErrorEvent
-			// Fired when there is an error loading a tile.
-			this.fire('tileerror', {
-				error: err,
-				tile: tile,
-				coords: coords
-			});
-		}
-
-		var key = this._tileCoordsToKey(coords);
-
-		tile = this._tiles[key];
-		if (!tile) { return; }
-
-		tile.loaded = +new Date();
-
-		if (!err) {
-			L.DomUtil.addClass(tile.el, 'leaflet-tile-loaded');
-			this.fire('tileload', {		// @event tileload: TileEvent // Fired when a tile loads.
-				tile: tile.el,
-				coords: coords
-			});
-		}
-
-		if (this._noTilesToLoad()) {
-			this._loading = false;
-			this._clearOldLevels(this._tileZoom);
-			this.fire('load');			// @event load: Event // Fired when the grid layer loaded all visible tiles.
-		}
-	}
-});
-*/
 var VectorGridLayer = L.GridLayer.extend({
 	_animateZoom: function (e) {
 		this.options.updateWhenZooming = false;
@@ -393,6 +306,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
     },
 
 	_chkOldLevels: function () {
+		if (!this._map) {return;}
 		var zoom = this._map._zoom,
 			key, tile;
 
@@ -413,7 +327,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
     },
 
 	_chkTiles: function () {
-		//return;
+		if (!this._map) {return;}
 		// console.log('_onmoveend ', this._tileZoom, this._loading, this._noTilesToLoad(), this._tileZoom, Date.now());
 		var zoom = this._tileZoom || this._map._zoom,
 			key, tile;
@@ -678,6 +592,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 			// ph.properties.srs = gmx.srs = Number(gmx.rawProperties.RasterSRS);
 		}
 
+        ph.properties.sessionKey = ph.properties.sessionKey || gmx.sessionKey || '';
         ph.properties.needBbox = gmx.needBbox;
         ph.properties.isGeneralized = this.options.isGeneralized;
         ph.properties.isFlatten = this.options.isFlatten;

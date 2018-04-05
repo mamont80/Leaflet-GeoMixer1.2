@@ -55,12 +55,12 @@ var gmxSessionManager = {
 					var url = L.gmxUtil.protocol + '//' + serverHost + '/ApiKey.ashx?WrapStyle=None&Key=' + apiKey,
 						storeKey = function(json) {
 							if (json && json.Status === 'ok') {
-								var key = this._sessionKeysRes[serverHost] = json.Result.Key;
+								var key = gmxSessionManager._sessionKeysRes[serverHost] = json.Result.Key;
 								resolve(key);
 							} else {
 								reject();
 							}
-						}.bind(this);
+						};
 					fetch(url, {mode: 'cors'})
 					.then(function(resp) { return resp.json(); })
 					.then(storeKey);

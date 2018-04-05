@@ -4547,12 +4547,12 @@ var gmxSessionManager = {
 					var url = L.gmxUtil.protocol + '//' + serverHost + '/ApiKey.ashx?WrapStyle=None&Key=' + apiKey,
 						storeKey = function(json) {
 							if (json && json.Status === 'ok') {
-								var key = this._sessionKeysRes[serverHost] = json.Result.Key;
+								var key = gmxSessionManager._sessionKeysRes[serverHost] = json.Result.Key;
 								resolve(key);
 							} else {
 								reject();
 							}
-						}.bind(this);
+						};
 					fetch(url, {mode: 'cors'})
 					.then(function(resp) { return resp.json(); })
 					.then(storeKey);
@@ -5053,7 +5053,9 @@ var GmxEventsManager = L.Handler.extend({
 			map = this._map;
 
 		if (ev.originalEvent) {
-			var tagName = ev.originalEvent.target.tagName;
+			var target = ev.originalEvent.target;
+			if (target !== map._container) { return; }
+			var tagName = target.tagName.toLowerCase();
 			if (tagName === 'path') { return; }
 			map.gmxMouseDown = L.Browser.webkit && !L.gmxUtil.isIEOrEdge ? ev.originalEvent.which : ev.originalEvent.buttons;
 		}
@@ -7651,6 +7653,15 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 				// dm.fire('moveend');
 			// }
 		// }
+	// },
+
+	// _onMoveEnd: function () {
+		// if (!this._map || this._map._animatingZoom) { return; }
+//console.log('_onMoveEnd', arguments)
+		// requestIdleCallback(function () {
+			// this._update();
+		// }.bind(this), {timeout: 0});
+		//this._update();
 	// },
 
 	_getEvents: function () {
@@ -11543,7 +11554,9 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
         if (props.MaxZoom) {
             gmx.maxNativeZoom = props.MaxZoom;
         }
-        if (props.sessionKey) {
+
+        props.sessionKey = props.sessionKey || L.gmx.gmxSessionManager.getSessionKeyRes(props.hostName);
+		if (props.sessionKey) {
             gmx.sessionKey = props.sessionKey;
         }
         if (!ph.geometry) {

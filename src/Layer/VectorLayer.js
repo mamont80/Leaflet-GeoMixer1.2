@@ -359,6 +359,15 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 		// }
 	// },
 
+	// _onMoveEnd: function () {
+		// if (!this._map || this._map._animatingZoom) { return; }
+//console.log('_onMoveEnd', arguments)
+		// requestIdleCallback(function () {
+			// this._update();
+		// }.bind(this), {timeout: 0});
+		//this._update();
+	// },
+
 	_getEvents: function () {
 		var events = L.GridLayer.prototype.getEvents.call(this);
 		L.extend(events, {

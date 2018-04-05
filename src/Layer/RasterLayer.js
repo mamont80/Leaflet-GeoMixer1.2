@@ -33,7 +33,9 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
         if (props.MaxZoom) {
             gmx.maxNativeZoom = props.MaxZoom;
         }
-        if (props.sessionKey) {
+
+        props.sessionKey = props.sessionKey || L.gmx.gmxSessionManager.getSessionKeyRes(props.hostName);
+		if (props.sessionKey) {
             gmx.sessionKey = props.sessionKey;
         }
         if (!ph.geometry) {

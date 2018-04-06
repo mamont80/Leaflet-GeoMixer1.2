@@ -94,8 +94,8 @@ var GmxEventsManager = L.Handler.extend({
 
 		if (ev.originalEvent) {
 			var target = ev.originalEvent.target;
-			if (target !== map._container) { return; }
 			var tagName = target.tagName.toLowerCase();
+			if (tagName !== 'svg' && target !== map._container) { return; }
 			if (tagName === 'path') { return; }
 			map.gmxMouseDown = L.Browser.webkit && !L.gmxUtil.isIEOrEdge ? ev.originalEvent.which : ev.originalEvent.buttons;
 		}

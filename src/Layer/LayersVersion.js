@@ -37,6 +37,7 @@ var getRequestParams = function(layer) {
 			dm = layer;
 			prop = dm.options;
 		} else {
+			if (!layer._gmx) {return hosts;}
 			prop = layer._gmx.properties;
 			dm = layer._gmx.dataManager;
 			gmx = layer._gmx;

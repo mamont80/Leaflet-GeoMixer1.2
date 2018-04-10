@@ -46,6 +46,9 @@ var gmxMapManager = {
 								_rawTree: json.res,
 								_nodes: {}
 							};
+							if (L.gmx.mapPropertiesHook) {
+								L.gmx.mapPropertiesHook(json.res);
+							}
 							resolve(json.res);
 						} else {
 							reject(json);
@@ -63,6 +66,9 @@ var gmxMapManager = {
 									_rawTree: json.Result,
 									_nodes: {}
 								};
+								if (L.gmx.mapPropertiesHook) {
+									L.gmx.mapPropertiesHook(json.Result);
+								}
 								resolve(json.Result);
 							} else {
 								reject(json);

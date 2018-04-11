@@ -4638,6 +4638,9 @@ var gmxMapManager = {
 								_rawTree: json.res,
 								_nodes: {}
 							};
+							if (L.gmx.mapPropertiesHook) {
+								L.gmx.mapPropertiesHook(json.res);
+							}
 							resolve(json.res);
 						} else {
 							reject(json);
@@ -4655,6 +4658,9 @@ var gmxMapManager = {
 									_rawTree: json.Result,
 									_nodes: {}
 								};
+								if (L.gmx.mapPropertiesHook) {
+									L.gmx.mapPropertiesHook(json.Result);
+								}
 								resolve(json.Result);
 							} else {
 								reject(json);
@@ -11198,6 +11204,7 @@ var getRequestParams = function(layer) {
 			dm = layer;
 			prop = dm.options;
 		} else {
+			if (!layer._gmx) {return hosts;}
 			prop = layer._gmx.properties;
 			dm = layer._gmx.dataManager;
 			gmx = layer._gmx;

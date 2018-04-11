@@ -29,7 +29,7 @@ var getParams = function(prop, dm, gmx) {
 var getRequestParams = function(layer) {
     var hosts = {},
         prop, hostName, dm, gmx;
-    if (layer) {
+    if (layer && layer._gmx) {
         if (layer.target instanceof L.gmx.DataManager) {
 			layer = layer.target;
 		}
@@ -37,7 +37,7 @@ var getRequestParams = function(layer) {
 			dm = layer;
 			prop = dm.options;
 		} else {
-			if (!layer._gmx) {return hosts;}
+			// if (!layer._gmx) {return hosts;}
 			prop = layer._gmx.properties;
 			dm = layer._gmx.dataManager;
 			gmx = layer._gmx;

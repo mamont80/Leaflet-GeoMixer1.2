@@ -3967,7 +3967,8 @@ L.gmx.Deferred = Deferred;
 
 (function() {
 'use strict';
-L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js')
+L.gmx = L.gmx || {};
+L.gmx.workerPromise = L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js')
 .then(function(worker) {
 	var ImageBitmapLoader = function() {
 		this.jobs = {};
@@ -8646,6 +8647,7 @@ L.Map.addInitHook(function () {
 	this.options.srs = this.options.srs || 3857;
 	this.options.skipTiles = this.options.skipTiles || 'All';
 
+	L.gmx.leafletMap = this;
 	L.gmx._zoomLevelsCache = {};
 	// L.gmx._zoomAnimCache = {};
 

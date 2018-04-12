@@ -1344,6 +1344,7 @@ L.Map.addInitHook(function () {
 	this.options.srs = this.options.srs || 3857;
 	this.options.skipTiles = this.options.skipTiles || 'All';
 
+	L.gmx.leafletMap = this;
 	L.gmx._zoomLevelsCache = {};
 	// L.gmx._zoomAnimCache = {};
 

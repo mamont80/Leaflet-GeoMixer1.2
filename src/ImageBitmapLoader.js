@@ -1,6 +1,7 @@
 (function() {
 'use strict';
-L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js')
+L.gmx = L.gmx || {};
+L.gmx.workerPromise = L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/ImageBitmapLoader-worker.js')
 .then(function(worker) {
 	var ImageBitmapLoader = function() {
 		this.jobs = {};

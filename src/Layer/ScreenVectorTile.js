@@ -495,7 +495,7 @@ ScreenVectorTile.prototype = {
 						done(canvas_);
 						_this.layer.fire('bitmap', {id: idr, loaded: true, url: url, result: res});
 					}, skipRaster)
-				.catch(L.Util.falseFn);
+				.catch(skipRaster);
 			} else {
 				var request = this.rasterRequests[url];
 				if (!request) {

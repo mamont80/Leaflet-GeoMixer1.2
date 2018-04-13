@@ -491,7 +491,7 @@ ScreenVectorTile.prototype = {
 							canvas_ = document.createElement('canvas');
 						canvas_.width = imageObj.width;
 						canvas_.height = imageObj.height;
-						canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.width);
+						canvas_.getContext('2d').drawImage(imageObj, 0, 0, canvas_.width, canvas_.height);
 						done(canvas_);
 						_this.layer.fire('bitmap', {id: idr, loaded: true, url: url, result: res});
 					}, skipRaster)

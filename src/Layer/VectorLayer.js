@@ -297,7 +297,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
     _onVersionChange: function () {
         this._updateProperties(this._gmx.rawProperties);
-		this._chkTiles({repaint: true});
+		this._chkTiles();
     },
 
 	_waitCheckOldLevels: function () {
@@ -326,7 +326,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 		this._onmoveendTimer = setTimeout(this._chkTiles.bind(this), 250);
     },
 
-	_chkTiles: function () {
+	_chkCurrentTiles: function () {
 		if (!this._map) {return;}
 		// console.log('_onmoveend ', this._tileZoom, this._loading, this._noTilesToLoad(), this._tileZoom, Date.now());
 		var zoom = this._tileZoom || this._map._zoom,
@@ -344,6 +344,10 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 				}
 			}
 		}
+    },
+
+	_chkTiles: function () {
+		this._chkCurrentTiles();
 		this.repaint();
 		this._waitCheckOldLevels();
 		//this._removeScreenObservers(zoom, true);
@@ -397,7 +401,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         var gmx = this._gmx;
         var owner = {
 			dateIntervalChanged: function() {
-				this._chkTiles({repaint: true});
+				this._chkTiles();
 				if (L.gmx.sendCmd) {
 					var interval = gmx.dataManager.getMaxDateInterval();
 					L.gmx.sendCmd('dateIntervalChanged', {
@@ -884,6 +888,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
     repaint: function (zKeys) {
         if (this._map) {
+			this._chkCurrentTiles();
             if (!zKeys) {
                 zKeys = {};
                 for (var key in this._tiles) { zKeys[key] = true; this._clearLoaded(key); }

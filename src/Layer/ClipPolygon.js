@@ -70,7 +70,7 @@ var isPointInClipPolygons = function (chkPoint, clipPolygons) {
 };
 
 var getClipPolygonItem = function (geo) {
-    var geometry = gmxAPIutils.convertGeometry(geo),
+    var geometry = gmxAPIutils.convertGeometry(geo, false, true),		// все в 3857
         bboxArr = gmxAPIutils.geoItemBounds(geometry);
     bboxArr.geometry = geometry;
     return bboxArr;

@@ -1063,7 +1063,7 @@ var DataManager = L.Class.extend({
         var vTile = this.processingTile;
         if (vTile) {
 			var chkKeys = (data || vTile.data).reduce(function(a,item) {
-				var id = item[0];
+				var id = typeof(item) === 'string' ? item : item[0];
 				a[id] = true;
 				delete this._items[id];
 				return a;

@@ -14,7 +14,7 @@ var gmxMapManager = {
 
 	loadMapProperties: function(options) {
         var maps = this._maps,
-			serverHost = options.hostName || options.serverHost,
+			serverHost = options.hostName || options.serverHost || 'maps.kosmosnimki.ru',
 			mapName = options.mapName;
 
         if (!maps[serverHost] || !maps[serverHost][mapName]) {

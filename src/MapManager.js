@@ -12,6 +12,26 @@ var gmxMapManager = {
 		});
     },
 
+	_addMapProperties: function(res, serverHost, mapName) {
+		L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
+		L.gmx._maps[serverHost][mapName] = {
+			_rawTree: res,
+			_nodes: {}
+		};
+		gmxMapManager.iterateNode(res, function(it) {	// TODO: удалить после переделки стилей на сервере
+			if (it.type === 'layer') {
+				var props = it.content.properties;
+				if (props.styles) {
+					it.content.properties.gmxStyles = L.gmx.StyleManager.decodeOldStyles(props);
+				}
+			}
+		});
+
+		if (L.gmx.mapPropertiesHook) {
+			L.gmx.mapPropertiesHook(res);
+		}
+    },
+
 	loadMapProperties: function(options) {
         var maps = this._maps,
 			serverHost = options.hostName || options.serverHost || 'maps.kosmosnimki.ru',
@@ -39,16 +59,7 @@ var gmxMapManager = {
 						ModeKey: 'map'
 					}).then(function(json) {
 						if (json && json.load && json.res) {
-							// json.res.properties.hostName = serverHost;
-							// json.res.properties.sessionKey = sessionKey;
-							L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
-							L.gmx._maps[serverHost][mapName] = {
-								_rawTree: json.res,
-								_nodes: {}
-							};
-							if (L.gmx.mapPropertiesHook) {
-								L.gmx.mapPropertiesHook(json.res);
-							}
+							gmxMapManager._addMapProperties(json.res, serverHost, mapName);
 							resolve(json.res);
 						} else {
 							reject(json);
@@ -61,14 +72,7 @@ var gmxMapManager = {
 							if (json && json.Status === 'ok' && json.Result) {
 								json.Result.properties.hostName = serverHost;
 								json.Result.properties.sessionKey = sessionKey;
-								L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
-								L.gmx._maps[serverHost][mapName] = {
-									_rawTree: json.Result,
-									_nodes: {}
-								};
-								if (L.gmx.mapPropertiesHook) {
-									L.gmx.mapPropertiesHook(json.Result);
-								}
+								gmxMapManager._addMapProperties(json.Result, serverHost, mapName);
 								resolve(json.Result);
 							} else {
 								reject(json);

@@ -4605,6 +4605,26 @@ var gmxMapManager = {
 		});
     },
 
+	_addMapProperties: function(res, serverHost, mapName) {
+		L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
+		L.gmx._maps[serverHost][mapName] = {
+			_rawTree: res,
+			_nodes: {}
+		};
+		gmxMapManager.iterateNode(res, function(it) {	// TODO: удалить после переделки стилей на сервере
+			if (it.type === 'layer') {
+				var props = it.content.properties;
+				if (props.styles) {
+					it.content.properties.gmxStyles = L.gmx.StyleManager.decodeOldStyles(props);
+				}
+			}
+		});
+
+		if (L.gmx.mapPropertiesHook) {
+			L.gmx.mapPropertiesHook(res);
+		}
+    },
+
 	loadMapProperties: function(options) {
         var maps = this._maps,
 			serverHost = options.hostName || options.serverHost || 'maps.kosmosnimki.ru',
@@ -4632,16 +4652,7 @@ var gmxMapManager = {
 						ModeKey: 'map'
 					}).then(function(json) {
 						if (json && json.load && json.res) {
-							// json.res.properties.hostName = serverHost;
-							// json.res.properties.sessionKey = sessionKey;
-							L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
-							L.gmx._maps[serverHost][mapName] = {
-								_rawTree: json.res,
-								_nodes: {}
-							};
-							if (L.gmx.mapPropertiesHook) {
-								L.gmx.mapPropertiesHook(json.res);
-							}
+							gmxMapManager._addMapProperties(json.res, serverHost, mapName);
 							resolve(json.res);
 						} else {
 							reject(json);
@@ -4654,14 +4665,7 @@ var gmxMapManager = {
 							if (json && json.Status === 'ok' && json.Result) {
 								json.Result.properties.hostName = serverHost;
 								json.Result.properties.sessionKey = sessionKey;
-								L.gmx._maps[serverHost] = L.gmx._maps[serverHost] || {};
-								L.gmx._maps[serverHost][mapName] = {
-									_rawTree: json.Result,
-									_nodes: {}
-								};
-								if (L.gmx.mapPropertiesHook) {
-									L.gmx.mapPropertiesHook(json.Result);
-								}
+								gmxMapManager._addMapProperties(json.Result, serverHost, mapName);
 								resolve(json.Result);
 							} else {
 								reject(json);
@@ -9980,22 +9984,26 @@ StyleManager.prototype = {
             arr = props.styles || [{MinZoom: 1, MaxZoom: 21, RenderStyle: StyleManager.DEFAULT_STYLE}],
             len = Math.max(arr.length, gmx.styles.length);
 
-        for (var i = 0; i < len; i++) {
-            if (!this._styles[i]) {
-                var gmxStyle = gmx.styles[i] || arr[i];
-                if (!gmxStyle.RenderStyle) { gmxStyle.RenderStyle = StyleManager.DEFAULT_STYLE; }
-                if (gmxStyle.HoverStyle === undefined) {
-                    var hoveredStyle = JSON.parse(JSON.stringify(gmxStyle.RenderStyle));
-                    if (hoveredStyle.outline) { hoveredStyle.outline.thickness += 1; }
-                    gmxStyle.HoverStyle = hoveredStyle;
-                } else if (gmxStyle.HoverStyle === null) {
-                    delete gmxStyle.HoverStyle;
-                }
-                var pt = this._prepareItem(gmxStyle);
-                this._styles.push(pt);
-                if (this._isLabel(pt.RenderStyle)) { gmx.labelsLayer = true; }
-            }
-        }
+		if (props.gmxStyles) {
+			this._styles = props.gmxStyles.styles;
+		} else {
+			for (var i = 0; i < len; i++) {
+				if (!this._styles[i]) {
+					var gmxStyle = gmx.styles[i] || arr[i];
+					if (!gmxStyle.RenderStyle) { gmxStyle.RenderStyle = StyleManager.DEFAULT_STYLE; }
+					if (gmxStyle.HoverStyle === undefined) {
+						var hoveredStyle = JSON.parse(JSON.stringify(gmxStyle.RenderStyle));
+						if (hoveredStyle.outline) { hoveredStyle.outline.thickness += 1; }
+						gmxStyle.HoverStyle = hoveredStyle;
+					} else if (gmxStyle.HoverStyle === null) {
+						delete gmxStyle.HoverStyle;
+					}
+					var pt = this._prepareItem(gmxStyle);
+					this._styles.push(pt);
+					if (this._isLabel(pt.RenderStyle)) { gmx.labelsLayer = true; }
+				}
+			}
+		}
         this._checkStyles();
         this._serverStylesParsed = true;
     },
@@ -10468,6 +10476,138 @@ StyleManager.parseLinearGradient = function(lg) {
     return common;
 };
 
+StyleManager.parReg = /\[([^\]]+)\]/g;
+StyleManager.getKeysHash = function(str, type) {
+	var out = {},
+		arr = str.match(StyleManager.parReg);
+	if (arr) {
+		arr.forEach(function(it) {
+			var key = it.replace(/[[\]""]/g, '');
+			if (!out[key]) {out[key] = type || true; }
+		});
+	}
+	return out;
+};
+
+StyleManager.decodeOldStyle = function(style) {   // Style Scanex->leaflet
+	var st, i, len, key, key1,
+		styleOut = {},
+		attrKeys = {},
+		type = '';
+
+	for (key in gmxAPIutils.styleKeys) {
+		var keys = gmxAPIutils.styleKeys[key];
+		for (i = 0, len = keys.client.length; i < len; i++) {
+			key1 = keys.client[i];
+			if (key1 in style) {
+				styleOut[key1] = style[key1];
+			}
+		}
+		st = style[key];
+		if (st && typeof (st) === 'object') {
+			for (i = 0, len = keys.server.length; i < len; i++) {
+				key1 = keys.server[i];
+				if (key1 in st) {
+					var newKey = keys.client[i],
+						zn = st[key1];
+					if (typeof (zn) === 'string') {
+						var hash = StyleManager.getKeysHash(zn, newKey);
+						if (Object.keys(hash).length) {
+							styleOut.common = false;
+							L.extend(attrKeys, hash);
+						}
+					} else if (key1 === 'opacity') {
+						zn /= 100;
+					}
+					styleOut[newKey] = zn;
+				}
+			}
+		}
+	}
+	if (style.marker) {
+		st = style.marker;
+		if ('dx' in st || 'dy' in st) {
+			var dx = st.dx || 0,
+				dy = st.dy || 0;
+			styleOut.iconAnchor = [-dx, -dy];    // For leaflet type iconAnchor
+		}
+	}
+	for (key in style) {
+		if (!gmxAPIutils.styleKeys[key]) {
+			styleOut[key] = style[key];
+		}
+	}
+	return {
+		style: styleOut,			// стиль
+		attrKeys: attrKeys,			// используемые поля атрибутов
+		type: type					// 'polygon', 'line', 'circle', 'square', 'image'
+	};
+};
+
+StyleManager.decodeOldStyles = function(props) {
+    var styles = props.styles,
+		arr = styles || [{MinZoom: 1, MaxZoom: 21, RenderStyle: StyleManager.DEFAULT_STYLE}],
+		type = props.type.toLocaleLowerCase(),
+		gmxStyles = {
+			attrKeys: {},
+			iconsUrl: {}
+		};
+	gmxStyles.styles = arr.map(function(it) {
+        var pt = {
+            Name: it.Name || '',
+            type: type || '',
+			//legend: false,
+            MinZoom: it.MinZoom || 0,
+            MaxZoom: it.MaxZoom || 18
+        };
+
+        if ('Balloon' in it) {
+            pt.Balloon = it.Balloon;
+			var hash = StyleManager.getKeysHash(it.Balloon, 'Balloon');
+			if (Object.keys(hash).length) {
+				L.extend(gmxStyles.attrKeys, hash);
+			}
+        }
+        if (it.RenderStyle) {
+            var rt = StyleManager.decodeOldStyle(it.RenderStyle);
+			L.extend(gmxStyles.attrKeys, rt.attrKeys);
+			if (rt.style.iconUrl) { gmxStyles.iconsUrl[rt.style.iconUrl] = true; }
+            pt.RenderStyle = rt.style;
+			if (it.HoverStyle === undefined) {
+				var hoveredStyle = JSON.parse(JSON.stringify(pt.RenderStyle));
+				if (hoveredStyle.outline) { hoveredStyle.outline.thickness += 1; }
+				pt.HoverStyle = hoveredStyle;
+			} else if (it.HoverStyle === null) {
+				delete pt.HoverStyle;
+			} else {
+				var ht = StyleManager.decodeOldStyle(it.HoverStyle);
+				pt.HoverStyle = ht.style;
+			}
+        } else if (type === 'vector ') {
+            pt.RenderStyle = StyleManager.DEFAULT_STYLE;
+		}
+
+        if ('DisableBalloonOnMouseMove' in it) {
+            pt.DisableBalloonOnMouseMove = it.DisableBalloonOnMouseMove === false ? false : true;
+        }
+        if ('DisableBalloonOnClick' in it) {
+            pt.DisableBalloonOnClick = it.DisableBalloonOnClick || false;
+        }
+        if ('Filter' in it) {
+/*eslint-disable no-useless-escape */
+            pt.Filter = it.Filter;
+            var ph = L.gmx.Parsers.parseSQL(it.Filter.replace(/[\[\]]/g, '"'));
+/*eslint-enable */
+			// TODO: need body for function ƒ (props, indexes, types)
+            if (ph) { pt.filterFunction = ph; }
+        }
+		return pt;
+	});
+    return gmxStyles;
+};
+
+L.gmx = L.gmx || {};
+L.gmx.StyleManager = StyleManager;
 
 L.gmx.VectorLayer.include({
     bindPopup: function (content, options) {

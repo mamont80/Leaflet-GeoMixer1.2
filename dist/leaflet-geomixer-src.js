@@ -9981,15 +9981,25 @@ StyleManager.prototype = {
     _parseServerStyles: function() {
         var gmx = this.gmx,
             props = gmx.properties,
-            arr = props.styles || [{MinZoom: 1, MaxZoom: 21, RenderStyle: StyleManager.DEFAULT_STYLE}],
-            len = Math.max(arr.length, gmx.styles.length);
+            gmxStyles = props.gmxStyles ? props.gmxStyles.styles : null,
+            arr = gmxStyles || props.styles || [{MinZoom: 1, MaxZoom: 21, RenderStyle: StyleManager.DEFAULT_STYLE}],
+            len = Math.max(arr.length, gmx.styles.length),
+			i, gmxStyle;
 
-		if (props.gmxStyles) {
-			this._styles = props.gmxStyles.styles;
-		} else {
-			for (var i = 0; i < len; i++) {
+		if (gmxStyles) {
+			for (i = 0; i < len; i++) {
 				if (!this._styles[i]) {
-					var gmxStyle = gmx.styles[i] || arr[i];
+					gmxStyle = gmx.styles[i] || arr[i];
+					gmxStyle.RenderStyle = this._parseStyle(gmxStyle.RenderStyle);
+					gmxStyle.HoverStyle = this._parseStyle(gmxStyle.HoverStyle);
+					this._styles.push(gmxStyle);
+					if (this._isLabel(gmxStyle.RenderStyle)) { gmx.labelsLayer = true; }
+				}
+			}
+		} else {
+			for (i = 0; i < len; i++) {
+				if (!this._styles[i]) {
+					gmxStyle = gmx.styles[i] || arr[i];
 					if (!gmxStyle.RenderStyle) { gmxStyle.RenderStyle = StyleManager.DEFAULT_STYLE; }
 					if (gmxStyle.HoverStyle === undefined) {
 						var hoveredStyle = JSON.parse(JSON.stringify(gmxStyle.RenderStyle));
@@ -10515,6 +10525,20 @@ StyleManager.decodeOldStyle = function(style) {   // Style Scanex->leaflet
 						if (Object.keys(hash).length) {
 							styleOut.common = false;
 							L.extend(attrKeys, hash);
+						}
+						if (gmxAPIutils.styleFuncKeys[newKey]) {
+/*eslint-disable no-useless-escape */
+							if (zn.match(/[^\d\.]/) === null) {
+/*eslint-enable */
+								zn = Number(zn);
+							} else {
+								var func = L.gmx.Parsers.parseExpression(zn);
+								if (func === null) {
+									zn = gmxAPIutils.styleFuncError[newKey]();
+								} else {
+									styleOut[gmxAPIutils.styleFuncKeys[newKey]] = func;
+								}
+							}
 						}
 					} else if (key1 === 'opacity') {
 						zn /= 100;

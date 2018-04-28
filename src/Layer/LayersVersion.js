@@ -17,7 +17,7 @@ var getParams = function(prop, dm, gmx) {
         Name: prop.name,
         Version: isExistsTiles(prop) ? prop.LayerVersion : -1
     };
-	if (dm && (prop.UseTiles === false || gmx.skipTiles === 'NotVisible' || gmx.needBbox)) {
+	if (dm && (prop.UseTiles === false || gmx.skipTiles === 'NotVisible' || gmx.needBbox || gmx.options.needBbox)) {
 		var maxDateInterval = dm.getMaxDateInterval(),
 			beginDate = maxDateInterval.beginDate || gmx.beginDate,
 			endDate = maxDateInterval.endDate || gmx.endDate;

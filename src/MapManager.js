@@ -21,7 +21,7 @@ var gmxMapManager = {
 		gmxMapManager.iterateNode(res, function(it) {	// TODO: удалить после переделки стилей на сервере
 			if (it.type === 'layer') {
 				var props = it.content.properties;
-				if (props.styles) {
+				if (props.styles && !props.gmxStyles) {
 					it.content.properties.gmxStyles = L.gmx.StyleManager.decodeOldStyles(props);
 				}
 			}

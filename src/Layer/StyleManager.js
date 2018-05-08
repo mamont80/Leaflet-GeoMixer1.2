@@ -567,10 +567,10 @@ StyleManager.prototype = {
             out.rotate = rotateRes || 0;
         }
         if ('iconColor' in pt) {
-            out.iconColor = 'iconColorFunction' in pt ? pt.iconColorFunction(prop, indexes) : pt.iconColor;
+            out.iconColor = pt.iconColorFunction ? pt.iconColorFunction(prop, indexes) : pt.iconColor;
         }
         if ('iconScale' in pt) {
-            out.iconScale = 'scaleFunction' in pt ? (pt.scaleFunction ? pt.scaleFunction(prop, indexes) : 1) : pt.iconScale;
+            out.iconScale = pt.scaleFunction ? pt.scaleFunction(prop, indexes) : (pt.iconScale || 1);
         }
         if (type === 'image') {
             out.type = type;
@@ -628,7 +628,7 @@ StyleManager.prototype = {
                 type = 'polygon';
             }
             if (pt.iconSize) {
-                var iconSize = ('sizeFunction' in pt ? pt.sizeFunction(prop, indexes) : pt.iconSize);
+                var iconSize = (pt.sizeFunction ? pt.sizeFunction(prop, indexes) : pt.iconSize);
                 out.sx = out.sy = iconSize;
                 // iconSize += pt.weight ? pt.weight : 0;
                 out.iconSize = iconSize;
@@ -638,16 +638,14 @@ StyleManager.prototype = {
                 out.maxSize = iconSize;
             }
             out.stroke = true;
-            if ('colorFunction' in pt || 'opacityFunction' in pt) {
-                color = 'colorFunction' in pt ? pt.colorFunction(prop, indexes) : color;
-                opacity = 'opacityFunction' in pt ? pt.opacityFunction(prop, indexes) : opacity;
-            }
+			color = pt.colorFunction ? pt.colorFunction(prop, indexes) : color;
+			opacity = pt.opacityFunction ? pt.opacityFunction(prop, indexes) : opacity;
             out.strokeStyle = gmxAPIutils.dec2color(color, opacity);
             out.lineWidth = 'weight' in pt ? pt.weight : 1;
         }
 
         if ('iconScale' in pt) {
-            out.iconScale = 'scaleFunction' in pt ? (pt.scaleFunction ? pt.scaleFunction(prop, indexes) : 1) : pt.iconScale;
+            out.iconScale = pt.scaleFunction ? (pt.scaleFunction(prop, indexes) || 1) : pt.iconScale;
         }
         if ('iconAnchor' in pt) {
             out.iconAnchor = pt.iconAnchor;
@@ -666,8 +664,8 @@ StyleManager.prototype = {
                 out.fillStyle = gmxAPIutils.dec2color(fcDec, 1);
             }
             if ('fillColorFunction' in pt || 'fillOpacityFunction' in pt) {
-                color = ('fillColorFunction' in pt ? pt.fillColorFunction(prop, indexes) : fc || 255);
-                opacity = ('fillOpacityFunction' in pt ? pt.fillOpacityFunction(prop, indexes) : fop || 1);
+                color = pt.fillColorFunction ? pt.fillColorFunction(prop, indexes) : (fc || 255);
+                opacity = pt.fillOpacityFunction ? pt.fillOpacityFunction(prop, indexes) : (fop || 1);
                 out.fillStyle = gmxAPIutils.dec2color(color, opacity);
             } else if ('fillOpacity' in pt && 'fillColor' in pt) {
                 out.fillStyle = gmxAPIutils.dec2color(fcDec, fop);

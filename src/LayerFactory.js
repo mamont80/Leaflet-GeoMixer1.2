@@ -80,7 +80,7 @@ L.gmx.loadLayer = function(mapID, layerID, options) {
 		layerParams.hostName = hostName;
 
 		gmxMapManager.loadMapProperties({
-				srs: options.srs,
+				srs: options.srs || '3857',
 				hostName: hostName,
 				apiKey: options.apiKey,
 				mapName: mapID,
@@ -123,7 +123,7 @@ L.gmx.loadLayer = function(mapID, layerID, options) {
 L.gmx.loadLayers = function(layers, globalOptions) {
 	return new Promise(function(resolve) {
 		Promise.all(layers.map(function(layerInfo) {
-			var options = L.extend({}, globalOptions, layerInfo.options);
+			var options = L.extend({}, globalOptions, layerInfo);
 			return L.gmx.loadLayer(layerInfo.mapID, layerInfo.layerID, options);
 		}))
 		.then(function(res) {

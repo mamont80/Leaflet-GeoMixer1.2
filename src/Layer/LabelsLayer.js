@@ -339,6 +339,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
 					count = arrTxtWidth.length || 1,
                     width = label.width,
                     width2 = width / 2,
+                    labelFontFamily = style.labelFontFamily || 'Arial',
                     size = style.labelFontSize || 12,
                     size2 = size / 2,
                     center = options.center,
@@ -379,7 +380,8 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
 
                     if (!options.labelStyle) {
                         options.labelStyle = {
-                            font: size + 'px "Arial"',
+                            font: size + 'px "' + labelFontFamily + '"',
+                            //font: size + 'px "Arial"',
                             fillStyle: gmxAPIutils.dec2color(style.labelColor || 0, 1),
                             shadowBlur: 4
                         };

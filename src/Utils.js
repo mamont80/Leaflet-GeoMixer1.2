@@ -728,6 +728,9 @@ var gmxAPIutils = {
         ptx1.drawImage(canvas, 0, 0, ww, hh);
         return {'notFunc': notFunc, 'canvas': canvas1};
     },
+    setSVGIcon: function(id) {
+		return '<svg role="img" class="svgIcon"><use xlink:href="#' + id + '" href="#' + id + '"></use></svg>';
+    },
 
     getSVGIcon: function (options) {
         var svg = '<svg xmlns="' + L.Path.SVG_NS + '" xmlns:xlink="http://www.w3.org/1999/xlink"',
@@ -3059,6 +3062,7 @@ L.extend(L.gmxUtil, {
     prettifyArea: gmxAPIutils.prettifyArea,
     geoArea: gmxAPIutils.geoArea,
     parseBalloonTemplate: gmxAPIutils.parseBalloonTemplate,
+    setSVGIcon: gmxAPIutils.setSVGIcon,
     getSVGIcon: gmxAPIutils.getSVGIcon,
     getCoordinatesString: gmxAPIutils.getCoordinatesString,
     getGeometriesSummary: gmxAPIutils.getGeometriesSummary,

@@ -221,15 +221,28 @@
                         protoOffset[1] - style.iconAnchor[1] + style.sy / 2
                     ];
                 }
+				if (this.parentLayer._balloonHook) {
+					for (var key in this.parentLayer._balloonHook) {
+						properties[key] = L.gmxUtil.parseTemplate(this.parentLayer._balloonHook[key].resStr, properties);
+					}
+				}
+				var content = L.gmxUtil.parseBalloonTemplate(balloonData.templateBalloon, {
+					properties: properties,
+					tileAttributeTypes: gmx.tileAttributeTypes,
+					unitOptions: this._map.options || {},
+					geometries: geometry
+				});
+				var contentDiv = L.DomUtil.create('div', '');
+				contentDiv.innerHTML = content;
+
                 this._popup
                     .setLatLng(latlng)
-                    .setContent(L.gmxUtil.parseBalloonTemplate(balloonData.templateBalloon, {
-                        properties: properties,
-                        tileAttributeTypes: gmx.tileAttributeTypes,
-                        unitOptions: this._map.options || {},
-                        geometries: geometry
-                    }))
+                    .setContent(contentDiv)
                     .openOn(this._map);
+
+				if (this.parentLayer._balloonHook) {
+					this.parentLayer._callBalloonHook(properties, this._popup.getContent());
+				}
             }
         }
     });

@@ -11323,11 +11323,10 @@ L.gmx.VectorLayer.include({
                     }
                     this._map.doubleClickZoom.disable();
                     return idr;
-                }
+                } else if (this._map) {
+					this._map.doubleClickZoom.enable();
+				}
             }
-        }
-        if (this._map) {
-            this._map.doubleClickZoom.enable();
         }
         return 0;
     },

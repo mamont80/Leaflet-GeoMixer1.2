@@ -6,6 +6,7 @@ var fetchOptions = {
 
 function ScreenVectorTile(layer, tileElem) {
     this.layer = layer;
+	this.ts = layer.options.tileSize;
 	this.tileElem = tileElem;
 	this.tile = tileElem.el;
 	var tilePoint = tileElem.coords,
@@ -26,25 +27,25 @@ function ScreenVectorTile(layer, tileElem) {
     this.worldWidthMerc = utils.worldWidthMerc;
 
     var gmxTilePoint = utils.getTileNumFromLeaflet(tilePoint, zoom);
-    this.tpx = 256 * gmxTilePoint.x;
-    this.tpy = 256 * (1 + gmxTilePoint.y);
+    this.tpx = this.ts * gmxTilePoint.x;
+    this.tpy = this.ts * (1 + gmxTilePoint.y);
 
-	var tileSize = utils.tileSizes[tilePoint.z];
+	var tileSize = utils.tileSizes[tilePoint.z] * this.ts / 256;
 
-    this.tbounds = utils.getBoundsByTilePoint(this.ntp);
+    this.tbounds = utils.getBoundsByTilePoint(this.ntp, tileSize);
     this.topLeft = {
 		tilePoint: tilePoint,
 		tileSize: tileSize,
-		mInPixel: 256 / tileSize,
+		mInPixel: this.ts / tileSize,
 		pix: {
-			px: 256 * tilePoint.x,
-			py: 256 * tilePoint.y
+			px: this.ts * tilePoint.x,
+			py: this.ts * tilePoint.y
 		},
 		wm: {
 			x: tileSize * tilePoint.x - this.worldWidthMerc,
 			y: this.worldWidthMerc - tileSize * tilePoint.y
 		},
-		bounds: utils.getBoundsByTilePoint(tilePoint)
+		bounds: utils.getBoundsByTilePoint(tilePoint, tileSize)
 	};
 
     this.gmxTilePoint = gmxTilePoint;
@@ -231,9 +232,9 @@ ScreenVectorTile.prototype = {
             gmxTilePoint = this.gmxTilePoint,
             px = shiftX * mInPixel,
             py = shiftY * mInPixel,
-            deltaX = Math.floor(0.5 + px % 256),            // shift on tile in pixel
-            deltaY = Math.floor(0.5 + py % 256),
-            tileSize = 256 / mInPixel,
+            deltaX = Math.floor(0.5 + px % this.ts),            // shift on tile in pixel
+            deltaY = Math.floor(0.5 + py % this.ts),
+            tileSize = this.ts / mInPixel,
             tminX = gmxTilePoint.x - shiftX / tileSize,     // by screen tile
             tminY = gmxTilePoint.y - shiftY / tileSize,
             rminX = Math.floor(tminX),
@@ -281,7 +282,7 @@ ScreenVectorTile.prototype = {
 
 	getTilePosZoomDelta: function(tilePoint, zoomFrom, zoomTo) {		// получить смещение тайла на меньшем zoom
         var dz = Math.pow(2, zoomFrom - zoomTo),
-            size = 256 / dz,
+            size = this.ts / dz,
             dx = tilePoint.x % dz,
             dy = tilePoint.y % dz;
 		return {
@@ -357,8 +358,8 @@ ScreenVectorTile.prototype = {
 								zKey: _this.zKey,
 								destinationTilePoint: tilePoint,
 								sourceTilePoint: gtp,
-								sx: 0, sy: 0, sw: 256, sh: 256,
-								dx: 0, dy: 0, dw: 256, dh: 256
+								sx: 0, sy: 0, sw: _this.ts, sh: _this.ts,
+								dx: 0, dy: 0, dw: _this.ts, dh: _this.ts
 							};
 
 						if (isShift) {
@@ -383,11 +384,11 @@ ScreenVectorTile.prototype = {
 							info.sw = info.sh = posInfo.size;
 							if (isShift) {
 								var sw = Math.floor(info.dw / posInfo.zDelta);
-								info.sx = (info.dx === 0 ? info.sw : 256) - sw;
+								info.sx = (info.dx === 0 ? info.sw : _this.ts) - sw;
 								info.sw = sw;
 
 								var sh = Math.floor(info.dh / posInfo.zDelta);
-								info.sy = (info.dy === 0 ? info.sh : 256) - sh;
+								info.sy = (info.dy === 0 ? info.sh : _this.ts) - sh;
 								info.sh = sh;
 							}
 						}
@@ -399,7 +400,7 @@ ScreenVectorTile.prototype = {
 						} else {
 							if (!resCanvas) {
 								resCanvas = document.createElement('canvas');
-								resCanvas.width = resCanvas.height = 256;
+								resCanvas.width = resCanvas.height = _this.ts;
 							}
 							info.res = resCanvas;
 							var hookResult = _this._rasterHook(info),
@@ -522,7 +523,7 @@ ScreenVectorTile.prototype = {
         }
         if (!gmxAPIutils._tileCanvas) {
             gmxAPIutils._tileCanvas = document.createElement('canvas');
-            gmxAPIutils._tileCanvas.width = gmxAPIutils._tileCanvas.height = 256;
+            gmxAPIutils._tileCanvas.width = gmxAPIutils._tileCanvas.height = this.ts;
         }
         var i, len,
             gmx = this.gmx,
@@ -537,7 +538,7 @@ ScreenVectorTile.prototype = {
                 tpy: this.tpy,
                 ctx: ctx
             };
-        ctx.clearRect(0, 0, 256, 256);
+        ctx.clearRect(0, 0, this.ts, this.ts);
         ctx.imageSmoothingEnabled = false;
         for (i = 0, len = geoItems.length; i < len; i++) {
             ctx.fillStyle = gmxAPIutils.dec2rgba(i + 1, 1);
@@ -550,7 +551,7 @@ ScreenVectorTile.prototype = {
             );
         }
         var items = {},
-            data = ctx.getImageData(0, 0, 256, 256).data;
+            data = ctx.getImageData(0, 0, this.ts, this.ts).data;
 
         for (i = 0, len = data.length; i < len; i += 4) {
             if (data[i + 3] === 255) {
@@ -626,7 +627,7 @@ ScreenVectorTile.prototype = {
         if (!items) {
             var tLink = layer._tiles[this.zKey];
             if (tLink && tLink.el) {
-                tLink.el.getContext('2d').clearRect(0, 0, 256, 256);
+                tLink.el.getContext('2d').clearRect(0, 0, this.ts, this.ts);
             }
             return null;
         }
@@ -667,7 +668,12 @@ ScreenVectorTile.prototype = {
     drawTile: function (data) {
 		this.destructor();
 		return new Promise(function(resolve, reject) {
-			this.drawReject = reject;
+			if (L.gmx._zoomStart && L.gmx._zoomStart !== this.zoom) {
+				resolve();
+				return;
+			}
+			
+			// this.drawReject = reject;
 			var geoItems = this._chkItems(data);
 			var result = function() {
 				resolve({count: geoItems.length});
@@ -677,11 +683,21 @@ ScreenVectorTile.prototype = {
 			this._uniqueID++;       // count draw attempt
 
 			if (geoItems) {
+				var ts = this.layer.options.tileSize;
+				this.tile.width = this.tile.height = ts;
+				var tile = _this.tile,
+					ctx = tile.getContext('2d');
+				//console.log('gridZoomShift', _this.zKey, this.gmx.gridZoomShift, geoItems.length, ts);
+				if (this.layer._gridClusters && this.layer._gridClusters.checkData({
+						geoItems: geoItems,
+						tileElem: this.tileElem,
+						layer: this.layer
+					})) {
+					result();
+					return;
+				}
 				var doDraw = function() {
-					_this.tile.width = _this.tile.height = 256;
-					var tile = _this.tile,
-						ctx = tile.getContext('2d'),
-						gmx = _this.gmx,
+					var gmx = _this.gmx,
 						dattr = {
 							//tileLink: tileLink,
 							tbounds: _this.tbounds,
@@ -695,10 +711,12 @@ ScreenVectorTile.prototype = {
 						tinfo = 'zKey:' + _this.zKey + ' count: ' + geoItems.length;
 					L.DomUtil.addClass(tile, tinfo);
 
-					ctx.clearRect(0, 0, 256, 256);
-					if (gmx.showScreenTiles) {
-						ctx.strokeRect(0, 0, 255, 255);
-						ctx.strokeText(_this.zKey + ' ' + _this.gmxTilePoint.x + ' ' + _this.gmxTilePoint.y, 50, 50);
+					if (!_this.layer._gridClusters) {
+						ctx.clearRect(0, 0, ts, ts);
+						if (gmx.showScreenTiles) {
+							ctx.strokeRect(0, 0, ts - 1, ts - 1);
+							ctx.strokeText( _this.zKey + ' ' + geoItems.length, 50, 50);
+						}
 					}
 					var hookInfo = {
 							zKey: _this.zKey,
@@ -715,7 +733,7 @@ ScreenVectorTile.prototype = {
 					gmx.preRenderHooks.forEach(function (f) {
 						if (!bgImage) {
 							bgImage = document.createElement('canvas');
-							bgImage.width = bgImage.height = 256;
+							bgImage.width = bgImage.height = this.ts;
 						}
 						var res = f(bgImage, hookInfo);
 						if (res && res.then) {
@@ -767,7 +785,7 @@ ScreenVectorTile.prototype = {
 				resolve();
 			}
 		}.bind(this)).catch(function() {
-			//console.warn('catch1:', e);
+			// console.warn('catch1:', arguments);
 		});
     },
 

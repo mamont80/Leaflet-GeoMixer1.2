@@ -313,8 +313,8 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 		for (key in this._tiles) {
 			tile = this._tiles[key];
 			if (tile.coords.z === zoom && !tile.loaded) {
-				return;
-			}
+			return;
+		}
 		}
 		this._loading = false;
 		this._clearOldLevels(zoom);
@@ -337,10 +337,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 			if (tile.coords.z === zoom) {
 				L.DomUtil.setPosition(tile.el, this._getTilePos(tile.coords));	// позиции тайлов
 				if (!tile.promise) {							// данный тайл еще не рисовался
-// console.log('_chkTiles _______', key, zoom);
 					this.__drawTile(tile);
-				// } else if (tile.loded && !tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
-					// this._level.el.appendChild(tile.el);
 				}
 			}
 		}
@@ -350,7 +347,6 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 		this._chkCurrentTiles();
 		this.repaint();
 		this._waitCheckOldLevels();
-		//this._removeScreenObservers(zoom, true);
 	},
 
 	// _removeScreenObservers: function (z, flag) {
@@ -533,10 +529,10 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         this.fire('remove');
     },
 	_removeTile: function (key) {
+		if (!this._map || this._map._animatingZoom) { return; }
         if (this._gmx && this._gmx.dataManager) {
 			this._gmx.dataManager.removeObserver(key);		// TODO: про active
 		}
-		if (!this._map || this._map._animatingZoom) { return; }
         L.GridLayer.prototype._removeTile.call(this, key);
 	},
 
@@ -651,6 +647,10 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
         this._resolve();
         return this;
+    },
+
+    getStyleIcon: function (nm, txt) {
+		return this._gmx.styleManager.getStyleIcon(nm, txt);
     },
 
     _chkNeedLayerVersion: function () {
@@ -897,8 +897,20 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         if (this._map) {
 			this._chkCurrentTiles();
             if (!zKeys) {
+				var zoom = L.gmx._zoomStart || this._tileZoom || this._map._zoom,
+					key, tile;
+				// console.log('_____',  L.gmx._zoomStart, this._tileZoom, this._map._zoom)
                 zKeys = {};
-                for (var key in this._tiles) { zKeys[key] = true; this._clearLoaded(key); }
+                for (key in this._tiles) {
+					tile = this._tiles[key];
+					if (tile.coords.z === zoom) {
+						zKeys[key] = true;
+						this._clearLoaded(key);
+						if (tile.observer) { tile.observer.activate(true); }
+					} else {
+						if (tile.observer) { tile.observer.deactivate(true); }
+					}
+				}
                 L.extend(zKeys, this.repaintObservers);
             } else if (L.Util.isArray(zKeys)) {
 				var arr = zKeys;
@@ -911,7 +923,6 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 				zKeys[it] = true;
 			}
             this._gmx.dataManager._triggerObservers(zKeys);
-// console.log('repaint', Date.now() - window.startTest, zKeys)
 			//this._onmoveend();
        }
     },
@@ -1066,6 +1077,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
             ne = screenBounds.getNorthEast(),
             dx = 0;
 
+
         if (ne.lng - sw.lng < 360) {
             if (maxLatLng.lng < sw.lng) {
                 dx = 360 * (1 + Math.floor((sw.lng - maxLatLng.lng) / 360));
@@ -1078,21 +1090,22 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
         var pixelBounds = this._map.getPixelBounds(),
             minPoint = this._map.project(minLatLng),
-            maxPoint = this._map.project(maxLatLng);
+            maxPoint = this._map.project(maxLatLng),
+			ts = this.options.tileSize;
 
         var minY, maxY, minX, maxX;
         if (pixelBounds) {
-            minY = Math.floor((Math.max(maxPoint.y, pixelBounds.min.y) + shiftY) / 256);
-            maxY = Math.floor((Math.min(minPoint.y, pixelBounds.max.y) + shiftY) / 256);
+            minY = Math.floor((Math.max(maxPoint.y, pixelBounds.min.y) + shiftY) / ts);
+            maxY = Math.floor((Math.min(minPoint.y, pixelBounds.max.y) + shiftY) / ts);
             minX = minLatLng.lng <= -180 ? pixelBounds.min.x : Math.max(minPoint.x, pixelBounds.min.x);
-            minX = Math.floor((minX + shiftX) / 256);
+            minX = Math.floor((minX + shiftX) / ts);
             maxX = maxLatLng.lng >= 180 ? pixelBounds.max.x : Math.min(maxPoint.x, pixelBounds.max.x);
-            maxX = Math.floor((maxX + shiftX) / 256);
+            maxX = Math.floor((maxX + shiftX) / ts);
         } else {
-            minY = Math.floor((maxPoint.y + shiftY) / 256);
-            maxY = Math.floor((minPoint.y + shiftY) / 256);
-            minX = Math.floor((minPoint.x + shiftX) / 256);
-            maxX = Math.floor((maxPoint.x + shiftX) / 256);
+            minY = Math.floor((maxPoint.y + shiftY) / ts);
+            maxY = Math.floor((minPoint.y + shiftY) / ts);
+            minX = Math.floor((minPoint.x + shiftX) / ts);
+            maxX = Math.floor((maxPoint.x + shiftX) / ts);
         }
         var gmxTiles = {};
         for (var x = minX; x <= maxX; x++) {
@@ -1101,7 +1114,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                 gmxTiles[zKey] = true;
             }
         }
-        return gmxTiles;
+      return gmxTiles;
     },
 
     _updateProperties: function (prop) {
@@ -1264,7 +1277,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         var gmx = this._gmx;
 		gmx.currentZoom = zoom;
 		gmx.tileSize = gmxAPIutils.tileSizes[zoom];
-		gmx.mInPixel = 256 / gmx.tileSize;
+		gmx.mInPixel = this.options.tileSize / gmx.tileSize;
     },
 
     __drawTile: function (ev) {
@@ -1365,6 +1378,7 @@ L.Map.addInitHook(function () {
 	// }, this);
 	this.on('zoomstart', function(ev) {
 			// console.log('zoomstart ', ev);
+		L.gmx._zoomStart = ev.zoom;
 		L.gmx._zoomLevelsCache = {};
 		L.gmx._zoomLevelsCount = 0;
 		var cnt = 0,

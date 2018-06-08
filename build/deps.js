@@ -39,6 +39,7 @@
     "Layer/external/BindWMS.js",
     "Layer/external/HeatMap.js",
     "Layer/external/MarkerCluster.js",
+    "Layer/external/GridCluster.js",
     "Layer/external/earcut.js",
 
     "LayerFactory.js"

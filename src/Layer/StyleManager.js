@@ -25,6 +25,33 @@ var StyleManager = function(gmx) {
     this.maxZoom = maxZoom === -Infinity ? 18 : maxZoom;
 };
 StyleManager.prototype = {
+    getStyleIcon: function(nm, txt) {		// строка легенды стилей
+		var st = this._styles[nm];
+		if (!st) { return null; }
+
+		txt = txt || '';
+		var geometryType = this.gmx.GeometryType || 'polygon',
+			renderStyle = st.RenderStyle,
+			out = '<div class="gmx-style-legend"><span class="prefix' + (renderStyle.iconUrl ? '' : ' style') + '">' + txt + '</span>';
+
+		out += '<span class="legend-block">';
+		if (renderStyle.iconUrl) {
+			out += '<span class="legendIconStyleImage"><img crossorigin="" src="' + renderStyle.iconUrl + '" /></span>';
+		} else {
+			var style = '';
+			if (renderStyle.fillColor) {
+				style = 'background-color: ' + L.gmxUtil.dec2rgba(renderStyle.fillColor, renderStyle.fillOpacity || 1);
+			}
+			if (renderStyle.color) {
+				style += ' border-color: ' + L.gmxUtil.dec2rgba(renderStyle.color, renderStyle.opacity || 1);
+			}
+			out += '<span class="legendIconStyle ' + geometryType + '"' + (style ? ' style="' + style + '"': '') + '"></span>';
+		}
+		var title = st.Name || st.Filter || 'легенда';
+		out += '<span class="legendIconCell"><span class="styleName"> ' + title + '</span>';
+		out += '</span></div>';
+		return out;
+    },
     _getMaxStyleSize: function(zoom) {  // estimete style size for arbitrary object
         var maxSize = 0;
         for (var i = 0, len = this._styles.length; i < len; i++) {
@@ -703,6 +730,14 @@ StyleManager.MAX_STYLE_SIZE = 256;
 StyleManager.DEFAULT_STYLE = {outline: {color: 255, thickness: 1}, marker: {size: 8}};
 StyleManager.DEFAULT_KEYS = ['Name', 'MinZoom', 'MaxZoom', 'Balloon', 'BalloonEnable', 'DisableBalloonOnMouseMove', 'DisableBalloonOnClick'];
 StyleManager.DEFAULT_ICONPATH = [0, 10, 5, -10, -5, -10, 0, 10];  // [TL.x, TL.y, BR.x, BR.y, BL.x, BL.y, TL.x, TL.y]
+StyleManager.DEFAULT_STYLE_KEYS = [
+	'iconUrl', 'iconAngle', 'iconSize', 'iconScale', 'iconMinScale', 'iconMaxScale', 'iconCircle', 'iconCenter', 'iconAnchor', 'iconColor',	// для иконок
+	'stroke', 'color', 'weight', 'opacity', 'dashArray',	// для линии
+	'fillColor', 'fillOpacity', 'fillIconUrl', 'fillPattern', 'fillRadialGradient', 'fillLinearGradient',	// для заполнения
+	'labelTemplate', 'labelField', 'labelColor', 'labelHaloColor', 'labelFontSize', 'labelSpacing', 'labelAlign', 'labelAnchor', 'labelText'	// для надписей
+];
+StyleManager.HASH_KEYS = StyleManager.DEFAULT_KEYS.reduce(function(a, key) { a[key] = true; return a; }, {})
+StyleManager.HASH_KEYS.RenderStyle = StyleManager.DEFAULT_STYLE_KEYS.reduce(function(a, key) { a[key] = true; return a; }, {});
 
 StyleManager.parsePattern = function(pattern) {
     var common = true,

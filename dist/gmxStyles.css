@@ -1,0 +1,20 @@
+.leaflet-popup-content .gmx-style-legend .prefix, .leaflet-marker-icon.gmx-style-legend-icon.leaflet-zoom-animated.leaflet-interactive {
+	padding-right: 4px;
+    padding-left: 4px;
+    background-color: lightcoral;
+    color: white;
+    border-radius: 16px;
+    text-align: center;
+    display: inline-table;
+    margin-right: 6px;
+}
+.leaflet-popup-content .gmx-style-legend .legendIconStyleImage img {
+	height: 14px;
+}
+/*
+.gmx-style-legend .prefixWrapper {
+    min-width: 41px;
+    max-width: 67px;
+    display: inline-block;
+}
+*/

@@ -59,13 +59,16 @@ L.gmx.VectorLayer.include({
         }
     },
 
-    disablePopup: function () {
+    disablePopup: function (flagHover) {
         this._popupDisabled = true;
+
+		if (flagHover) { this._cacheClickable = this.options.clickable; this.options.clickable = false; }
 		return this;
     },
 
-    enablePopup: function () {
+    enablePopup: function (flagHover) {
         this._popupDisabled = false;
+		if (flagHover) { this.options.clickable = this._cacheClickable; }
 		return this;
     },
 

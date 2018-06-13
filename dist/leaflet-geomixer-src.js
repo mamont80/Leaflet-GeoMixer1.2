@@ -2375,13 +2375,8 @@ var gmxAPIutils = {
         return Math.round(zn * x) / zn;
     },
 	getBoundsByTilePoint: function(tPoint) {  //tPoint - OSM tile point
-        var tileSize = gmxAPIutils.tileSizes[tPoint.z],
-            minx = tPoint.x * tileSize - gmxAPIutils.worldWidthMerc,
-            maxy = gmxAPIutils.worldWidthMerc - tPoint.y * tileSize;
-		return gmxAPIutils.bounds([
-			[minx, maxy - tileSize],
-			[minx + tileSize, maxy]
-		]);
+		var gmt = gmxAPIutils.getTileNumFromLeaflet(tPoint);
+		return gmxAPIutils.getTileBounds(gmt.x, gmt.y, gmt.z);
 	},
     getTileBounds: function(x, y, z) {  //x, y, z - GeoMixer tile coordinates
         var tileSize = gmxAPIutils.tileSizes[z],
@@ -5604,10 +5599,10 @@ var Observer = L.Class.extend({
         return false;
     },
 
-    activate: function() {
+    activate: function(withoutActivate) {
         if (!this.active) {
             this.active = true;
-            this.fire('activate');
+            if (!withoutActivate) { this.fire('activate'); }
         }
         return this;
     },
@@ -7648,10 +7643,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 			if (tile.coords.z === zoom) {
 				L.DomUtil.setPosition(tile.el, this._getTilePos(tile.coords));	// позиции тайлов
 				if (!tile.promise) {							// данный тайл еще не рисовался
-// console.log('_chkTiles _______', key, zoom);
 					this.__drawTile(tile);
-				// } else if (tile.loded && !tile.el.parentNode.parentNode) {	// данный тайл почему то в потерянном parentNode
-					// this._level.el.appendChild(tile.el);
 				}
 			}
 		}
@@ -7661,7 +7653,6 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 		this._chkCurrentTiles();
 		this.repaint();
 		this._waitCheckOldLevels();
-		//this._removeScreenObservers(zoom, true);
 	},
 
 	// _removeScreenObservers: function (z, flag) {
@@ -7844,10 +7835,10 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         this.fire('remove');
     },
 	_removeTile: function (key) {
+		if (!this._map || this._map._animatingZoom) { return; }
         if (this._gmx && this._gmx.dataManager) {
 			this._gmx.dataManager.removeObserver(key);		// TODO: про active
 		}
-		if (!this._map || this._map._animatingZoom) { return; }
         L.GridLayer.prototype._removeTile.call(this, key);
 	},
 
@@ -7962,6 +7953,10 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
         this._resolve();
         return this;
+    },
+
+    getStyleIcon: function (nm, txt) {
+		return this._gmx.styleManager.getStyleIcon(nm, txt);
     },
 
     _chkNeedLayerVersion: function () {
@@ -8208,8 +8203,20 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         if (this._map) {
 			this._chkCurrentTiles();
             if (!zKeys) {
+				var zoom = L.gmx._zoomStart || this._tileZoom || this._map._zoom,
+					key, tile;
+				// console.log('_____',  L.gmx._zoomStart, this._tileZoom, this._map._zoom)
                 zKeys = {};
-                for (var key in this._tiles) { zKeys[key] = true; this._clearLoaded(key); }
+                for (key in this._tiles) {
+					tile = this._tiles[key];
+					if (tile.coords.z === zoom) {
+						zKeys[key] = true;
+						this._clearLoaded(key);
+						if (tile.observer) { tile.observer.activate(true); }
+					} else if (tile.observer) {
+						tile.observer.deactivate(true);
+					}
+				}
                 L.extend(zKeys, this.repaintObservers);
             } else if (L.Util.isArray(zKeys)) {
 				var arr = zKeys;
@@ -8222,7 +8229,6 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 				zKeys[it] = true;
 			}
             this._gmx.dataManager._triggerObservers(zKeys);
-// console.log('repaint', Date.now() - window.startTest, zKeys)
 			//this._onmoveend();
        }
     },
@@ -8377,6 +8383,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
             ne = screenBounds.getNorthEast(),
             dx = 0;
 
+
         if (ne.lng - sw.lng < 360) {
             if (maxLatLng.lng < sw.lng) {
                 dx = 360 * (1 + Math.floor((sw.lng - maxLatLng.lng) / 360));
@@ -8389,21 +8396,22 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
         var pixelBounds = this._map.getPixelBounds(),
             minPoint = this._map.project(minLatLng),
-            maxPoint = this._map.project(maxLatLng);
+            maxPoint = this._map.project(maxLatLng),
+			ts = this.options.tileSize;
 
         var minY, maxY, minX, maxX;
         if (pixelBounds) {
-            minY = Math.floor((Math.max(maxPoint.y, pixelBounds.min.y) + shiftY) / 256);
-            maxY = Math.floor((Math.min(minPoint.y, pixelBounds.max.y) + shiftY) / 256);
+            minY = Math.floor((Math.max(maxPoint.y, pixelBounds.min.y) + shiftY) / ts);
+            maxY = Math.floor((Math.min(minPoint.y, pixelBounds.max.y) + shiftY) / ts);
             minX = minLatLng.lng <= -180 ? pixelBounds.min.x : Math.max(minPoint.x, pixelBounds.min.x);
-            minX = Math.floor((minX + shiftX) / 256);
+            minX = Math.floor((minX + shiftX) / ts);
             maxX = maxLatLng.lng >= 180 ? pixelBounds.max.x : Math.min(maxPoint.x, pixelBounds.max.x);
-            maxX = Math.floor((maxX + shiftX) / 256);
+            maxX = Math.floor((maxX + shiftX) / ts);
         } else {
-            minY = Math.floor((maxPoint.y + shiftY) / 256);
-            maxY = Math.floor((minPoint.y + shiftY) / 256);
-            minX = Math.floor((minPoint.x + shiftX) / 256);
-            maxX = Math.floor((maxPoint.x + shiftX) / 256);
+            minY = Math.floor((maxPoint.y + shiftY) / ts);
+            maxY = Math.floor((minPoint.y + shiftY) / ts);
+            minX = Math.floor((minPoint.x + shiftX) / ts);
+            maxX = Math.floor((maxPoint.x + shiftX) / ts);
         }
         var gmxTiles = {};
         for (var x = minX; x <= maxX; x++) {
@@ -8412,7 +8420,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                 gmxTiles[zKey] = true;
             }
         }
-        return gmxTiles;
+      return gmxTiles;
     },
 
     _updateProperties: function (prop) {
@@ -8575,7 +8583,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         var gmx = this._gmx;
 		gmx.currentZoom = zoom;
 		gmx.tileSize = gmxAPIutils.tileSizes[zoom];
-		gmx.mInPixel = 256 / gmx.tileSize;
+		gmx.mInPixel = this.options.tileSize / gmx.tileSize;
     },
 
     __drawTile: function (ev) {
@@ -8676,6 +8684,7 @@ L.Map.addInitHook(function () {
 	// }, this);
 	this.on('zoomstart', function(ev) {
 			// console.log('zoomstart ', ev);
+		L.gmx._zoomStart = ev.zoom;
 		L.gmx._zoomLevelsCache = {};
 		L.gmx._zoomLevelsCount = 0;
 		var cnt = 0,
@@ -8702,6 +8711,7 @@ var fetchOptions = {
 
 function ScreenVectorTile(layer, tileElem) {
     this.layer = layer;
+	this.ts = layer.options.tileSize;
 	this.tileElem = tileElem;
 	this.tile = tileElem.el;
 	var tilePoint = tileElem.coords,
@@ -8722,25 +8732,25 @@ function ScreenVectorTile(layer, tileElem) {
     this.worldWidthMerc = utils.worldWidthMerc;
 
     var gmxTilePoint = utils.getTileNumFromLeaflet(tilePoint, zoom);
-    this.tpx = 256 * gmxTilePoint.x;
-    this.tpy = 256 * (1 + gmxTilePoint.y);
+    this.tpx = this.ts * gmxTilePoint.x;
+    this.tpy = this.ts * (1 + gmxTilePoint.y);
 
-	var tileSize = utils.tileSizes[tilePoint.z];
+	var tileSize = utils.tileSizes[tilePoint.z] * this.ts / 256;
 
-    this.tbounds = utils.getBoundsByTilePoint(this.ntp);
+    this.tbounds = utils.getBoundsByTilePoint(this.ntp, tileSize);
     this.topLeft = {
 		tilePoint: tilePoint,
 		tileSize: tileSize,
-		mInPixel: 256 / tileSize,
+		mInPixel: this.ts / tileSize,
 		pix: {
-			px: 256 * tilePoint.x,
-			py: 256 * tilePoint.y
+			px: this.ts * tilePoint.x,
+			py: this.ts * tilePoint.y
 		},
 		wm: {
 			x: tileSize * tilePoint.x - this.worldWidthMerc,
 			y: this.worldWidthMerc - tileSize * tilePoint.y
 		},
-		bounds: utils.getBoundsByTilePoint(tilePoint)
+		bounds: utils.getBoundsByTilePoint(tilePoint, tileSize)
 	};
 
     this.gmxTilePoint = gmxTilePoint;
@@ -8927,9 +8937,9 @@ ScreenVectorTile.prototype = {
             gmxTilePoint = this.gmxTilePoint,
             px = shiftX * mInPixel,
             py = shiftY * mInPixel,
-            deltaX = Math.floor(0.5 + px % 256),            // shift on tile in pixel
-            deltaY = Math.floor(0.5 + py % 256),
-            tileSize = 256 / mInPixel,
+            deltaX = Math.floor(0.5 + px % this.ts),            // shift on tile in pixel
+            deltaY = Math.floor(0.5 + py % this.ts),
+            tileSize = this.ts / mInPixel,
             tminX = gmxTilePoint.x - shiftX / tileSize,     // by screen tile
             tminY = gmxTilePoint.y - shiftY / tileSize,
             rminX = Math.floor(tminX),
@@ -8977,7 +8987,7 @@ ScreenVectorTile.prototype = {
 
 	getTilePosZoomDelta: function(tilePoint, zoomFrom, zoomTo) {		// получить смещение тайла на меньшем zoom
         var dz = Math.pow(2, zoomFrom - zoomTo),
-            size = 256 / dz,
+            size = this.ts / dz,
             dx = tilePoint.x % dz,
             dy = tilePoint.y % dz;
 		return {
@@ -9053,8 +9063,8 @@ ScreenVectorTile.prototype = {
 								zKey: _this.zKey,
 								destinationTilePoint: tilePoint,
 								sourceTilePoint: gtp,
-								sx: 0, sy: 0, sw: 256, sh: 256,
-								dx: 0, dy: 0, dw: 256, dh: 256
+								sx: 0, sy: 0, sw: _this.ts, sh: _this.ts,
+								dx: 0, dy: 0, dw: _this.ts, dh: _this.ts
 							};
 
 						if (isShift) {
@@ -9079,11 +9089,11 @@ ScreenVectorTile.prototype = {
 							info.sw = info.sh = posInfo.size;
 							if (isShift) {
 								var sw = Math.floor(info.dw / posInfo.zDelta);
-								info.sx = (info.dx === 0 ? info.sw : 256) - sw;
+								info.sx = (info.dx === 0 ? info.sw : _this.ts) - sw;
 								info.sw = sw;
 
 								var sh = Math.floor(info.dh / posInfo.zDelta);
-								info.sy = (info.dy === 0 ? info.sh : 256) - sh;
+								info.sy = (info.dy === 0 ? info.sh : _this.ts) - sh;
 								info.sh = sh;
 							}
 						}
@@ -9095,7 +9105,7 @@ ScreenVectorTile.prototype = {
 						} else {
 							if (!resCanvas) {
 								resCanvas = document.createElement('canvas');
-								resCanvas.width = resCanvas.height = 256;
+								resCanvas.width = resCanvas.height = _this.ts;
 							}
 							info.res = resCanvas;
 							var hookResult = _this._rasterHook(info),
@@ -9218,7 +9228,7 @@ ScreenVectorTile.prototype = {
         }
         if (!gmxAPIutils._tileCanvas) {
             gmxAPIutils._tileCanvas = document.createElement('canvas');
-            gmxAPIutils._tileCanvas.width = gmxAPIutils._tileCanvas.height = 256;
+            gmxAPIutils._tileCanvas.width = gmxAPIutils._tileCanvas.height = this.ts;
         }
         var i, len,
             gmx = this.gmx,
@@ -9233,7 +9243,7 @@ ScreenVectorTile.prototype = {
                 tpy: this.tpy,
                 ctx: ctx
             };
-        ctx.clearRect(0, 0, 256, 256);
+        ctx.clearRect(0, 0, this.ts, this.ts);
         ctx.imageSmoothingEnabled = false;
         for (i = 0, len = geoItems.length; i < len; i++) {
             ctx.fillStyle = gmxAPIutils.dec2rgba(i + 1, 1);
@@ -9246,7 +9256,7 @@ ScreenVectorTile.prototype = {
             );
         }
         var items = {},
-            data = ctx.getImageData(0, 0, 256, 256).data;
+            data = ctx.getImageData(0, 0, this.ts, this.ts).data;
 
         for (i = 0, len = data.length; i < len; i += 4) {
             if (data[i + 3] === 255) {
@@ -9322,7 +9332,7 @@ ScreenVectorTile.prototype = {
         if (!items) {
             var tLink = layer._tiles[this.zKey];
             if (tLink && tLink.el) {
-                tLink.el.getContext('2d').clearRect(0, 0, 256, 256);
+                tLink.el.getContext('2d').clearRect(0, 0, this.ts, this.ts);
             }
             return null;
         }
@@ -9363,7 +9373,12 @@ ScreenVectorTile.prototype = {
     drawTile: function (data) {
 		this.destructor();
 		return new Promise(function(resolve, reject) {
-			this.drawReject = reject;
+			if (L.gmx._zoomStart && L.gmx._zoomStart !== this.zoom) {
+				resolve();
+				return;
+			}
+
+			// this.drawReject = reject;
 			var geoItems = this._chkItems(data);
 			var result = function() {
 				resolve({count: geoItems.length});
@@ -9373,11 +9388,20 @@ ScreenVectorTile.prototype = {
 			this._uniqueID++;       // count draw attempt
 
 			if (geoItems) {
+				var tile = _this.tile,
+					ctx = tile.getContext('2d');
+				if (this.layer._gridClusters && this.layer._gridClusters.checkData({
+						geoItems: geoItems,
+						tileElem: this.tileElem,
+						layer: this.layer
+					})) {
+					result();
+					return;
+				}
+				var ts = this.layer.options.tileSize;
+				this.tile.width = this.tile.height = ts;
 				var doDraw = function() {
-					_this.tile.width = _this.tile.height = 256;
-					var tile = _this.tile,
-						ctx = tile.getContext('2d'),
-						gmx = _this.gmx,
+					var gmx = _this.gmx,
 						dattr = {
 							//tileLink: tileLink,
 							tbounds: _this.tbounds,
@@ -9391,10 +9415,12 @@ ScreenVectorTile.prototype = {
 						tinfo = 'zKey:' + _this.zKey + ' count: ' + geoItems.length;
 					L.DomUtil.addClass(tile, tinfo);
 
-					ctx.clearRect(0, 0, 256, 256);
-					if (gmx.showScreenTiles) {
-						ctx.strokeRect(0, 0, 255, 255);
-						ctx.strokeText(_this.zKey + ' ' + _this.gmxTilePoint.x + ' ' + _this.gmxTilePoint.y, 50, 50);
+					if (!_this.layer._gridClusters) {
+						ctx.clearRect(0, 0, ts, ts);
+						if (gmx.showScreenTiles) {
+							ctx.strokeRect(0, 0, ts - 1, ts - 1);
+							ctx.strokeText( _this.zKey + ' ' + geoItems.length, 50, 50);
+						}
 					}
 					var hookInfo = {
 							zKey: _this.zKey,
@@ -9411,7 +9437,7 @@ ScreenVectorTile.prototype = {
 					gmx.preRenderHooks.forEach(function (f) {
 						if (!bgImage) {
 							bgImage = document.createElement('canvas');
-							bgImage.width = bgImage.height = 256;
+							bgImage.width = bgImage.height = this.ts;
 						}
 						var res = f(bgImage, hookInfo);
 						if (res && res.then) {
@@ -9463,7 +9489,7 @@ ScreenVectorTile.prototype = {
 				resolve();
 			}
 		}.bind(this)).catch(function() {
-			//console.warn('catch1:', e);
+			// console.warn('catch1:', arguments);
 		});
     },
 
@@ -9676,6 +9702,33 @@ var StyleManager = function(gmx) {
     this.maxZoom = maxZoom === -Infinity ? 18 : maxZoom;
 };
 StyleManager.prototype = {
+    getStyleIcon: function(nm, txt) {		// строка легенды стилей
+		var st = this._styles[nm];
+		if (!st) { return null; }
+
+		txt = txt || '';
+		var geometryType = this.gmx.GeometryType || 'polygon',
+			renderStyle = st.RenderStyle,
+			out = '<div class="gmx-style-legend"><span class="prefixWrapper"><span class="prefix' + (renderStyle.iconUrl ? '' : ' style') + '">' + txt + '</span></span>';
+
+		out += '<span class="legend-block">';
+		if (renderStyle.iconUrl) {
+			out += '<span class="legendIconStyleImage"><img crossorigin="" src="' + renderStyle.iconUrl + '" /></span>';
+		} else {
+			var style = '';
+			if (renderStyle.fillColor) {
+				style = 'background-color: ' + L.gmxUtil.dec2rgba(renderStyle.fillColor, renderStyle.fillOpacity || 1);
+			}
+			if (renderStyle.color) {
+				style += ' border-color: ' + L.gmxUtil.dec2rgba(renderStyle.color, renderStyle.opacity || 1);
+			}
+			out += '<span class="legendIconStyle ' + geometryType + '"' + (style ? ' style="' + style + '"': '') + '"></span>';
+		}
+		var title = st.Name || st.Filter || 'легенда';
+		out += '<span class="legendIconCell"><span class="styleName"> ' + title + '</span>';
+		out += '</span></div>';
+		return out;
+    },
     _getMaxStyleSize: function(zoom) {  // estimete style size for arbitrary object
         var maxSize = 0;
         for (var i = 0, len = this._styles.length; i < len; i++) {
@@ -10354,6 +10407,14 @@ StyleManager.MAX_STYLE_SIZE = 256;
 StyleManager.DEFAULT_STYLE = {outline: {color: 255, thickness: 1}, marker: {size: 8}};
 StyleManager.DEFAULT_KEYS = ['Name', 'MinZoom', 'MaxZoom', 'Balloon', 'BalloonEnable', 'DisableBalloonOnMouseMove', 'DisableBalloonOnClick'];
 StyleManager.DEFAULT_ICONPATH = [0, 10, 5, -10, -5, -10, 0, 10];  // [TL.x, TL.y, BR.x, BR.y, BL.x, BL.y, TL.x, TL.y]
+StyleManager.DEFAULT_STYLE_KEYS = [
+	'iconUrl', 'iconAngle', 'iconSize', 'iconScale', 'iconMinScale', 'iconMaxScale', 'iconCircle', 'iconCenter', 'iconAnchor', 'iconColor',	// для иконок
+	'stroke', 'color', 'weight', 'opacity', 'dashArray',	// для линии
+	'fillColor', 'fillOpacity', 'fillIconUrl', 'fillPattern', 'fillRadialGradient', 'fillLinearGradient',	// для заполнения
+	'labelTemplate', 'labelField', 'labelColor', 'labelHaloColor', 'labelFontSize', 'labelSpacing', 'labelAlign', 'labelAnchor', 'labelText'	// для надписей
+];
+StyleManager.HASH_KEYS = StyleManager.DEFAULT_KEYS.reduce(function(a, key) { a[key] = true; return a; }, {})
+StyleManager.HASH_KEYS.RenderStyle = StyleManager.DEFAULT_STYLE_KEYS.reduce(function(a, key) { a[key] = true; return a; }, {});
 
 StyleManager.parsePattern = function(pattern) {
     var common = true,
@@ -10703,13 +10764,16 @@ L.gmx.VectorLayer.include({
         }
     },
 
-    disablePopup: function () {
+    disablePopup: function (flagHover) {
         this._popupDisabled = true;
+
+		if (flagHover) { this._cacheClickable = this.options.clickable; this.options.clickable = false; }
 		return this;
     },
 
-    enablePopup: function () {
+    enablePopup: function (flagHover) {
         this._popupDisabled = false;
+		if (flagHover) { this.options.clickable = this._cacheClickable; }
 		return this;
     },
 
@@ -13825,6 +13889,184 @@ L.gmx.ExternalLayer = L.Class.extend({
                     this.enablePopup();
                 }
             }
+            return this;
+        }
+    });
+})();
+
+
+(function() {
+    'use strict';
+    var GmxGridCluster = L.Evented.extend({
+        options: {
+			skipItems: true,
+            pixelDelta: 0,
+			styleHook: function (ctx, it, maxCount) {
+				ctx.setLineDash([2, 4]);
+				var zn = Math.floor(255 * (1 - it.count / maxCount));
+				ctx.fillStyle = 'rgb(' + zn + ',255, ' + zn + ', 0.2)';
+			},
+            // style: {
+				// setLineDash: [5, 15]
+			// },
+            minZoom: 1,
+            maxZoom: 6
+        },
+        _layer: null,
+        _markers: null,
+		initialize: function (options, layer) {
+			this._layer = layer;
+			options = L.Util.setOptions(this, options);
+            this._markers = new L.FeatureGroup(options);
+			this._layer.on('load', this.checkLoad, this);
+        },
+
+        checkLoad: function () {
+			var tiles = this._layer._tiles,
+				maxCount = 0,
+				count = 0;
+			for(var key in tiles) {
+				var pt = tiles[key];
+				if (pt.count) {
+					count += pt.count;
+				}
+				if (pt._gridData) {
+					pt._gridData.forEach(function(it) {
+						if (it.count) {
+							maxCount = Math.max(maxCount, it.count);
+						}
+					});
+				}
+			}
+			if (count) {
+				this._drawMe(maxCount, count);
+			}
+        },
+
+        _drawMe: function (maxCount, allCount) {
+			var tiles = this._layer._tiles,
+				ts = this._layer.options.tileSize;
+			for(var key in tiles) {
+				var pt = tiles[key];
+				if (!pt._drawDone && pt._gridData) {
+					pt._drawDone = true;
+					pt.el.width = pt.el.height = ts;
+					var ctx = pt.el.getContext('2d');
+					pt._gridData.forEach(function(it) {
+						if (it.count) {
+							if (this.options.styleHook) {
+								this.options.styleHook(ctx, it, maxCount);
+							}
+							var bbox = it.pixelBox;
+							if (ctx.fillStyle !== '#000000') {
+								ctx.fillRect(bbox[0], bbox[1], bbox[2], bbox[3]);
+							}
+							
+							ctx.strokeRect(bbox[0], bbox[1], bbox[2], bbox[3]);
+						}
+					}.bind(this));
+				}
+			}
+        },
+
+        _zoomClear: null,
+        checkData: function (data) {
+			// console.log('ssssssss', data);
+			var zoom = this._layer._gmx.currentZoom;
+			if (zoom < this.options.minZoom || zoom > this.options.maxZoom) {
+				this._layer.enablePopup(true);
+				return false;
+			}
+			this._layer.disablePopup(true);
+			this._parseData(data)
+			if (this._layer._map && zoom === data.tileElem.coords.z) {
+				this._layer._map.addLayer(this._markers);
+				if (!this._zoomClear) {
+					this._layer._map.on('zoomstart', function(ev) {
+						this._markers.clearLayers()
+					}, this);
+					this._zoomClear = true;
+				}
+			}
+			return this.options.skipItems && true;
+        },
+
+        _parseData: function (data) {
+			var tileElem = data.tileElem,
+				tbounds = tileElem.screenTile.tbounds,
+				center = tbounds.getCenter(),
+				bp = this._layer._tileCoordsToNwSe(tileElem.coords),
+				lbounds = L.latLngBounds(bp[0], bp[1]),
+				lcenter = lbounds.getCenter(),
+				arr = [
+					{ bounds: L.gmxUtil.bounds([[tbounds.min.x, center[1]], 	[center[0], tbounds.max.y]]), 		center: L.latLngBounds(lbounds.getNorthWest(), lcenter).getCenter() },
+					{ bounds: L.gmxUtil.bounds([center,							[tbounds.max.x, tbounds.max.y]]),	center: L.latLngBounds(lbounds.getNorthEast(), lcenter).getCenter() },
+					{ bounds: L.gmxUtil.bounds([[tbounds.min.x, tbounds.min.y],	center]), 							center: L.latLngBounds(lbounds.getSouthWest(), lcenter).getCenter() },
+					{ bounds: L.gmxUtil.bounds([[center[0], tbounds.min.y],		[tbounds.max.x, center[1]]]), 		center: L.latLngBounds(lbounds.getSouthEast(), lcenter).getCenter() }
+				],
+				cnt = 2,
+				delta = 256 / cnt - this.options.pixelDelta;
+
+			data.geoItems.forEach(function(it) {
+				var item = it.item,
+					bbox = item.bounds;
+
+				for(var i = 0; i < 4; i++) {
+					var pt = arr[i];
+					if (pt.bounds.intersects(bbox)) {
+						var nm = item.currentFilter;
+						if (!pt.counts) { pt.counts = {}; }
+						if (!pt.counts[nm]) { pt.counts[nm] = 1; }
+						else { pt.counts[nm]++; }
+						break;
+					}
+				}
+			});
+			arr.forEach(function(it, i) {
+				if (it.counts) {
+					var count = 0;
+					for (var key in it.counts) {
+						count += it.counts[key];
+					}
+					it.count = count;
+					it.data = data;
+					it.pixelBox = [128 * (i % 2) + this.options.pixelDelta, (i > 1 ? 128 : 0) + this.options.pixelDelta, delta, delta];
+					it.marker = this.addMarker(it, count);
+					it.marker.addTo(this._markers);
+				}
+			}.bind(this));
+			tileElem._gridData = arr;
+        },
+
+        addMarker: function (it, count) {
+			var center = it.bounds.toLatLngBounds().getCenter(),
+				marker = L.marker(L.latLng(center.lat, it.center.lng), L.extend({
+					icon: L.divIcon({className: 'gmx-style-legend-icon', html: count})
+				}, this.options))
+				.bindPopup(Object.keys(it.counts).sort(function(a, b) {
+						return  it.counts[b] - it.counts[a];
+					}).map(function(key) {
+						return this._layer.getStyleIcon(key, it.counts[key]);
+					}.bind(this)).join(''));
+
+			return marker;
+        }
+    });
+
+    L.gmx.VectorLayer.include({
+        bindGridClusters: function (options) {
+			if (this._gridClusters) {
+				this._gridClusters.unbindLayer();
+			}
+			this._gridClusters = new GmxGridCluster(options, this);
+            return this;
+        },
+
+        unbindGridClusters: function () {
+			if (this._gridClusters) {
+				this._gridClusters.unbindLayer();
+				this._gridClusters = null;
+			}
             return this;
         }
     });

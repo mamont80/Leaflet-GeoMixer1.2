@@ -313,8 +313,8 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 		for (key in this._tiles) {
 			tile = this._tiles[key];
 			if (tile.coords.z === zoom && !tile.loaded) {
-			return;
-		}
+				return;
+			}
 		}
 		this._loading = false;
 		this._clearOldLevels(zoom);
@@ -907,8 +907,8 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 						zKeys[key] = true;
 						this._clearLoaded(key);
 						if (tile.observer) { tile.observer.activate(true); }
-					} else {
-						if (tile.observer) { tile.observer.deactivate(true); }
+					} else if (tile.observer) {
+						tile.observer.deactivate(true);
 					}
 				}
                 L.extend(zKeys, this.repaintObservers);

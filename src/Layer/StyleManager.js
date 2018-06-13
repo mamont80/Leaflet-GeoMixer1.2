@@ -32,7 +32,7 @@ StyleManager.prototype = {
 		txt = txt || '';
 		var geometryType = this.gmx.GeometryType || 'polygon',
 			renderStyle = st.RenderStyle,
-			out = '<div class="gmx-style-legend"><span class="prefix' + (renderStyle.iconUrl ? '' : ' style') + '">' + txt + '</span>';
+			out = '<div class="gmx-style-legend"><span class="prefixWrapper"><span class="prefix' + (renderStyle.iconUrl ? '' : ' style') + '">' + txt + '</span></span>';
 
 		out += '<span class="legend-block">';
 		if (renderStyle.iconUrl) {

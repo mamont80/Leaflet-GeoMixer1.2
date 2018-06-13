@@ -672,7 +672,7 @@ ScreenVectorTile.prototype = {
 				resolve();
 				return;
 			}
-			
+
 			// this.drawReject = reject;
 			var geoItems = this._chkItems(data);
 			var result = function() {
@@ -683,11 +683,8 @@ ScreenVectorTile.prototype = {
 			this._uniqueID++;       // count draw attempt
 
 			if (geoItems) {
-				var ts = this.layer.options.tileSize;
-				this.tile.width = this.tile.height = ts;
 				var tile = _this.tile,
 					ctx = tile.getContext('2d');
-				//console.log('gridZoomShift', _this.zKey, this.gmx.gridZoomShift, geoItems.length, ts);
 				if (this.layer._gridClusters && this.layer._gridClusters.checkData({
 						geoItems: geoItems,
 						tileElem: this.tileElem,
@@ -696,6 +693,8 @@ ScreenVectorTile.prototype = {
 					result();
 					return;
 				}
+				var ts = this.layer.options.tileSize;
+				this.tile.width = this.tile.height = ts;
 				var doDraw = function() {
 					var gmx = _this.gmx,
 						dattr = {

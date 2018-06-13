@@ -2361,21 +2361,6 @@ var gmxAPIutils = {
 	getBoundsByTilePoint: function(tPoint) {  //tPoint - OSM tile point
 		var gmt = gmxAPIutils.getTileNumFromLeaflet(tPoint);
 		return gmxAPIutils.getTileBounds(gmt.x, gmt.y, gmt.z);
-		/*
-        var pz = Math.pow(2, tPoint.z);
-		return gmxAPIutils.getTileBounds(tPoint.x % pz - pz/2, pz/2 - tPoint.y % pz - 1, tPoint.z);
-        var tileSize = gmxAPIutils.tileSizes[tPoint.z],
-			pz = Math.pow(2, tPoint.z),
-			ts = gmxAPIutils.worldWidthFull / pz,
-            minx = (tPoint.x % pz - pz/2) * tileSize,
-            minx = (tPoint.x % pz - pz/2) * tileSize - gmxAPIutils.worldWidthMerc) % tileSize,
-            maxy = (gmxAPIutils.worldWidthMerc - tPoint.y * tileSize);
-            // minx = (tPoint.x * tileSize - gmxAPIutils.worldWidthMerc) % tileSize,
-            // maxy = (gmxAPIutils.worldWidthMerc - tPoint.y * tileSize) % tileSize;
-		return gmxAPIutils.bounds([
-			[minx, maxy - tileSize],
-			[minx + tileSize, maxy]
-		]);*/
 	},
     getTileBounds: function(x, y, z) {  //x, y, z - GeoMixer tile coordinates
         var tileSize = gmxAPIutils.tileSizes[z],

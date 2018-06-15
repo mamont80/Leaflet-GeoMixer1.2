@@ -732,7 +732,7 @@ ScreenVectorTile.prototype = {
 					gmx.preRenderHooks.forEach(function (f) {
 						if (!bgImage) {
 							bgImage = document.createElement('canvas');
-							bgImage.width = bgImage.height = this.ts;
+							bgImage.width = bgImage.height = ts || 256;
 						}
 						var res = f(bgImage, hookInfo);
 						if (res && res.then) {

@@ -11,6 +11,10 @@
 .leaflet-popup-content .gmx-style-legend .legendIconStyleImage img {
 	height: 14px;
 }
+.leaflet-popup-content .gmx-style-legend .styleName {
+	display: inherit;
+}
+
 /*
 .gmx-style-legend .prefixWrapper {
     min-width: 41px;

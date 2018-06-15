@@ -52,8 +52,8 @@
 			for(var key in tiles) {
 				var pt = tiles[key];
 				if (!pt._drawDone && pt._gridData) {
-					pt._drawDone = true;
-					pt.el.width = pt.el.height = ts;
+					//pt._drawDone = true;
+					if (pt.el.height != ts) { pt.el.width = pt.el.height = ts; }
 					var ctx = pt.el.getContext('2d');
 					pt._gridData.forEach(function(it) {
 						if (it.count) {
@@ -150,8 +150,9 @@
 						return  it.counts[b] - it.counts[a];
 					}).map(function(key) {
 						return this._layer.getStyleIcon(key, it.counts[key]);
-					}.bind(this)).join(''));
-
+					}.bind(this)).join(''), {
+						minWidth: 100
+					});
 			return marker;
         }
     });

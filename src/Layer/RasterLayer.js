@@ -7,6 +7,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
         //clickable: false
     },
     initFromDescription: function(ph) {
+        this._gmx.srs = this._gmx.srs || 3857;
         var props = ph.properties,
             styles = props.styles[0] || {MinZoom: props.MinZoom || 0, MaxZoom: props.MaxZoom || 21},
             vectorProperties = {

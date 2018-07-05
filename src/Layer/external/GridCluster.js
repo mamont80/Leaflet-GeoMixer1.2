@@ -52,7 +52,7 @@
 			for(var key in tiles) {
 				var pt = tiles[key];
 				if (!pt._drawDone && pt._gridData) {
-					//pt._drawDone = true;
+					// pt._drawDone = true;
 					if (pt.el.height != ts) { pt.el.width = pt.el.height = ts; }
 					var ctx = pt.el.getContext('2d');
 					pt._gridData.forEach(function(it) {
@@ -151,8 +151,9 @@
 					}).map(function(key) {
 						return this._layer.getStyleIcon(key, it.counts[key]);
 					}.bind(this)).join(''), {
-						minWidth: 100
+						minWidth: 150
 					});
+
 			return marker;
         }
     });

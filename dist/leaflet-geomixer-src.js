@@ -2678,7 +2678,7 @@ var gmxAPIutils = {
             tileAttributeTypes: tileAttributeTypes,
             tileAttributeIndexes: tileAttributeIndexes
         };
-    }
+	}
 };
 
 gmxAPIutils.lambertCoefX = 100 * gmxAPIutils.distVincenty(0, 0, 0.01, 0);				// 111319.5;
@@ -3017,6 +3017,55 @@ gmxAPIutils.parseUri.options = {
 /*eslint-enable */
 };
 
+gmxAPIutils.layerHelper = {
+	/**
+	 *  Модифицирует объекты внутри векторного слоя, отправляя изменения на сервер и информируя об этом API
+	 *
+	 * @memberOf _mapHelper
+	 * @name modifyObjectLayer
+	 * @function
+	 * @param {String} layerName Имя слоя
+	 * @param {Object[]} objs Массив описания объектов. Каждое описание представляет из себя объект:
+	 *
+	 *  * id {String} ID объекта слоя, над которым производятся изменения (только для модификации и удаления)
+	 *  * geometry Описание геометрии (вставка и изменение). GeoJSON
+	 *  * source: {rc: <name КР-источника>, rcobj: <id объекта внутри КР>}
+	 *  * properties Свойства объекта (вставка и изменение)
+	 *  * action {'delete'|'insert'|'update'} Производимое действие. Если не указано, то вычисляется следующим образом:
+	 *    * Если не указан id, то вставка
+	 *    * Если указан id, то модифицируем
+	 *    * Для удаления объекта нужно явно прописать параметр
+	 * @param {String} [crs='EPSG:3395'] Название системы координат геометрии объектов. Поддерживаются 3395, 4326, 3857
+	 * @return {jQuery.Deferred} Ресолвится в соответствии с ответом сервера
+	*/
+	modifyObject: function(url, layerName, objs, crs) {
+		return new Promise(function(resolve, reject) {
+			objs.forEach(function(obj) {
+				obj.action = obj.action || (obj.id ? 'update' : 'insert');
+			});
+			var params = {
+				WrapStyle: 'window',
+				LayerName: layerName,
+				objects: JSON.stringify(objs)
+			};
+			params['geometry_cs'] = crs ? crs : 'EPSG:4326';
+
+			L.gmxUtil.sendCrossDomainPostRequest(url,
+				params
+				,
+				function(res) {
+					if (res && res.Status === 'ok') {
+						L.gmx.layersVersion.chkVersion(layerName);
+						resolve(res.Result);
+					} else {
+						reject();
+					}
+				}
+			)
+		}).catch(console.log);
+    }
+};
+
 if (!L.gmxUtil) { L.gmxUtil = {}; }
 
 //public interface
@@ -3103,6 +3152,8 @@ L.extend(L.gmxUtil, {
     parseTemplate: gmxAPIutils.parseTemplate
 });
 
+L.gmxUtil.layerHelper = gmxAPIutils.layerHelper;
+
 L.gmxUtil.isOldVersion = L.version.substr(0, 3) === '0.7';
 L.gmxUtil.isIEOrEdge = L.gmxUtil.gtIE11 || L.gmxUtil.isIE11 || L.gmxUtil.isIE10 || L.gmxUtil.isIE9;
 if (!('requestIdleCallback' in window)) {
@@ -3112,6 +3163,22 @@ if (!('requestIdleCallback' in window)) {
 	}
 	window.cancelIdleCallback = window.clearTimeout;
 }
+
+if (!String.prototype.eval) {	// ES6-like template strings in ES5 - example: 'Hello, ${nested["greeting"]}!'.eval(data);
+/*eslint-disable */
+	String.prototype.eval = function(data) {
+	  return this.replace(/\${(.*?)}/g, function(_, code) {
+		var scoped = code.replace(/(["'\.\w\$]+)/g, function(match) {
+		  return /["']/.test(match[0]) ? match : 'scope.' + match;
+		});
+		try {
+		  return new Function('scope', 'return '+ scoped)(data);
+		} catch (e) { return ''; }
+	  });
+	}
+/*eslint-enable */
+}
+
 L.gmx = L.gmx || {};
 L.gmx.gmxProxy = '//maps.kosmosnimki.ru/ApiSave.ashx';
 
@@ -11479,6 +11546,10 @@ var getRequestParams = function(layer) {
 };
 
 var chkVersion = function (layer, callback) {
+	if (typeof(layer) === 'string') {
+		layer = layers[layer];
+	}
+
 	var map = layersVersion._map;
     var processResponse = function(res) {
         if (res && res.Status === 'ok' && res.Result) {
@@ -11778,6 +11849,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
         //clickable: false
     },
     initFromDescription: function(ph) {
+        this._gmx.srs = this._gmx.srs || 3857;
         var props = ph.properties,
             styles = props.styles[0] || {MinZoom: props.MinZoom || 0, MaxZoom: props.MaxZoom || 21},
             vectorProperties = {
@@ -13949,7 +14021,7 @@ L.gmx.ExternalLayer = L.Class.extend({
 			for(var key in tiles) {
 				var pt = tiles[key];
 				if (!pt._drawDone && pt._gridData) {
-					//pt._drawDone = true;
+					// pt._drawDone = true;
 					if (pt.el.height != ts) { pt.el.width = pt.el.height = ts; }
 					var ctx = pt.el.getContext('2d');
 					pt._gridData.forEach(function(it) {
@@ -14048,8 +14120,9 @@ L.gmx.ExternalLayer = L.Class.extend({
 					}).map(function(key) {
 						return this._layer.getStyleIcon(key, it.counts[key]);
 					}.bind(this)).join(''), {
-						minWidth: 100
+						minWidth: 150
 					});
+
 			return marker;
         }
     });

@@ -69,6 +69,10 @@ var getRequestParams = function(layer) {
 };
 
 var chkVersion = function (layer, callback) {
+	if (typeof(layer) === 'string') {
+		layer = layers[layer];
+	}
+
 	var map = layersVersion._map;
     var processResponse = function(res) {
         if (res && res.Status === 'ok' && res.Result) {

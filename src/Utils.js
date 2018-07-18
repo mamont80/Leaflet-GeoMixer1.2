@@ -3028,7 +3028,7 @@ gmxAPIutils.layerHelper = {
 				obj.action = obj.action || (obj.id ? 'update' : 'insert');
 			});
 			var params = {
-				WrapStyle: 'window',
+				WrapStyle: 'None',
 				LayerName: layerName,
 				objects: JSON.stringify(objs)
 			};

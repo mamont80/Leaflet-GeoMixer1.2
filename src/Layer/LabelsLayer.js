@@ -137,7 +137,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
 
         var addObserver = function (layer, id) {
             var gmx = layer._gmx,
-                filters = ['styleFilter', 'userFilter'],
+                filters = ['clipFilter', 'clipPointsFilter', 'styleFilter', 'userFilter'],
                 options = {
                     type: 'resend',
                     bbox: _this.bbox,

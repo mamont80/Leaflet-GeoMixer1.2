@@ -3044,7 +3044,7 @@ gmxAPIutils.layerHelper = {
 				obj.action = obj.action || (obj.id ? 'update' : 'insert');
 			});
 			var params = {
-				WrapStyle: 'window',
+				WrapStyle: 'None',
 				LayerName: layerName,
 				objects: JSON.stringify(objs)
 			};
@@ -12198,7 +12198,7 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
 
         var addObserver = function (layer, id) {
             var gmx = layer._gmx,
-                filters = ['styleFilter', 'userFilter'],
+                filters = ['clipFilter', 'clipPointsFilter', 'styleFilter', 'userFilter'],
                 options = {
                     type: 'resend',
                     bbox: _this.bbox,
@@ -13975,8 +13975,8 @@ L.gmx.ExternalLayer = L.Class.extend({
             pixelDelta: 0,
 			styleHook: function (ctx, it, maxCount) {
 				ctx.setLineDash([2, 4]);
-				var zn = Math.floor(255 * (1 - it.count / maxCount));
-				ctx.fillStyle = 'rgb(' + zn + ',255, ' + zn + ', 0.2)';
+				// var zn = Math.floor(255 * (1 - it.count / maxCount));
+				// ctx.fillStyle = 'rgb(' + zn + ',255, ' + zn + ', 0.2)';
 			},
             // style: {
 				// setLineDash: [5, 15]
@@ -14030,9 +14030,9 @@ L.gmx.ExternalLayer = L.Class.extend({
 								this.options.styleHook(ctx, it, maxCount);
 							}
 							var bbox = it.pixelBox;
-							if (ctx.fillStyle !== '#000000') {
-								ctx.fillRect(bbox[0], bbox[1], bbox[2], bbox[3]);
-							}
+							// if (ctx.fillStyle !== '#000000') {
+								// ctx.fillRect(bbox[0], bbox[1], bbox[2], bbox[3]);
+							// }
 							
 							ctx.strokeRect(bbox[0], bbox[1], bbox[2], bbox[3]);
 						}
@@ -14110,6 +14110,13 @@ L.gmx.ExternalLayer = L.Class.extend({
 			tileElem._gridData = arr;
         },
 
+        clearLayers: function () {
+			if (this._markers) {
+				this._markers.clearLayers();
+				if (this._markers._map) { this._markers._map.removeLayer(this._markers); }
+			}
+        },
+
         addMarker: function (it, count) {
 			var center = it.bounds.toLatLngBounds().getCenter(),
 				marker = L.marker(L.latLng(center.lat, it.center.lng), L.extend({
@@ -14130,16 +14137,22 @@ L.gmx.ExternalLayer = L.Class.extend({
     L.gmx.VectorLayer.include({
         bindGridClusters: function (options) {
 			if (this._gridClusters) {
-				this._gridClusters.unbindLayer();
+				this._gridClusters.clearLayers();
 			}
 			this._gridClusters = new GmxGridCluster(options, this);
+			this
+				.redraw()
+				.repaint();
             return this;
         },
 
         unbindGridClusters: function () {
 			if (this._gridClusters) {
-				this._gridClusters.unbindLayer();
+				this._gridClusters.clearLayers();
 				this._gridClusters = null;
+				this
+					.redraw()
+					.repaint();
 			}
             return this;
         }

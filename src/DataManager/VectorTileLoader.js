@@ -42,11 +42,9 @@ var gmxVectorTileLoader = {
 						var pref = 'gmxAPI._vectorTileReceiver(';
 						if (txt.substr(0, pref.length) === pref) {
 							txt = txt.replace(pref, '');
-							var data = JSON.parse(txt.substr(0, txt.length -1));
-							resolve(data);
-						} else {
-							reject();
+							txt = txt.substr(0, txt.length -1);
 						}
+						resolve(JSON.parse(txt));
 					});
 			});
             this._loadedTiles[key] = promise;

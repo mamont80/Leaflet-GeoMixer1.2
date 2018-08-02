@@ -142,6 +142,9 @@ var chkVersion = function (layer, callback) {
 						params += '&srs=3857';
 						crs = L.CRS.EPSG3857;
 					}
+					if (map.options.generalized === false) {
+						params += '&generalizedTiles=false';
+					}
 					var zoom = map.getZoom(),
 						bbox = map.getBounds(),
 						min = crs.project(bbox.getSouthWest()),

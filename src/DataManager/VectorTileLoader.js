@@ -29,7 +29,7 @@ var gmxVectorTileLoader = {
                 requestParams.sw = L.gmx._sw;
             }
 
-			var promise = new Promise(function(resolve, reject) {
+			var promise = new Promise(function(resolve) {
 				var query = tileSenderPrefix + '&' + Object.keys(requestParams).map(function(name) {
 					return name + '=' + requestParams[name];
 				}).join('&');

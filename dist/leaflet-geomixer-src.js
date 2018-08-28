@@ -11480,8 +11480,8 @@ var delay = 20000,
     script = '/Layer/CheckVersion.ashx',
     intervalID = null,
     timeoutID = null,
-    lastParams = {};
-    // lastLayersStr = '';
+    hostBusy = {},
+    needReq = {};
 
 var isExistsTiles = function(prop) {
     var tilesKey = prop.Temporal ? 'TemporalTiles' : 'tiles';
@@ -11607,7 +11607,7 @@ var chkVersion = function (layer, callback) {
 
     if (document.body && !L.gmxUtil.isPageHidden()) {
         var hosts = getRequestParams(layer),
-            chkHost = function(hostName) {
+            chkHost = function(hostName, busyFlag) {
 				var url = L.gmxUtil.protocol + '//' + hostName + script,
                     layersStr = JSON.stringify(hosts[hostName]);
 				var params = 'WrapStyle=None&ftc=osm';
@@ -11630,32 +11630,41 @@ var chkVersion = function (layer, callback) {
 				}
 				params += '&layers=' + encodeURIComponent(layersStr);
 
-                if (layer || !lastParams[hostName] || lastParams[hostName] !== params) {
-                    // lastLayersStr = layersStr;
-                    if ('FormData' in window) {
-                        L.gmxUtil.request({
-                            url: url,
-                            async: true,
-                            headers: {
-                                'Content-type': 'application/x-www-form-urlencoded'
-                            },
-                            type: 'POST',
-                            params: params,
-                            withCredentials: true,
-                            callback: function(response) {
-								lastParams[hostName] = params;
-                                processResponse(JSON.parse(response));
-                            },
-                            onError: function(response) {
-                                console.log('Error: LayerVersion ', response);
-                            }
-                        });
+				if ('FormData' in window) {
+					hostBusy[hostName] = true;
+					L.gmxUtil.request({
+						url: url,
+						async: true,
+						headers: {
+							'Content-type': 'application/x-www-form-urlencoded'
+						},
+						type: 'POST',
+						params: params,
+						withCredentials: true,
+						callback: function(response) {
+							delete hostBusy[hostName];
+							if (needReq[hostName] && !busyFlag) {
+								delete needReq[hostName];
+								chkHost(hostName, true);
+							} else {
+								processResponse(JSON.parse(response));
+							}
+						},
+						onError: function(response) {
+							console.log('Error: LayerVersion ', response);
+							delete hostBusy[hostName];
+							if (needReq[hostName] && !busyFlag) {
+								delete needReq[hostName];
+								chkHost(hostName, true);
+							}
+						}
+					});
                     // } else {
                         // L.gmxUtil.sendCrossDomainPostRequest(url, {
                             // WrapStyle: 'message',
                             // layers: layersStr
                         // }, processResponse);
-                    }
+                    // }
                     var timeStamp = Date.now();
                     for (var key in layers) {
                         var it = layers[key];
@@ -11665,7 +11674,11 @@ var chkVersion = function (layer, callback) {
                 }
             };
         for (var hostName in hosts) {
-            chkHost(hostName);
+			if (!hostBusy[hostName]) {
+				chkHost(hostName);
+			} else {
+				needReq[hostName] = true;
+			}
         }
     }
 };

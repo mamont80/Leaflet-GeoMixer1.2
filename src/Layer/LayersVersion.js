@@ -132,12 +132,16 @@ var chkVersion = function (layer, callback) {
 
     if (document.body && !L.gmxUtil.isPageHidden()) {
         var hosts = getRequestParams(layer),
+			w = gmxAPIutils.worldWidthMerc,
+			bboxStr = [-w, -w, w, w].join(','),
             chkHost = function(hostName, busyFlag) {
 				var url = L.gmxUtil.protocol + '//' + hostName + script,
                     layersStr = JSON.stringify(hosts[hostName]);
 				var params = 'WrapStyle=None&ftc=osm';
 				if (layersVersion.needBbox) {
-					var crs = L.Projection.Mercator;
+					var zoom = map.getZoom(),
+						crs = L.Projection.Mercator;
+					params += '&zoom=' + zoom;
 					if (map.options.srs == 3857) {
 						params += '&srs=3857';
 						crs = L.CRS.EPSG3857;
@@ -145,12 +149,13 @@ var chkVersion = function (layer, callback) {
 					if (map.options.generalized === false) {
 						params += '&generalizedTiles=false';
 					}
-					var zoom = map.getZoom(),
-						bbox = map.getBounds(),
-						min = crs.project(bbox.getSouthWest()),
-						max = crs.project(bbox.getNorthEast()),
+					if (!map.options.allWorld) {
+						var bbox = map.getBounds(),
+							min = crs.project(bbox.getSouthWest()),
+							max = crs.project(bbox.getNorthEast());
+
 						bboxStr = [min.x, min.y, max.x, max.y].join(',');
-					params += '&zoom=' + zoom;
+					}
 					params += '&bbox=[' + bboxStr + ']';
 				}
 				params += '&layers=' + encodeURIComponent(layersStr);

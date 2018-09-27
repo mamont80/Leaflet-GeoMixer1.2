@@ -1,0 +1,36 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>GeoMixer.js Add Map Example</title>
+    <meta charset="utf-8" />
+    <style>
+        html, body, #map {
+            height: 100%;
+            margin: 0px;
+        }
+    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.5/leaflet.css" />
+    
+    <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet-src.js"></script>
+    <script src="../../build/leaflet-geomixer-dev.js?key=U92596WMIH"></script>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <script>
+        var map = L.map('map').setView([55.753781, 37.622680], 9);
+
+        L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        L.gmx.loadMap('H2DUP').then(function(gmxMap) {
+            map.addLayer(gmxMap.layersByID['B2CC196063834EF48A163EC14C392FAE']);
+            map.addLayer(gmxMap.layersByID['033B16D566194EBE9F3CC247F6DDA4A4']);
+        });
+
+    </script>
+</body>
+</html>

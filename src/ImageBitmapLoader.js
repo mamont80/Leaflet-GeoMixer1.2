@@ -47,7 +47,7 @@ L.gmx.workerPromise = L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/Image
 	var imageBitmapLoader = new ImageBitmapLoader();
 	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
 	L.gmx.getJSON = imageBitmapLoader.push.bind(imageBitmapLoader);
-	if (L.gmxUtil.debug) {
+	if (L.gmxUtil.debug === 2) {
 		L.gmx.sendCmd = function(cmd, options) {
 			options.cmd = cmd;
 			options.syncParams = L.gmx.gmxMapManager.syncParams;

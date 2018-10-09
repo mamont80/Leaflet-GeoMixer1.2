@@ -20,7 +20,7 @@ if (typeof module !== 'undefined' && module.exports) {
 */
 var gmxAPIutils = {
     lastMapId: 0,
-	debug: /\bdebug=1\b/.test(location.search),
+	debug: (function() { var arr = /\bdebug=(\d)\b/.exec(location.search); return arr ? Number(arr[1]) : false; })(),
 	fromWebMercY: function(y) {
 		return 90 * (4 * Math.atan(Math.exp(y / gmxAPIutils.rMajor)) / Math.PI - 1);
 	},
@@ -4080,7 +4080,7 @@ L.gmx.workerPromise = L.gmxUtil.createWorker(L.gmxUtil.apiLoadedFrom() + '/Image
 	var imageBitmapLoader = new ImageBitmapLoader();
 	L.gmx.getBitmap = imageBitmapLoader.push.bind(imageBitmapLoader);
 	L.gmx.getJSON = imageBitmapLoader.push.bind(imageBitmapLoader);
-	if (L.gmxUtil.debug) {
+	if (L.gmxUtil.debug === 2) {
 		L.gmx.sendCmd = function(cmd, options) {
 			options.cmd = cmd;
 			options.syncParams = L.gmx.gmxMapManager.syncParams;
@@ -6190,7 +6190,6 @@ var ObserverTileLoader = L.Class.extend({
 
     addTile: function(tile) {
         var leftToLoadDelta = tile.state === 'loaded' ? 0 : 1;
-        tile.loadDef.then(this._tileLoadedCallback.bind(this, tile));
 
         var tileObservers = {};
 
@@ -6209,6 +6208,7 @@ var ObserverTileLoader = L.Class.extend({
             tile: tile
         };
 
+        tile.loadDef.then(this._tileLoadedCallback.bind(this, tile));
         return this;
     },
 
@@ -6304,22 +6304,26 @@ var ObserverTileLoader = L.Class.extend({
     _tileLoadedCallback: function(tile) {
         this.fire('tileload', {tile: tile});
 
-        if (!(tile.vectorTileKey in this._tileData)) {		// TODO: проверка загружаемого тайла
+        var vtk = tile.vectorTileKey;
+        if (!(vtk in this._tileData)) {		// TODO: проверка загружаемого тайла
 			//console.log('tileload', tile, this._tileData)
             return;
         }
 
-        var tileObservers = this._tileData[tile.vectorTileKey].observers;
+        var tileObservers = this._tileData[vtk].observers;
         for (var id in tileObservers) {
-            var obsData = this._observerData[id];
-            obsData.leftToLoad--;
+            var obsData = this._observerData[id],
+				leftToLoad = obsData.leftToLoad;
+
+			obsData.leftToLoad = this._isLeftToLoad(obsData);
 
             if (obsData.leftToLoad < 1) {
                 if (obsData.loadingState) {
                     obsData.loadingState = false;
-                    obsData.observer.fire('stopLoadingTiles');
                 }
-                this.fire('observertileload', {observer: obsData.observer});
+				if (leftToLoad) {
+					this.fire('observertileload', {observer: obsData.observer});
+				}
             }
         }
     }
@@ -6936,7 +6940,7 @@ var DataManager = L.Class.extend({
         }
         this._waitCheckObservers();
     },
-
+/*
     preloadTiles: function(dateBegin, dateEnd, bounds) {
         var tileKeys = {};
         if (this._isTemporalLayer) {
@@ -6967,7 +6971,7 @@ var DataManager = L.Class.extend({
 
         return Deferred.all.apply(null, loadingDefs);
     },
-
+*/
     _updateActiveTilesList: function(newTilesList) {
 
         if (this._tileFilteringHook) {
@@ -8834,6 +8838,10 @@ ScreenVectorTile.prototype = {
     _getUrlFunction: function (gtp, item) {
 		return this.gmx.rasterBGfunc(gtp.x, gtp.y, gtp.z, item);
     },
+    _chkZoom: function (zoom) {
+		return	(zoom >= this.gmx.minZoomRasters && 'rasterBGfunc' in this.gmx) ||
+				(zoom >= this.gmx.minZoomQuicklooks && 'quicklookBGfunc' in this.gmx);
+    },
 
     _loadTileRecursive: function (tilePoint, item) {    //return promise, which resolves with object {gtp, image}
         var gmx = this.gmx,
@@ -8855,11 +8863,13 @@ ScreenVectorTile.prototype = {
 						if (url) {
 							gmx.badTiles[url] = true;
 						}
-						if (gtp.z > 1) {
+
+						var nextZoom = gtp.z - 1;
+						if (nextZoom && _this._chkZoom(nextZoom)) {
 							tryLoad({
 								x: Math.floor(gtp.x / 2),
 								y: Math.floor(gtp.y / 2),
-								z: gtp.z - 1
+								z: nextZoom
 							}, ''); // 'anonymous' 'use-credentials'
 						} else {
 							resolve({gtp: gtp});
@@ -11819,7 +11829,7 @@ L.gmx.VectorLayer.include({
             if (layerDescription.properties) {
                 L.extend(gmx.properties, layerDescription.properties);
                 gmx.properties.currentTiles = layerDescription.tiles;
-                gmx.properties.GeoProcessing = layerDescription.properties.GeoProcessing;
+                gmx.properties.GeoProcessing = layerDescription.properties.GeoProcessing;	// TODO: проверка изменения версии
                 gmx.rawProperties = gmx.properties;
                 this.fire('versionchange');
             }

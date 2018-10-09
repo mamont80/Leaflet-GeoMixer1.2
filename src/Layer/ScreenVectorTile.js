@@ -64,6 +64,10 @@ ScreenVectorTile.prototype = {
     _getUrlFunction: function (gtp, item) {
 		return this.gmx.rasterBGfunc(gtp.x, gtp.y, gtp.z, item);
     },
+    _chkZoom: function (zoom) {
+		return	(zoom >= this.gmx.minZoomRasters && 'rasterBGfunc' in this.gmx) ||
+				(zoom >= this.gmx.minZoomQuicklooks && 'quicklookBGfunc' in this.gmx);
+    },
 
     _loadTileRecursive: function (tilePoint, item) {    //return promise, which resolves with object {gtp, image}
         var gmx = this.gmx,
@@ -85,11 +89,13 @@ ScreenVectorTile.prototype = {
 						if (url) {
 							gmx.badTiles[url] = true;
 						}
-						if (gtp.z > 1) {
+
+						var nextZoom = gtp.z - 1;
+						if (nextZoom && _this._chkZoom(nextZoom)) {
 							tryLoad({
 								x: Math.floor(gtp.x / 2),
 								y: Math.floor(gtp.y / 2),
-								z: gtp.z - 1
+								z: nextZoom
 							}, ''); // 'anonymous' 'use-credentials'
 						} else {
 							resolve({gtp: gtp});

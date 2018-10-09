@@ -108,6 +108,8 @@ function ImageHandler(workerContext) {
     this.maxCount = 48;
     this.loading = 0;
     this.queue = [];
+	this.inProgress = {};
+
     this.workerContext = workerContext;
 }
 ImageHandler.prototype = {
@@ -119,45 +121,62 @@ ImageHandler.prototype = {
 		}
 	},
 
+	_resolveRequest: function(out, arr) {
+		this.loading--;
+		arr = arr || [];
+		var url = out.src;
+		this.workerContext.postMessage(out, arr);
+		if (this.inProgress[url]) {
+			this.inProgress[url].requests.forEach(function() {
+				this.workerContext.postMessage(out, arr);
+			}.bind(this));
+			delete this.inProgress[url];
+		}
+	},
+
 	processQueue: function() {
-		// log('processQueue', this.queue.length, this.loading, this.maxCount);
 		if (this.queue.length > 0 && this.loading < this.maxCount) {
-			this.loading++;
 			var it = this.queue.shift(),
-				options = it.options || {},
-				type = options.type || 'bitmap',
-				out = {url: it.src, type: type, load: false, loading: this.loading, queueLength: this.queue.length};
+				url = it.src;
 
-// log('processQueue', it.src.length, Date.now(), utils.chkProtocol(out.url))
-			var promise = fetch(utils.chkProtocol(out.url), utils.extend({}, fetchOptions, options)).then(function(resp) {
-					return utils.chkResponse(resp, type);
-				});
+			if (url in this.inProgress) {
+				// log('processQueue', this.queue.length, this.loading, this.maxCount, it);
+				this.inProgress[url].requests.push(it);
+			} else {
+				this.loading++;
+				this.inProgress[url] = {requests: [it]};
 
-			if (type === 'bitmap') {
-				promise = promise.then(createImageBitmap);				// Turn it into an ImageBitmap.
+				var options = it.options || {},
+					type = options.type || 'bitmap',
+					out = {url: it.src, type: type, load: false, loading: this.loading, queueLength: this.queue.length};
+
+				var promise = fetch(utils.chkProtocol(out.url), utils.extend({}, fetchOptions, options)).then(function(resp) {
+						return utils.chkResponse(resp, type);
+					});
+
+				if (type === 'bitmap') {
+					promise = promise.then(createImageBitmap);				// Turn it into an ImageBitmap.
+				}
+				return promise
+					.then(function(res) {									// Post it back to main thread.
+						out.load = true;
+						var arr = [];
+						if (type === 'bitmap') {
+							arr = [res];
+							out.imageBitmap = res;
+						} else {
+							out.res = res;
+						}
+						// log('imageBitmap __', this.queue.length, this.loading, out);
+						this._resolveRequest(out, arr);
+						this.processQueue();
+					}.bind(this))
+					.catch(function(err) {
+						out.error = err.toString();
+						this._resolveRequest(out);
+						this.processQueue();
+					}.bind(this));
 			}
-			return promise
-				.then(function(res) {									// Post it back to main thread.
-					this.loading--;
-					out.load = true;
-					var arr = [];
-					if (type === 'bitmap') {
-						arr = [res];
-						out.imageBitmap = res;
-					} else {
-						out.res = res;
-					}
-					// log('imageBitmap __', this.queue.length, this.loading, out);
-					this.workerContext.postMessage(out, arr);
-					this.processQueue();
-				}.bind(this))
-				.catch(function(err) {
-					out.error = err.toString();
-					this.workerContext.postMessage(out);
-					this.loading--;
-					// log('catch', err, out);
-					this.processQueue();
-				}.bind(this));
 		}
 	}
 };

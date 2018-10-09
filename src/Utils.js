@@ -4,7 +4,7 @@
 */
 var gmxAPIutils = {
     lastMapId: 0,
-	debug: /\bdebug=1\b/.test(location.search),
+	debug: (function() { var arr = /\bdebug=(\d)\b/.exec(location.search); return arr ? Number(arr[1]) : false; })(),
 	fromWebMercY: function(y) {
 		return 90 * (4 * Math.atan(Math.exp(y / gmxAPIutils.rMajor)) / Math.PI - 1);
 	},

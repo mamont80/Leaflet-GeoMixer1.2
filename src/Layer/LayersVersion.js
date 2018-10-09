@@ -344,7 +344,7 @@ L.gmx.VectorLayer.include({
             if (layerDescription.properties) {
                 L.extend(gmx.properties, layerDescription.properties);
                 gmx.properties.currentTiles = layerDescription.tiles;
-                gmx.properties.GeoProcessing = layerDescription.properties.GeoProcessing;
+                gmx.properties.GeoProcessing = layerDescription.properties.GeoProcessing;	// TODO: проверка изменения версии
                 gmx.rawProperties = gmx.properties;
                 this.fire('versionchange');
             }

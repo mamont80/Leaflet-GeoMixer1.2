@@ -35,7 +35,6 @@ var ObserverTileLoader = L.Class.extend({
 
     addTile: function(tile) {
         var leftToLoadDelta = tile.state === 'loaded' ? 0 : 1;
-        tile.loadDef.then(this._tileLoadedCallback.bind(this, tile));
 
         var tileObservers = {};
 
@@ -54,6 +53,7 @@ var ObserverTileLoader = L.Class.extend({
             tile: tile
         };
 
+        tile.loadDef.then(this._tileLoadedCallback.bind(this, tile));
         return this;
     },
 
@@ -149,22 +149,26 @@ var ObserverTileLoader = L.Class.extend({
     _tileLoadedCallback: function(tile) {
         this.fire('tileload', {tile: tile});
 
-        if (!(tile.vectorTileKey in this._tileData)) {		// TODO: проверка загружаемого тайла
+        var vtk = tile.vectorTileKey;
+        if (!(vtk in this._tileData)) {		// TODO: проверка загружаемого тайла
 			//console.log('tileload', tile, this._tileData)
             return;
         }
 
-        var tileObservers = this._tileData[tile.vectorTileKey].observers;
+        var tileObservers = this._tileData[vtk].observers;
         for (var id in tileObservers) {
-            var obsData = this._observerData[id];
-            obsData.leftToLoad--;
+            var obsData = this._observerData[id],
+				leftToLoad = obsData.leftToLoad;
+
+			obsData.leftToLoad = this._isLeftToLoad(obsData);
 
             if (obsData.leftToLoad < 1) {
                 if (obsData.loadingState) {
                     obsData.loadingState = false;
-                    obsData.observer.fire('stopLoadingTiles');
                 }
-                this.fire('observertileload', {observer: obsData.observer});
+				if (leftToLoad) {
+					this.fire('observertileload', {observer: obsData.observer});
+				}
             }
         }
     }
@@ -781,7 +785,7 @@ var DataManager = L.Class.extend({
         }
         this._waitCheckObservers();
     },
-
+/*
     preloadTiles: function(dateBegin, dateEnd, bounds) {
         var tileKeys = {};
         if (this._isTemporalLayer) {
@@ -812,7 +816,7 @@ var DataManager = L.Class.extend({
 
         return Deferred.all.apply(null, loadingDefs);
     },
-
+*/
     _updateActiveTilesList: function(newTilesList) {
 
         if (this._tileFilteringHook) {

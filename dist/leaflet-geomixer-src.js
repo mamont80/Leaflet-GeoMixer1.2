@@ -6356,11 +6356,14 @@ var DataManager = L.Class.extend({
     },
 
     setOptions: function(options) {
-        this._clearProcessing();
         if (options.GeoProcessing) {
-            this.processingTile = this.addData([]);
-            this._chkProcessing(options.GeoProcessing);
-        }
+            if (this.options.LayerVersion === options.LayerVersion) {
+				return;	// не было изменения версии слоя - но сервер почему то присылает новое properties слоя
+			}
+			this._chkProcessing(options.GeoProcessing);
+        } else {
+			this._clearProcessing();
+		}
         L.setOptions(this, options);
         this.optionsLink = options;
         this._isTemporalLayer = this.options.Temporal;
@@ -7060,10 +7063,14 @@ var DataManager = L.Class.extend({
     },
 
     _chkProcessing: function(processing) {
+		this.processingTile = this.processingTile || this.addData([]);
         var _items = this._items,
             needProcessingFilter = false,
             skip = {},
-            id, i, len, it, data;
+			tile = this.processingTile,
+			vtk = tile.vectorTileKey,
+			tdata = tile.data || [],
+            id, i, len, it, data, oldIt;
 
         if (processing) {
             if (processing.Deleted) {
@@ -7074,24 +7081,36 @@ var DataManager = L.Class.extend({
                         _items[id].processing = true;
                         _items[id].currentFilter = null;
                     }
-                    if (len > 0) { needProcessingFilter = true; }
                 }
+				if (len > 0) { needProcessingFilter = true; }
             }
 
             var out = {};
             if (processing.Inserted) {
                 for (i = 0, len = processing.Inserted.length; i < len; i++) {
                     it = processing.Inserted[i];
-                    if (!skip[it[0]]) { out[it[0]] = it; }
+                    id = it[0];
+					oldIt = _items[id];
+					if (oldIt && oldIt.processing && this._isUpdateded(it, oldIt.properties) !== it.length - 1) {
+						tdata[oldIt.options.fromTiles[vtk]] = it;
+						continue;
+					}
+                    if (!skip[id]) { out[id] = it; }
                 }
             }
 
             if (processing.Updated) {
                 for (i = 0, len = processing.Updated.length; i < len; i++) {
                     it = processing.Updated[i];
-                    if (!skip[it[0]]) { out[it[0]] = it; }
+                    id = it[0];
+					oldIt = _items[id];
+					if (oldIt && oldIt.processing && this._isUpdateded(it, oldIt.properties) !== it.length - 1) {
+						tdata[oldIt.options.fromTiles[vtk]] = it;
+						continue;
+					}
+                    if (!skip[id]) { out[id] = it; }
+					if (!needProcessingFilter) { needProcessingFilter = true; }
                 }
-                if (!needProcessingFilter && len > 0) { needProcessingFilter = true; }
             }
 
             data = [];
@@ -7108,14 +7127,28 @@ var DataManager = L.Class.extend({
                 this.processingTile = this.addData(data);
             }
         }
+
         if (needProcessingFilter) {
             this.addFilter('processingFilter', function(item, tile) {
                 return tile.z === 0 || !item.processing;
             });
-        } else {
+        } else if (this._filters['processingFilter']) {
             this.removeFilter('processingFilter');
         }
     },
+
+	_isUpdateded: function(a, b) {
+		if (a.length === b.length) {
+			for (var i = 0, len = a.length; i < len; i++) {
+				if ((typeof(a[i]) === 'object' && JSON.stringify(a[i]) !== JSON.stringify(b[i])) && a[i] !== b[i]) {
+					return i;
+				}
+			}
+			return false;
+		} else {
+			return true;
+		}
+	},
 
     enableGeneralization: function() {
         if (!this.options.isGeneralized) {
@@ -7377,7 +7410,6 @@ var VectorGridLayer = L.GridLayer.extend({
 	_animateZoom: function (e) {
 		this.options.updateWhenZooming = false;
 		this._setView(e.center, e.zoom, true, true);
-//	console.log('_setView _animateZoom', e.zoom, e.center, Date.now() - window.startTest, this)
 	},
 
 	_setZoomTransform: function (level, center, zoom) {	// Add by Geomixer (for cache levels transform)
@@ -7398,7 +7430,6 @@ var VectorGridLayer = L.GridLayer.extend({
 	},
 	_clearOldLevels: function (z) {
 		if (this._map) {
-// console.log('_clearOldLevels', z, Date.now() - window.startTest, this)
 			z = z || this._map.getZoom();
 			for (var key in this._levels) {
 				var el = this._levels[key].el,
@@ -7422,8 +7453,6 @@ var VectorGridLayer = L.GridLayer.extend({
 
 	_tileReady: function (coords, err, tile) {
 		if (!this._map) { return; }				// Add by Geomixer (нет возможности отключения fade-anim)
-// if (this._map._animatingZoom)
-// console.log('_tileReady _animateZoom', coords, err, tile, Date.now() - window.startTest, this)
 
 		if (err) {
 			// @event tileerror: TileErrorEvent
@@ -7480,8 +7509,6 @@ var VectorGridLayer = L.GridLayer.extend({
 			level = this._levels[zoom] = {};
 
 			level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated', this._container);
-			// level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated ' + zoom, this._container);
-			// level.el.style.zIndex = maxZoom;
 
 			level.origin = map.project(map.unproject(map.getPixelOrigin()), zoom).round();
 			level.zoom = zoom;
@@ -7672,7 +7699,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
     _onVersionChange: function () {
         this._updateProperties(this._gmx.rawProperties);
-		this._chkTiles();
+		//this._chkTiles();
     },
 
 	_waitCheckOldLevels: function () {
@@ -11827,11 +11854,12 @@ L.gmx.VectorLayer.include({
                 gmx.geometry = layerDescription.geometry;
             }
             if (layerDescription.properties) {
+				var out = {versionChanged: layerDescription.properties.LayerVersion !== gmx.properties.LayerVersion};
                 L.extend(gmx.properties, layerDescription.properties);
                 gmx.properties.currentTiles = layerDescription.tiles;
                 gmx.properties.GeoProcessing = layerDescription.properties.GeoProcessing;	// TODO: проверка изменения версии
                 gmx.rawProperties = gmx.properties;
-                this.fire('versionchange');
+                this.fire('versionchange', out);
             }
 			if (!gmx.dataSource && gmx.dataManager) {
 				gmx.dataManager.updateVersion(gmx.rawProperties, layerDescription.tiles);

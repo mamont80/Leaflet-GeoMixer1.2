@@ -342,11 +342,12 @@ L.gmx.VectorLayer.include({
                 gmx.geometry = layerDescription.geometry;
             }
             if (layerDescription.properties) {
+				var out = {versionChanged: layerDescription.properties.LayerVersion !== gmx.properties.LayerVersion};
                 L.extend(gmx.properties, layerDescription.properties);
                 gmx.properties.currentTiles = layerDescription.tiles;
                 gmx.properties.GeoProcessing = layerDescription.properties.GeoProcessing;	// TODO: проверка изменения версии
                 gmx.rawProperties = gmx.properties;
-                this.fire('versionchange');
+                this.fire('versionchange', out);
             }
 			if (!gmx.dataSource && gmx.dataManager) {
 				gmx.dataManager.updateVersion(gmx.rawProperties, layerDescription.tiles);

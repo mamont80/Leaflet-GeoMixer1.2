@@ -201,11 +201,14 @@ var DataManager = L.Class.extend({
     },
 
     setOptions: function(options) {
-        this._clearProcessing();
         if (options.GeoProcessing) {
-            this.processingTile = this.addData([]);
-            this._chkProcessing(options.GeoProcessing);
-        }
+            if (this.options.LayerVersion === options.LayerVersion) {
+				return;	// не было изменения версии слоя - но сервер почему то присылает новое properties слоя
+			}
+			this._chkProcessing(options.GeoProcessing);
+        } else {
+			this._clearProcessing();
+		}
         L.setOptions(this, options);
         this.optionsLink = options;
         this._isTemporalLayer = this.options.Temporal;
@@ -905,10 +908,14 @@ var DataManager = L.Class.extend({
     },
 
     _chkProcessing: function(processing) {
+		this.processingTile = this.processingTile || this.addData([]);
         var _items = this._items,
             needProcessingFilter = false,
             skip = {},
-            id, i, len, it, data;
+			tile = this.processingTile,
+			vtk = tile.vectorTileKey,
+			tdata = tile.data || [],
+            id, i, len, it, data, oldIt;
 
         if (processing) {
             if (processing.Deleted) {
@@ -919,24 +926,36 @@ var DataManager = L.Class.extend({
                         _items[id].processing = true;
                         _items[id].currentFilter = null;
                     }
-                    if (len > 0) { needProcessingFilter = true; }
                 }
+				if (len > 0) { needProcessingFilter = true; }
             }
 
             var out = {};
             if (processing.Inserted) {
                 for (i = 0, len = processing.Inserted.length; i < len; i++) {
                     it = processing.Inserted[i];
-                    if (!skip[it[0]]) { out[it[0]] = it; }
+                    id = it[0];
+					oldIt = _items[id];
+					if (oldIt && oldIt.processing && this._isUpdateded(it, oldIt.properties) !== it.length - 1) {
+						tdata[oldIt.options.fromTiles[vtk]] = it;
+						continue;
+					}
+                    if (!skip[id]) { out[id] = it; }
                 }
             }
 
             if (processing.Updated) {
                 for (i = 0, len = processing.Updated.length; i < len; i++) {
                     it = processing.Updated[i];
-                    if (!skip[it[0]]) { out[it[0]] = it; }
+                    id = it[0];
+					oldIt = _items[id];
+					if (oldIt && oldIt.processing && this._isUpdateded(it, oldIt.properties) !== it.length - 1) {
+						tdata[oldIt.options.fromTiles[vtk]] = it;
+						continue;
+					}
+                    if (!skip[id]) { out[id] = it; }
+					if (!needProcessingFilter) { needProcessingFilter = true; }
                 }
-                if (!needProcessingFilter && len > 0) { needProcessingFilter = true; }
             }
 
             data = [];
@@ -953,14 +972,28 @@ var DataManager = L.Class.extend({
                 this.processingTile = this.addData(data);
             }
         }
+
         if (needProcessingFilter) {
             this.addFilter('processingFilter', function(item, tile) {
                 return tile.z === 0 || !item.processing;
             });
-        } else {
+        } else if (this._filters['processingFilter']) {
             this.removeFilter('processingFilter');
         }
     },
+
+	_isUpdateded: function(a, b) {
+		if (a.length === b.length) {
+			for (var i = 0, len = a.length; i < len; i++) {
+				if ((typeof(a[i]) === 'object' && JSON.stringify(a[i]) !== JSON.stringify(b[i])) && a[i] !== b[i]) {
+					return i;
+				}
+			}
+			return false;
+		} else {
+			return true;
+		}
+	},
 
     enableGeneralization: function() {
         if (!this.options.isGeneralized) {

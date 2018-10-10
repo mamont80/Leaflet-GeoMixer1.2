@@ -2,7 +2,6 @@ var VectorGridLayer = L.GridLayer.extend({
 	_animateZoom: function (e) {
 		this.options.updateWhenZooming = false;
 		this._setView(e.center, e.zoom, true, true);
-//	console.log('_setView _animateZoom', e.zoom, e.center, Date.now() - window.startTest, this)
 	},
 
 	_setZoomTransform: function (level, center, zoom) {	// Add by Geomixer (for cache levels transform)
@@ -23,7 +22,6 @@ var VectorGridLayer = L.GridLayer.extend({
 	},
 	_clearOldLevels: function (z) {
 		if (this._map) {
-// console.log('_clearOldLevels', z, Date.now() - window.startTest, this)
 			z = z || this._map.getZoom();
 			for (var key in this._levels) {
 				var el = this._levels[key].el,
@@ -47,8 +45,6 @@ var VectorGridLayer = L.GridLayer.extend({
 
 	_tileReady: function (coords, err, tile) {
 		if (!this._map) { return; }				// Add by Geomixer (нет возможности отключения fade-anim)
-// if (this._map._animatingZoom)
-// console.log('_tileReady _animateZoom', coords, err, tile, Date.now() - window.startTest, this)
 
 		if (err) {
 			// @event tileerror: TileErrorEvent
@@ -105,8 +101,6 @@ var VectorGridLayer = L.GridLayer.extend({
 			level = this._levels[zoom] = {};
 
 			level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated', this._container);
-			// level.el = L.DomUtil.create('div', 'leaflet-tile-container leaflet-zoom-animated ' + zoom, this._container);
-			// level.el.style.zIndex = maxZoom;
 
 			level.origin = map.project(map.unproject(map.getPixelOrigin()), zoom).round();
 			level.zoom = zoom;
@@ -297,7 +291,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
     _onVersionChange: function () {
         this._updateProperties(this._gmx.rawProperties);
-		this._chkTiles();
+		//this._chkTiles();
     },
 
 	_waitCheckOldLevels: function () {

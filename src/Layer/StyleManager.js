@@ -308,7 +308,7 @@ StyleManager.prototype = {
         }
         for (var i = 0, len = this._styles.length; i < len; i++) {
             var st = this._styles[i];
-            if (z > st.MaxZoom || z < st.MinZoom
+            if (st.disabled || z > st.MaxZoom || z < st.MinZoom
                 || (st.filterFunction && !st.filterFunction(propArray, indexes, types))) {
                 continue;
             }

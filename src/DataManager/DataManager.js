@@ -73,9 +73,11 @@ var ObserverTileLoader = L.Class.extend({
     },
 
     _isLeftToLoad: function(obsData) {
-		var cnt = 0;
+		var cnt = 0,
+			processingTile = this._dataManager.processingTile;
 		for (var tileId in obsData.tiles) {
-			if (this._tileData[tileId].tile.state !== 'loaded') {cnt++;}
+			var vtile = this._tileData[tileId].tile;
+			if (vtile !== processingTile && vtile.state !== 'loaded') {cnt++;}
 		}
 		return cnt;
     },
@@ -1068,7 +1070,7 @@ var DataManager = L.Class.extend({
 
     _getProcessingTile: function() {
         if (!this.processingTile) {
-        var x = -0.5, y = -0.5, z = 0, v = 0, s = -1, d = -1, isFlatten = this.options.isFlatten;
+			var x = -0.5, y = -0.5, z = 0, v = 0, s = -1, d = -1, isFlatten = this.options.isFlatten;
 
             this.processingTile = new VectorTile({load: function(x, y, z, v, s, d, callback) {
                             callback({values: []});

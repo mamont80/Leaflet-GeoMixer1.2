@@ -6228,9 +6228,11 @@ var ObserverTileLoader = L.Class.extend({
     },
 
     _isLeftToLoad: function(obsData) {
-		var cnt = 0;
+		var cnt = 0,
+			processingTile = this._dataManager.processingTile;
 		for (var tileId in obsData.tiles) {
-			if (this._tileData[tileId].tile.state !== 'loaded') {cnt++;}
+			var vtile = this._tileData[tileId].tile;
+			if (vtile !== processingTile && vtile.state !== 'loaded') {cnt++;}
 		}
 		return cnt;
     },
@@ -7223,7 +7225,7 @@ var DataManager = L.Class.extend({
 
     _getProcessingTile: function() {
         if (!this.processingTile) {
-        var x = -0.5, y = -0.5, z = 0, v = 0, s = -1, d = -1, isFlatten = this.options.isFlatten;
+			var x = -0.5, y = -0.5, z = 0, v = 0, s = -1, d = -1, isFlatten = this.options.isFlatten;
 
             this.processingTile = new VectorTile({load: function(x, y, z, v, s, d, callback) {
                             callback({values: []});
@@ -10507,7 +10509,7 @@ StyleManager.prototype = {
 StyleManager.MAX_STYLE_SIZE = 256;
 //StyleManager.DEFAULT_STYLE = {outline: {color: 255, thickness: 1}, marker: {size: 8, circle: true}};
 StyleManager.DEFAULT_STYLE = {outline: {color: 255, thickness: 1}, marker: {size: 8}};
-StyleManager.DEFAULT_KEYS = ['Name', 'MinZoom', 'MaxZoom', 'Balloon', 'BalloonEnable', 'DisableBalloonOnMouseMove', 'DisableBalloonOnClick'];
+StyleManager.DEFAULT_KEYS = ['Name', 'MinZoom', 'MaxZoom', 'Balloon', 'BalloonEnable', 'DisableBalloonOnMouseMove', 'DisableBalloonOnClick', 'disabled'];
 StyleManager.DEFAULT_ICONPATH = [0, 10, 5, -10, -5, -10, 0, 10];  // [TL.x, TL.y, BR.x, BR.y, BL.x, BL.y, TL.x, TL.y]
 StyleManager.DEFAULT_STYLE_KEYS = [
 	'iconUrl', 'iconAngle', 'iconSize', 'iconScale', 'iconMinScale', 'iconMaxScale', 'iconCircle', 'iconCenter', 'iconAnchor', 'iconColor',	// для иконок
@@ -15030,6 +15032,7 @@ L.gmx.loadMap = function(mapID, options) {
 				loadedMap.layersCreated.then(function() {
 					if (options.leafletMap || options.setZIndex) {
 						var curZIndex = 0,
+							visibility = options.visibility,
 							layer, rawProperties;
 
 						for (var l = loadedMap.layers.length - 1; l >= 0; l--) {
@@ -15042,7 +15045,7 @@ L.gmx.loadMap = function(mapID, options) {
 								layer.setZIndex(++curZIndex);
 							}
 
-							if (options.leafletMap && rawProperties.visible) {
+							if (options.leafletMap && (visibility ? visibility[rawProperties.name] : rawProperties.visible)) {
 								layer.addTo(options.leafletMap);
 							}
 						}

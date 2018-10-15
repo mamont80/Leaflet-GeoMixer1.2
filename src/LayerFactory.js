@@ -155,6 +155,7 @@ L.gmx.loadMap = function(mapID, options) {
 				loadedMap.layersCreated.then(function() {
 					if (options.leafletMap || options.setZIndex) {
 						var curZIndex = 0,
+							visibility = options.visibility,
 							layer, rawProperties;
 
 						for (var l = loadedMap.layers.length - 1; l >= 0; l--) {
@@ -167,7 +168,7 @@ L.gmx.loadMap = function(mapID, options) {
 								layer.setZIndex(++curZIndex);
 							}
 
-							if (options.leafletMap && rawProperties.visible) {
+							if (options.leafletMap && (visibility ? visibility[rawProperties.name] : rawProperties.visible)) {
 								layer.addTo(options.leafletMap);
 							}
 						}

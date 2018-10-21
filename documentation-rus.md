@@ -100,7 +100,7 @@ L.gmx.loadLayer('7VKHM', '295894E2A2F742109AB112DBFEAEFF09').then(function(satel
 Параметр|Описание|Тип
 ------|-----------|:--:|
 leafletMap| Карта Leaflet для добавления к ней всех слоёв, включённых в исходной карте GeoMixer-а |`L.Map`
-setZIndex| Задать z-индексы создаваемых слоёв в соответствии с порядоком слоёв в карте GeoMixer-а (в том числе, векторные слои всегда будут над растровыми)|`Boolean`
+setZIndex| Задать z-индексы создаваемых слоёв в соответствии с порядоком слоёв в карте GeoMixer-а (в том числе, векторные слои всегда будут над растровыми при значении свойства `LayerOrder === 'VectorOnTop'` в описании карты)|`Boolean`
 
 Функция возвращает Promise, который выполняется (fulfilled) при загрузке всех слоёв. При этом в ф-ции выполнения передаётся объект типа `L.gmx.Map`.
 
@@ -177,7 +177,7 @@ removeClipPolygon|`removeClipPolygon(<`[L.Polygon](http://leafletjs.com/referenc
 | popupopen | `<PopupEvent>` | происходит при открытии Popup.
 | popupclose | `<PopupEvent>` | происходит при закрытии Popup.
 
-###Event object
+####Event object
 
 Расширяет [Leaflet Event](http://leafletjs.com/reference.html#event-objects)
 
@@ -187,7 +187,7 @@ gmx.id|`<UInt>`| Идентификатор объекта.
 gmx.target|`<`[VectorTile item](#vectortile-item)`>`| Объект векторного слоя на котором произошло событие.
 gmx.layer|`<`[L.gmx.VectorLayer](#Класс-lgmxvectorlayer)`>`| Слой которому принадлежит `gmx.target`.
 
-###PopupEvent object
+####PopupEvent object
 
 Расширяет [Leaflet PopupEvent](http://leafletjs.com/reference.html#popup-event)
 
@@ -199,7 +199,7 @@ gmx.templateBalloon|`<String>`| Шаблон балуна.
 gmx.summary|`<String>`| Итоговая строка балуна.
 gmx.latlng|`<LatLng>`| Координаты балуна.
 
-###VectorTile item
+####VectorTile item
 
 Свойство|Тип|Описание
 ------|:---------:|-----------

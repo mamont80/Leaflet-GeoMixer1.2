@@ -177,7 +177,7 @@ removeClipPolygon|`removeClipPolygon(<`[L.Polygon](http://leafletjs.com/referenc
 | popupopen | `<PopupEvent>` | происходит при открытии Popup.
 | popupclose | `<PopupEvent>` | происходит при закрытии Popup.
 
-####Event object
+#### Event object
 
 Расширяет [Leaflet Event](http://leafletjs.com/reference.html#event-objects)
 
@@ -187,7 +187,7 @@ gmx.id|`<UInt>`| Идентификатор объекта.
 gmx.target|`<`[VectorTile item](#vectortile-item)`>`| Объект векторного слоя на котором произошло событие.
 gmx.layer|`<`[L.gmx.VectorLayer](#Класс-lgmxvectorlayer)`>`| Слой которому принадлежит `gmx.target`.
 
-####PopupEvent object
+#### PopupEvent object
 
 Расширяет [Leaflet PopupEvent](http://leafletjs.com/reference.html#popup-event)
 
@@ -199,7 +199,7 @@ gmx.templateBalloon|`<String>`| Шаблон балуна.
 gmx.summary|`<String>`| Итоговая строка балуна.
 gmx.latlng|`<LatLng>`| Координаты балуна.
 
-####VectorTile item
+### VectorTile item
 
 Свойство|Тип|Описание
 ------|:---------:|-----------

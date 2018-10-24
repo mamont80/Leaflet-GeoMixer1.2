@@ -9554,10 +9554,9 @@ ScreenVectorTile.prototype = {
 					result();
 					return;
 				}
-				var ts = this.layer.options.tileSize;
-				this.tile.width = this.tile.height = ts;
 				var doDraw = function() {
 					var gmx = _this.gmx,
+						ts = _this.layer.options.tileSize || 256,
 						dattr = {
 							//tileLink: tileLink,
 							tbounds: _this.tbounds,
@@ -9570,6 +9569,7 @@ ScreenVectorTile.prototype = {
 						},
 						tinfo = 'zKey:' + _this.zKey + ' count: ' + geoItems.length;
 					L.DomUtil.addClass(tile, tinfo);
+					_this.tile.width = _this.tile.height = ts;
 
 					if (!_this.layer._gridClusters) {
 						ctx.clearRect(0, 0, ts, ts);
@@ -9593,7 +9593,7 @@ ScreenVectorTile.prototype = {
 					gmx.preRenderHooks.forEach(function (f) {
 						if (!bgImage) {
 							bgImage = document.createElement('canvas');
-							bgImage.width = bgImage.height = ts || 256;
+							bgImage.width = bgImage.height = ts;
 						}
 						var res = f(bgImage, hookInfo);
 						if (res && res.then) {

@@ -204,12 +204,13 @@ log('loadMapProperties', mapName)
 			var promise = new Promise(function(resolve, reject) {
 			var opt = {
 				WrapStyle: 'None',
-				skipTiles: options.skipTiles || 'None', // All, NotVisible, None
+				skipTiles: options.skipTiles || 'All', // All, NotVisible, None
 				MapName: mapName,
 				srs: options.srs || 3857,
 				ftc: options.ftc || 'osm',
 				ModeKey: 'map'
 			};
+			if (options.visibleItemOnly) { opt.visibleItemOnly = true; }
 				gmxMapManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
 					opt.key = sessionKey;
 					utils.getJson({

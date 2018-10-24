@@ -4691,6 +4691,51 @@ var gmxMapManager = {
 		}
     },
 
+	getMapFolder: function(options) {
+        var serverHost = options.hostName || options.serverHost || 'maps.kosmosnimki.ru',
+			mapId = options.mapId,
+			folderId = options.folderId;
+
+		var opt = {
+			folderId: folderId || '',
+			mapId: mapId,
+			skipTiles: options.skipTiles || 'All', // All, NotVisible, None
+			srs: options.srs || 3857
+		};
+		return new Promise(function(resolve, reject) {
+			if (L.gmx.sendCmd) {
+				console.log('TODO: L.gmx.sendCmd');
+			} else {
+				gmxSessionManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
+					opt.key = sessionKey;
+					gmxAPIutils.requestJSONP(L.gmxUtil.protocol + '//' + serverHost + '/Map/GetMapFolder', opt).then(function(json) {
+						if (json && json.Status === 'ok' && json.Result) {
+							var mapInfo = L.gmx._maps[serverHost][mapId],
+								gmxMap = mapInfo.loaded,
+								res = json.Result.content,
+								outInfo = {
+									children: res.children,
+									properties: gmxMap.properties
+								};
+							gmxMapManager.iterateNode(mapInfo._rawTree, function(it) {
+								if (folderId === it.content.properties.GroupID) {
+									L.extend(it, json.Result);
+								}
+							}, true);
+							gmxMap.layersCreated.then(function() {
+								gmxMap.layersCreatePromise(outInfo).then(function() {
+									resolve(json.Result);
+								});
+							});
+						} else {
+							reject(json);
+						}
+					}, reject);
+				}, reject);
+			}
+		});
+    },
+
 	loadMapProperties: function(options) {
         var maps = this._maps,
 			serverHost = options.hostName || options.serverHost || 'maps.kosmosnimki.ru',
@@ -4699,20 +4744,22 @@ var gmxMapManager = {
         if (!maps[serverHost] || !maps[serverHost][mapName]) {
 			var opt = {
 				WrapStyle: 'func',
-				skipTiles: options.skipTiles || 'None', // All, NotVisible, None
+				skipTiles: options.skipTiles || 'All', // All, NotVisible, None
 				MapName: mapName,
 				srs: options.srs || 3857,
 				ftc: options.ftc || 'osm',
 				ModeKey: 'map'
 			};
+			if (options.visibleItemOnly) { opt.visibleItemOnly = true; }
 			var promise = new Promise(function(resolve, reject) {
 				if (L.gmx.sendCmd) {
 					L.gmx.sendCmd('mapProperties', {
 						serverHost: serverHost,
 						apiKey: options.apiKey,
 						WrapStyle: 'func',
-						skipTiles: options.skipTiles || 'None', // All, NotVisible, None
+						skipTiles: options.skipTiles || 'All', // All, NotVisible, None
 						MapName: mapName,
+						visibleItemOnly: opt.visibleItemOnly|| false,
 						srs: options.srs || 3857,
 						ftc: options.ftc || 'osm',
 						ModeKey: 'map'
@@ -4784,23 +4831,23 @@ var gmxMapManager = {
             for (var i = 0, len = arr.length; i < len; i++) {
                 var layer = arr[i];
 
-                if (layer.type === 'group') {
-                    iterate(layer.content.children);
-                } else if (layer.type === 'layer') {
+                if (layer.type === 'layer') {
                     callback(layer.content);
+                } else if (layer.type === 'group') {
+                    iterate(layer.content.children || []);
                 }
             }
         };
 
         treeInfo && iterate(treeInfo.children);
     },
-    iterateNode: function(treeInfo, callback) {
+    iterateNode: function(treeInfo, callback, onceFlag) {
         var iterate = function(node) {
-			var arr = node.children;
+			var arr = node.children || [];
             for (var i = 0, len = arr.length; i < len; i++) {
                 var layer = arr[i];
 
-				callback(layer);
+				if (callback(layer) && onceFlag) { break; }
                 if (layer.type === 'group') {
                     iterate(layer.content);
                 }
@@ -4844,21 +4891,23 @@ var gmxMap = L.Class.extend({
 		this.layersByTitle = {};
 		this.layersByID = {};
 		this.dataManagers = {};
-
-		var _this = this;
+		this.options = commonLayerOptions;
 
 		this.properties = L.extend({}, mapInfo.properties);
 		this.properties.BaseLayers = this.properties.BaseLayers ? JSON.parse(this.properties.BaseLayers) : [];
 		this.rawTree = mapInfo;
-		var _skipTiles = commonLayerOptions.skipTiles || 'All',
-			_ftc = commonLayerOptions.ftc || 'osm',
-			_srs = commonLayerOptions.srs || 3857;
+		this.layersCreated = this.layersCreatePromise(mapInfo);
+	},
 
-		// var hostName = this.properties.hostName,
-		var mapID = this.properties.name;
-
-		this.layersCreated = new Promise(function(resolve) {
-			var missingLayerTypes = {},
+	layersCreatePromise: function(mapInfo) {
+		return new Promise(function(resolve) {
+			var mapID = mapInfo.properties.name,
+				_this = this,
+				commonOptions = this.options,
+				_skipTiles = this.options.skipTiles || 'All',
+				_ftc = this.options.ftc || 'osm',
+				_srs = this.options.srs || 3857,
+				missingLayerTypes = {},
 				dataSources = {};
 
 			gmxMapManager.iterateLayers(mapInfo, function(layerInfo) {
@@ -4876,8 +4925,11 @@ var gmxMap = L.Class.extend({
 
 				var type = props.ContentID || props.type,
 					meta = props.MetaProperties || {},
-					layerOptions = L.extend(options, commonLayerOptions);
+					layerOptions = L.extend(options, commonOptions);
 
+				if (props.styles && !props.gmxStyles) {
+					props.gmxStyles = L.gmx.StyleManager.decodeOldStyles(props);
+				}
 				if (props.dataSource || 'parentLayer' in meta) {      	// Set dataSource layer
 					layerOptions.parentLayer = props.dataSource || '';
 					if ('parentLayer' in meta) {      	// todo удалить после изменений вов вьювере

@@ -8,21 +8,23 @@ var gmxMap = L.Class.extend({
 		this.layersByTitle = {};
 		this.layersByID = {};
 		this.dataManagers = {};
-
-		var _this = this;
+		this.options = commonLayerOptions;
 
 		this.properties = L.extend({}, mapInfo.properties);
 		this.properties.BaseLayers = this.properties.BaseLayers ? JSON.parse(this.properties.BaseLayers) : [];
 		this.rawTree = mapInfo;
-		var _skipTiles = commonLayerOptions.skipTiles || 'All',
-			_ftc = commonLayerOptions.ftc || 'osm',
-			_srs = commonLayerOptions.srs || 3857;
+		this.layersCreated = this.layersCreatePromise(mapInfo);
+	},
 
-		// var hostName = this.properties.hostName,
-		var mapID = this.properties.name;
-
-		this.layersCreated = new Promise(function(resolve) {
-			var missingLayerTypes = {},
+	layersCreatePromise: function(mapInfo) {
+		return new Promise(function(resolve) {
+			var mapID = mapInfo.properties.name,
+				_this = this,
+				commonOptions = this.options,
+				_skipTiles = this.options.skipTiles || 'All',
+				_ftc = this.options.ftc || 'osm',
+				_srs = this.options.srs || 3857,
+				missingLayerTypes = {},
 				dataSources = {};
 
 			gmxMapManager.iterateLayers(mapInfo, function(layerInfo) {
@@ -40,8 +42,11 @@ var gmxMap = L.Class.extend({
 
 				var type = props.ContentID || props.type,
 					meta = props.MetaProperties || {},
-					layerOptions = L.extend(options, commonLayerOptions);
+					layerOptions = L.extend(options, commonOptions);
 
+				if (props.styles && !props.gmxStyles) {
+					props.gmxStyles = L.gmx.StyleManager.decodeOldStyles(props);
+				}
 				if (props.dataSource || 'parentLayer' in meta) {      	// Set dataSource layer
 					layerOptions.parentLayer = props.dataSource || '';
 					if ('parentLayer' in meta) {      	// todo удалить после изменений вов вьювере

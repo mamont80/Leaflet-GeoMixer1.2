@@ -121,14 +121,14 @@ ImageHandler.prototype = {
 		}
 	},
 
-	_resolveRequest: function(out, arr) {
+	_resolveRequest: function(out) {
 		this.loading--;
-		arr = arr || [];
-		var url = out.src;
-		this.workerContext.postMessage(out, arr);
+		// arr = arr || null;
+		var url = out.src || out.url;
+		this.workerContext.postMessage(out); // TODO: need send with , arr attribute
 		if (this.inProgress[url]) {
 			this.inProgress[url].requests.forEach(function() {
-				this.workerContext.postMessage(out, arr);
+				this.workerContext.postMessage(out);
 			}.bind(this));
 			delete this.inProgress[url];
 		}

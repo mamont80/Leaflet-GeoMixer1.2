@@ -15045,8 +15045,8 @@ L.gmx.loadLayer = function(mapID, layerID, options) {
 			function(response) {
 				reject('Can\'t load layer ' + layerID + ' from map ' + mapID + ': ' + response.error);
 			}
-		);
-	});
+		).catch(console.log);
+	}).catch(console.log);
 };
 
 L.gmx.loadLayers = function(layers, globalOptions) {

@@ -81,7 +81,7 @@ var gmxAPIutils = {
     createWorker: function(url)	{		// Создание Worker-а
         return new Promise(function(resolve, reject) {
 			if ('createImageBitmap' in window && 'Worker' in window) {
-				if (url.indexOf(location.origin) === 0) {
+				if (location.origin.substr(0, 4) === 'http' && url.indexOf(location.origin) === 0) {
 					resolve(new Worker(url));
 				} else {
 					fetch(url, {mode: 'cors'})
@@ -101,15 +101,21 @@ var gmxAPIutils = {
     },
 
     normalizeHostname: function(hostName) {
-        var parsedHost = L.gmxUtil.parseUri((hostName.substr(0, 4) !== 'http' ? L.gmxUtil.protocol + '//' : '') + hostName); // Bug in gmxAPIutils.parseUri for 'localhost:8000'
+        var parser = document.createElement('a');
+		parser.href = hostName;
+		return parser.host
+		// if (window.URL) {
+			// var ph = new Url(hostName);
+		// }
+		// var parsedHost = L.gmxUtil.parseUri((hostName.substr(0, 4) !== 'http' ? L.gmxUtil.protocol + '//' : '') + hostName); // Bug in gmxAPIutils.parseUri for 'localhost:8000'
 
-        hostName = parsedHost.host + parsedHost.directory;
+        // hostName = parsedHost.host + parsedHost.directory;
 
-        if (hostName[hostName.length - 1] === '/') {
-            hostName = hostName.substring(0, hostName.length - 1);
-        }
+        // if (hostName[hostName.length - 1] === '/') {
+            // hostName = hostName.substring(0, hostName.length - 1);
+        // }
 
-        return hostName;
+        // return hostName;
     },
 
 	getLayerItemFromServer: function(options) {
@@ -3070,6 +3076,7 @@ if (!L.gmxUtil) { L.gmxUtil = {}; }
 
 //public interface
 L.extend(L.gmxUtil, {
+	isHTTP2: self.performance && self.performance.getEntriesByType('navigation')[0].nextHopProtocol === 'h2',
 	debug: gmxAPIutils.debug,
 	createWorker: gmxAPIutils.createWorker,
 	apiLoadedFrom: gmxAPIutils.apiLoadedFrom,
@@ -11543,11 +11550,12 @@ L.gmx.VectorLayer.include({
                     }
                     this._map.doubleClickZoom.disable();
                     return idr;
-                } else if (this._map) {
-					this._map.doubleClickZoom.enable();
 				}
             }
         }
+		if (!this._map.doubleClickZoom.enabled()) {
+			this._map.doubleClickZoom.enable();
+		}
         return 0;
     },
 

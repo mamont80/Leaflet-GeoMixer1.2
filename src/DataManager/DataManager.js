@@ -237,8 +237,8 @@ var DataManager = L.Class.extend({
         gmxVectorTileLoader.load(
             _this.tileSenderPrefix,
             {x: x, y: y, z: z, v: v, s: s, d: d, srs: this.options.srs, layerID: _this.options.name}
-        ).then(callback, function() {
-            console.log('Error loading vector tile');
+        ).then(callback, function(res) {
+            console.log('Error loading vector tile:', res);
             callback({values:[]});
             _this.fire('chkLayerUpdate', {dataProvider: _this}); //TODO: do we really need event here?
         });

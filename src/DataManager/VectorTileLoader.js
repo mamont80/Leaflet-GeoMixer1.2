@@ -29,7 +29,7 @@ var gmxVectorTileLoader = {
                 requestParams.sw = L.gmx._sw;
             }
 
-			var promise = new Promise(function(resolve) {
+			var promise = new Promise(function(resolve, reject) {
 				var query = tileSenderPrefix + '&' + Object.keys(requestParams).map(function(name) {
 					return name + '=' + requestParams[name];
 				}).join('&');
@@ -37,15 +37,24 @@ var gmxVectorTileLoader = {
 					mode: 'cors',
 					credentials: 'include'
 				})
-					.then(function(response) { return response.text(); })
-					.then(function(txt) {
-						var pref = 'gmxAPI._vectorTileReceiver(';
-						if (txt.substr(0, pref.length) === pref) {
-							txt = txt.replace(pref, '');
-							txt = txt.substr(0, txt.length -1);
+					.then(function(response) {
+						if (response.status === 404) {
+							reject(response);
+							return '';
 						}
-						resolve(JSON.parse(txt));
-					});
+						return response.text();
+					})
+					.then(function(txt) {
+						if (txt) {
+							var pref = 'gmxAPI._vectorTileReceiver(';
+							if (txt.substr(0, pref.length) === pref) {
+								txt = txt.replace(pref, '');
+								txt = txt.substr(0, txt.length -1);
+							}
+							resolve(JSON.parse(txt));
+						}
+					})
+					.catch(console.log);
 			});
             this._loadedTiles[key] = promise;
         }

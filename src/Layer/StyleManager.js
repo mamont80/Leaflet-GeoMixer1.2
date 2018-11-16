@@ -121,9 +121,8 @@ StyleManager.prototype = {
 
     _chkReady: function() {
         if (this._needLoadIcons < 1) {
-            var _this = this;
 			if (this.gmx.dataManager) {
-				this.gmx.dataManager.addFilter('styleFilter', function(it) { return _this._chkStyleFilter(it); });
+				this.gmx.dataManager.addFilter('styleFilter', this._chkStyleFilter.bind(this));
 			}
             this.resolve();
         }
@@ -206,9 +205,9 @@ StyleManager.prototype = {
         return this.initStyles();
     },
 
-    getItemBalloon: function(id) {
-        var item = this.gmx.dataManager.getItem(id),
-            currentFilter = item ? item.currentFilter : 0,
+    getItemBalloon: function(item) {
+        if (typeof(item) === 'number') { item = this.gmx.dataManager.getItem(item); }
+        var currentFilter = item ? item.currentFilter : 0,
             style = this._styles[currentFilter];
         return style ? {
                 DisableBalloonOnMouseMove: style.DisableBalloonOnMouseMove || false,
@@ -318,13 +317,14 @@ StyleManager.prototype = {
         return out;
     },
 
-    _chkStyleFilter: function(item, zoom) {
+    _chkStyleFilter: function(item) {
         var gmx = this.gmx,
             fnum = gmx.multiFilters ? -1 : item.currentFilter,
             curr = this._styles[fnum],
-            needParse = !curr || curr.version !== item.styleVersion;
+            needParse = !curr || curr.version !== item.styleVersion,
+			zoom = gmx.currentZoom;
 
-		zoom = zoom || gmx.currentZoom;
+		// zoom = zoom || gmx.currentZoom;
         if (needParse || item._lastZoom !== zoom) {
             item.currentFilter = -1;
             item.multiFilters = [];

@@ -1,3 +1,4 @@
+(function() {
 //Single vector tile, received from GeoMixer server
 //  dataProvider: has single method "load": function(x, y, z, v, s, d, callback), which calls "callback" with the following parameters:
 //      - {Object[]} data - information about vector objects in tile
@@ -8,6 +9,7 @@
 //      isGeneralized: flag for generalized tile
 var VectorTile = function(dataProvider, options) {
     this.dataProvider = dataProvider;
+    this.itemsKeys = {};
     this.x = options.x;
     this.y = options.y;
     this.z = options.z;
@@ -15,6 +17,7 @@ var VectorTile = function(dataProvider, options) {
     this.s = options.s || -1;
     this.d = options.d || -1;
     // this._itemsArr = options._itemsArr;
+    this.processing = options.processing;
     this.attributes = options.attributes;
     this.isGeneralized = options.isGeneralized;
     this.isFlatten = options.isFlatten;
@@ -30,6 +33,9 @@ var VectorTile = function(dataProvider, options) {
 };
 
 VectorTile.prototype = {
+    itemsKeys: null,
+    data: null,
+    // attributes: {},
     addData: function(data, keys) {
 
         if (keys) {
@@ -40,9 +46,11 @@ VectorTile.prototype = {
             dataOptions = new Array(len),
             dataBounds = gmxAPIutils.bounds();
         for (var i = 0; i < len; i++) {
-            var dataOption = this._parseItem(data[i]);
+            var it = data[i],
+				dataOption = this._parseItem(it);
             dataOptions[i] = dataOption;
             dataBounds.extendBounds(dataOption.bounds);
+            this.itemsKeys[it[0]] = i;
         }
 
         if (!this.data) {
@@ -178,6 +186,19 @@ VectorTile.prototype = {
             }
         }
         var dataOption = {
+            id: it[0],
+            type: type,
+			processing: this.processing,
+			currentFilter: null,
+            properties: it,
+			options: {
+				fromTiles: {},
+				isGeneralized: this.isGeneralized
+			},
+			// options: {
+				// fromTiles: {5_23_6_52334_14179_1: 1},
+				// unixTimeStamp: 1540599811000
+			// },
             // props: props,
             bounds: bounds,
             boundsArr: boundsArr
@@ -207,3 +228,7 @@ VectorTile.boundsFromTileKey = function(gmxTileKey) {
     var p = VectorTile.parseTileKey(gmxTileKey);
     return gmxAPIutils.getTileBounds(p.x, p.y, p.z);
 };
+if (!L.gmx) { L.gmx = {}; }
+L.gmx.VectorTile = VectorTile;
+
+})();

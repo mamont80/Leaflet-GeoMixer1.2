@@ -85,21 +85,10 @@ var gmxAPIutils = {
     },
 
     normalizeHostname: function(hostName) {
+		if (hostName.indexOf('/') === -1) { return hostName; }
         var parser = document.createElement('a');
 		parser.href = hostName;
 		return parser.host
-		// if (window.URL) {
-			// var ph = new Url(hostName);
-		// }
-		// var parsedHost = L.gmxUtil.parseUri((hostName.substr(0, 4) !== 'http' ? L.gmxUtil.protocol + '//' : '') + hostName); // Bug in gmxAPIutils.parseUri for 'localhost:8000'
-
-        // hostName = parsedHost.host + parsedHost.directory;
-
-        // if (hostName[hostName.length - 1] === '/') {
-            // hostName = hostName.substring(0, hostName.length - 1);
-        // }
-
-        // return hostName;
     },
 
 	getLayerItemFromServer: function(options) {

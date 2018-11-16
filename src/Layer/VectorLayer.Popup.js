@@ -251,7 +251,7 @@ L.gmx.VectorLayer.include({
                 gmx = options.gmx,
                 balloonData = gmx.balloonData,
                 flag = type === 'click' && balloonData.isSummary && !balloonData.DisableBalloonOnClick,
-                item = gmx.target;
+                item = gmx.target.item;
 
             if (flag && item.options.isGeneralized && !item.geometry) {
                 var layerProp = gmx.layer.getGmxProperties();

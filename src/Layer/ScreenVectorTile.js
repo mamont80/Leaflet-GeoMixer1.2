@@ -315,7 +315,8 @@ ScreenVectorTile.prototype = {
             url = '',
             itemImageProcessingHook = null,
             isTiles = false,
-            item = gmx.dataManager.getItem(idr),
+            // item = gmx.dataManager.getItem(idr),
+            item = geo,
             gmxTilePoint = this.gmxTilePoint,
             tilePoint = this.tilePoint,
             ntp = this.ntp,
@@ -752,7 +753,8 @@ ScreenVectorTile.prototype = {
 						for (var i = 0, len = geoItems.length; i < len; i++) {
 							var geoItem = geoItems[i],
 								id = geoItem.id,
-								item = gmx.dataManager.getItem(id);
+								item = geoItem;
+								// item = gmx.dataManager.getItem(id);
 							if (item) {     // skip removed items   (bug with screen tile screenTileDrawPromise.cancel on hover repaint)
 								var style = gmx.styleManager.getObjStyle(item, _this.zoom),
 									hover = gmx.lastHover && gmx.lastHover.id === geoItem.id && style;

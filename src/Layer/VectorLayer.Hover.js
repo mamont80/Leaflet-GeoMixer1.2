@@ -9,13 +9,15 @@ L.gmx.VectorLayer.include({
             var geoItem = geoItems[i].properties,
                 idr = geoItem[0],
                 dataOption = geoItems[i].dataOption || {},
-                item = gmx.dataManager.getItem(idr),
+                item = geoItems[i],
+
+                // item = gmx.dataManager.getItem(idr),
                 currentStyle = item.currentStyle || item.parsedStyleKeys || {},
                 iconScale = currentStyle.iconScale || 1,
                 iconCenter = currentStyle.iconCenter,
                 iconAnchor = !iconCenter && currentStyle.iconAnchor ? currentStyle.iconAnchor : null,
                 parsedStyle = gmx.styleManager.getObjStyle(item),
-                lineWidth = currentStyle.lineWidth || parsedStyle.lineWidth || 0,
+                lineWidth = currentStyle.lineWidth || parsedStyle.lineWidth || parsedStyle.weight || 0,
                 sx = lineWidth + (parsedStyle.sx || currentStyle.sx || 0),
                 sy = lineWidth + (parsedStyle.sy || currentStyle.sy || 0),
                 offset = [
@@ -140,6 +142,7 @@ L.gmx.VectorLayer.include({
 
             return {
                 id: idr,
+                item: item,
                 properties: item.properties,
                 geometry: geom,
                 bounds: item.bounds,
@@ -220,7 +223,8 @@ L.gmx.VectorLayer.include({
                 var target = this._gmxFirstObjectsByPoint(geoItems, mercatorPoint, observerOptions.bbox);
                 if (target) {
                     var idr = target.id,
-                        item = gmx.dataManager.getItem(idr),
+						item = target.item,
+                        // item = gmx.dataManager.getItem(idr),
                         prevId = lastHover ? lastHover.id : null,
                         changed = !lastHover || lastHover.id !== idr;
                     if (type === 'mousemove' && lastHover) {
@@ -263,7 +267,7 @@ L.gmx.VectorLayer.include({
         return {
             layer: this,
             target: item,
-            balloonData: this._gmx.styleManager.getItemBalloon(item.id),
+            balloonData: this._gmx.styleManager.getItemBalloon(item),
             properties: this.getItemProperties(item.properties),
             currentFilter: item.currentFilter || 0,
             id: item.id

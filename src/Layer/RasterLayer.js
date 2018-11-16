@@ -63,7 +63,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
 			return url;
 		};
 
-		gmx.dataManager._rasterVectorTile = new VectorTile({
+		gmx.dataManager._rasterVectorTile = new L.gmx.VectorTile({
 			load: function(x, y, z, v, s, d, callback) {
 					var objects = [[777, ph.geometry]],
 						itemBounds = gmxAPIutils.geoItemBounds(ph.geometry),
@@ -108,7 +108,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
 						changeState: true,
 						values: objects
 					});
-					gmx.dataManager._updateItemsFromTile(gmx.dataManager._rasterVectorTile);
+					// gmx.dataManager._updateItemsFromTile(gmx.dataManager._rasterVectorTile);
 				}
 			},
 			{x: 0, y: 0, z: 0, v: 0, s: -2, d: -2}

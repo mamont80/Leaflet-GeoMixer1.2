@@ -921,10 +921,11 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
        }
     },
 
-    redrawItem: function (id) {
+    redrawItem: function (item) {
         if (this._map) {
-            var item = this._gmx.dataManager.getItem(id),
-                gmxTiles = this._getTilesByBounds(item.bounds);
+			if (typeof(item) === 'number') { item = this._gmx.dataManager.getItem(item); }
+            // var gmxTiles = this._gmx.dataManager.getTilesByItem(item);
+            var gmxTiles = this._getTilesByBounds(item.bounds);
 
             this.repaint(gmxTiles);
         }

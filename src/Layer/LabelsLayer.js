@@ -183,18 +183,20 @@ L.LabelsLayer = (L.Layer || L.Class).extend({
             }
         };
         this.remove = function (layer) {
-            var id = layer._leaflet_id;
-            if (_this._observers[id]) {
-                var gmx = layer._gmx,
-                    dataManager = gmx.dataManager;
-                dataManager.removeObserver(_this._observers[id].id);
-                delete _this._observers[id];
-                delete _this._styleManagers[id];
-                delete _this._labels['_' + id];
-                delete _this._labelsIndex['_' + id];
-                _this.redraw();
+            if (layer) {
+				var id = layer._leaflet_id;
+				if (_this._observers[id]) {
+					var gmx = layer._gmx,
+						dataManager = gmx.dataManager;
+					dataManager.removeObserver(_this._observers[id].id);
+					delete _this._observers[id];
+					delete _this._styleManagers[id];
+					delete _this._labels['_' + id];
+					delete _this._labelsIndex['_' + id];
+					_this.redraw();
+				}
             }
-        };
+		};
         this._layeradd = function (ev) {
             _this.add(ev.layer);
         };

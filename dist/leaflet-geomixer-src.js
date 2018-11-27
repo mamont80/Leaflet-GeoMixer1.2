@@ -6879,14 +6879,13 @@ var DataManager = L.Class.extend({
     _getItemArrByActiveTileKeys: function(id, firstOnly) {
         var arr = [];
 		for (var key in this._activeTileKeys) {    // get full object bounds
-			var tile = this._tiles[key].tile,
-				itemIndex = tile.itemsKeys[id];
-			if (tile.data && itemIndex) {
-				arr.push(tile.dataOptions[itemIndex]);
+			var tile = this._tiles[key].tile;
+			if (tile.data && id in tile.itemsKeys) {
+				arr.push(tile.dataOptions[tile.itemsKeys[id]]);
 				if (firstOnly) { break; }
 			}
 		}
-		return arr.length ? arr : null;
+		return arr;
     },
 
     // ??? combine and return all parts of geometry

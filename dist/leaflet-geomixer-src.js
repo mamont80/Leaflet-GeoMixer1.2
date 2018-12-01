@@ -9609,10 +9609,9 @@ var MAX = 1000000,
         },
         clickFunc: function (ev) {
             if (!this.disabled) {
-                var item = ev.gmx.target.item;
-					// id = ev.gmx.id;
-                this.addToReorder(item.id, ev.originalEvent.ctrlKey);
-                this.layer.redrawItem(item);
+                var id = ev.gmx.id;
+                this.addToReorder(id, ev.originalEvent.ctrlKey);
+                this.layer.redrawItem(id);
             }
         },
         sortItems: function(a, b) {     // layer context

@@ -5545,6 +5545,7 @@ VectorTile.prototype = {
         this.state = 'notLoaded';	 //notLoaded, loading, loaded
         this.data = null;
         this.dataOptions = null;
+		this.itemsKeys = {};
 
 		this.loadDef = new Promise(function(resolve, reject) {
 			this._resolve = resolve;
@@ -7111,8 +7112,9 @@ var DataManager = L.Class.extend({
         }
 
         if (needProcessingFilter) {
+			var processingTile = this.processingTile;
             this.addFilter('processingFilter', function(item, tile) {
-                return tile.z === 0 || !item.processing;
+                return tile.z === 0 || !(item.id in processingTile.itemsKeys);
             });
         } else if (this._filters['processingFilter']) {
             this.removeFilter('processingFilter');

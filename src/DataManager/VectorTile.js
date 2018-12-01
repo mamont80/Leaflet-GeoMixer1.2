@@ -98,6 +98,7 @@ VectorTile.prototype = {
         this.state = 'notLoaded';	 //notLoaded, loading, loaded
         this.data = null;
         this.dataOptions = null;
+		this.itemsKeys = {};
 
 		this.loadDef = new Promise(function(resolve, reject) {
 			this._resolve = resolve;

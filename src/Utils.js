@@ -3048,8 +3048,10 @@ gmxAPIutils.layerHelper = {
 if (!L.gmxUtil) { L.gmxUtil = {}; }
 
 //public interface
+var	pNavigation = self.performance && self.performance.getEntriesByType('navigation')[0];
+
 L.extend(L.gmxUtil, {
-	isHTTP2: self.performance && self.performance.getEntriesByType('navigation')[0].nextHopProtocol === 'h2',
+	isHTTP2: pNavigation && pNavigation.nextHopProtocol === 'h2',
 	debug: gmxAPIutils.debug,
 	createWorker: gmxAPIutils.createWorker,
 	apiLoadedFrom: gmxAPIutils.apiLoadedFrom,

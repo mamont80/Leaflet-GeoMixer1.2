@@ -7116,7 +7116,7 @@ var DataManager = L.Class.extend({
         if (needProcessingFilter) {
 			var processingTile = this.processingTile;
             this.addFilter('processingFilter', function(item, tile) {
-                return tile.z === 0 || !(item.id in processingTile.itemsKeys);
+                return tile.z === 0 || !(item.id in processingTile.itemsKeys || skip[item.id]);
             });
         } else if (this._filters['processingFilter']) {
             this.removeFilter('processingFilter');
@@ -8310,11 +8310,11 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 
     redrawItem: function (item) {
         if (this._map) {
-			if (typeof(item) === 'number') { item = this._gmx.dataManager.getItem(item); }
-            // var gmxTiles = this._gmx.dataManager.getTilesByItem(item);
-            var gmxTiles = this._getTilesByBounds(item.bounds);
-
-            this.repaint(gmxTiles);
+			if (typeof(item) !== 'object') { item = this._gmx.dataManager.getItem(item); }
+			if (item) {
+				var gmxTiles = this._getTilesByBounds(item.bounds);
+				this.repaint(gmxTiles);
+			}
         }
     },
 
@@ -11239,8 +11239,8 @@ L.gmx.VectorLayer.include({
                 iconAnchor = !iconCenter && currentStyle.iconAnchor ? currentStyle.iconAnchor : null,
                 parsedStyle = gmx.styleManager.getObjStyle(item),
                 lineWidth = currentStyle.lineWidth || parsedStyle.lineWidth || parsedStyle.weight || 0,
-                sx = lineWidth + (parsedStyle.sx || currentStyle.sx || 0),
-                sy = lineWidth + (parsedStyle.sy || currentStyle.sy || 0),
+                sx = lineWidth + (parsedStyle.sx || currentStyle.sx || parsedStyle.iconSize || 0),
+                sy = lineWidth + (parsedStyle.sy || currentStyle.sy || parsedStyle.iconSize || 0),
                 offset = [
                     iconScale * sx / 2,
                     iconScale * sy / 2

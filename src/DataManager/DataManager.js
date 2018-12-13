@@ -876,7 +876,7 @@ var DataManager = L.Class.extend({
         if (needProcessingFilter) {
 			var processingTile = this.processingTile;
             this.addFilter('processingFilter', function(item, tile) {
-                return tile.z === 0 || !(item.id in processingTile.itemsKeys);
+                return tile.z === 0 || !(item.id in processingTile.itemsKeys || skip[item.id]);
             });
         } else if (this._filters['processingFilter']) {
             this.removeFilter('processingFilter');

@@ -96,7 +96,7 @@ var TilesTree = function(options) {
             count: 0,
             tiles: []
         };
-        var key = VectorTile.createTileKey(t);
+        var key = L.gmx.VectorTile.createTileKey(t);
 
         addTile(_rootNodes[ds], t, key);
     }
@@ -147,7 +147,7 @@ var TilesTree = function(options) {
 
             if (options.bounds && !node.tileBounds) {
                 node.tileBounds = node.tiles.map(function(it) {
-                    return VectorTile.boundsFromTileKey(it);
+                    return L.gmx.VectorTile.boundsFromTileKey(it);
                 });
             }
 

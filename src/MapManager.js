@@ -188,7 +188,7 @@ var gmxMapManager = {
             for (var i = 0, len = arr.length; i < len; i++) {
                 var layer = arr[i];
 
-				if (callback(layer) && onceFlag) { break; }
+				if (callback(layer, node) && onceFlag) { break; }
                 if (layer.type === 'group') {
                     iterate(layer.content);
                 }

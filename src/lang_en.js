@@ -4,6 +4,7 @@ L.extend(L.gmxLocale, {
         Length : 'Length',
         nodeLength : 'From start point',
         edgeLength : 'Segment length',
+        Angle : 'Angle',
         Area : 'Area',
         Perimeter : 'Perimeter',
         units: {

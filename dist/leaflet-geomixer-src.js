@@ -4845,7 +4845,7 @@ var gmxMapManager = {
             for (var i = 0, len = arr.length; i < len; i++) {
                 var layer = arr[i];
 
-				if (callback(layer) && onceFlag) { break; }
+				if (callback(layer, node) && onceFlag) { break; }
                 if (layer.type === 'group') {
                     iterate(layer.content);
                 }
@@ -5324,6 +5324,7 @@ L.extend(L.gmxLocale, {
         Length : 'Длина',
         nodeLength : 'Длина от начала',
         edgeLength : 'Длина сегмента',
+        Angle : 'Угол',
         Area : 'Площадь',
         Perimeter : 'Периметр',
         units: {
@@ -5346,6 +5347,7 @@ L.extend(L.gmxLocale, {
         Length : 'Length',
         nodeLength : 'From start point',
         edgeLength : 'Segment length',
+        Angle : 'Angle',
         Area : 'Area',
         Perimeter : 'Perimeter',
         units: {
@@ -6083,7 +6085,7 @@ var TilesTree = function(options) {
             count: 0,
             tiles: []
         };
-        var key = VectorTile.createTileKey(t);
+        var key = L.gmx.VectorTile.createTileKey(t);
 
         addTile(_rootNodes[ds], t, key);
     }
@@ -6134,7 +6136,7 @@ var TilesTree = function(options) {
 
             if (options.bounds && !node.tileBounds) {
                 node.tileBounds = node.tiles.map(function(it) {
-                    return VectorTile.boundsFromTileKey(it);
+                    return L.gmx.VectorTile.boundsFromTileKey(it);
                 });
             }
 

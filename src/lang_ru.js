@@ -4,6 +4,7 @@ L.extend(L.gmxLocale, {
         Length : 'Длина',
         nodeLength : 'Длина от начала',
         edgeLength : 'Длина сегмента',
+        Angle : 'Угол',
         Area : 'Площадь',
         Perimeter : 'Периметр',
         units: {

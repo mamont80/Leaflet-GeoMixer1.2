@@ -1843,7 +1843,7 @@ var gmxAPIutils = {
     prettifyDistance: function(length, type) {
         var km = ' ' + gmxAPIutils.getText('units.km');
         if (type === 'nm') {
-            return (Math.round(0.539956803 * length) / 1000) + ' ' + gmxAPIutils.getText('units.nm');
+            return (Math.round(0.539956803 * length / 10) / 100) + ' ' + gmxAPIutils.getText('units.nm');
         } else if (type === 'km') {
             return (Math.round(length) / 1000) + km;
         } else if (length < 2000 || type === 'm') {

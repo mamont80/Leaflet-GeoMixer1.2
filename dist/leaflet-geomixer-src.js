@@ -4400,6 +4400,7 @@ L.gmxUtil.drawGeoItem = function(geoItem, item, options, currentStyle, style) {
     if (style) {
         if (gmx.styleHook) {
             if (!geoItem.styleExtend) {
+				item.ctx = ctx;
                 geoItem.styleExtend = gmx.styleHook(item, gmx.lastHover && idr === gmx.lastHover.id);
             }
             if (geoItem.styleExtend) {

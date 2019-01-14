@@ -709,6 +709,7 @@ var DataManager = L.Class.extend({
     _triggerObservers: function(oKeys) {
         var keys = oKeys || this._observers;
 
+		// console.log('_triggerObservers:', Object.keys(keys).length);	// TODO: много вызовов при начальной загрузке карты
         for (var id in keys) {
             if (this._observers[id]) {
                 this._observers[id].needRefresh = true;
@@ -757,7 +758,6 @@ var DataManager = L.Class.extend({
     },
 */
     _updateActiveTilesList: function(newTilesList) {
-
         if (this._tileFilteringHook) {
             var filteredTilesList = {};
             for (var tk in newTilesList) {
@@ -771,7 +771,6 @@ var DataManager = L.Class.extend({
         var oldTilesList = this._activeTileKeys || {};
 
         var observersToUpdate = {},
-            _this = this,
             key;
 
         if (this.processingTile) {
@@ -783,30 +782,29 @@ var DataManager = L.Class.extend({
 			this._tiles[key] = {tile: this._rasterVectorTile};
 		}
 
-        var checkSubscription = function(vKey) {
-            var observerIds = _this._observerTileLoader.getTileObservers(vKey);
-            for (var sid in observerIds) {
-                observersToUpdate[sid] = true;
-            }
-        };
-
         for (key in newTilesList) {
             if (!oldTilesList[key]) {
                 this._observerTileLoader.addTile(this._getVectorTile(key, true).tile);
-                checkSubscription(key);
+                this._checkSubscription(key, observersToUpdate);
             }
         }
 
         for (key in oldTilesList) {
             if (!newTilesList[key]) {
-                checkSubscription(key);
+                this._checkSubscription(key, observersToUpdate);
                 this._observerTileLoader.removeTile(key);
             }
         }
 
         this._activeTileKeys = newTilesList;
-
         this._triggerObservers(observersToUpdate);
+    },
+
+    _checkSubscription: function(vKey, observersToUpdate) {
+		var observerIds = this._observerTileLoader.getTileObservers(vKey);
+		for (var sid in observerIds) {
+			observersToUpdate[sid] = true;
+		}
     },
 
     _propertiesToArray: function(it) {

@@ -1010,7 +1010,7 @@ StyleManager.decodeOldStyles = function(props) {
         if ('DisableBalloonOnClick' in it) {
             pt.DisableBalloonOnClick = it.DisableBalloonOnClick || false;
         }
-        if ('Filter' in it) {
+        if ('Filter' in it) {	// TODO: переделать на new Function = function(props, indexes, types)
 /*eslint-disable no-useless-escape */
             pt.Filter = it.Filter;
             var ph = L.gmx.Parsers.parseSQL(it.Filter.replace(/[\[\]]/g, '"'));

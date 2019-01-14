@@ -337,9 +337,9 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 		}
     },
 
-	_chkTiles: function () {
+	_chkTiles: function (flag) {
 		this._chkCurrentTiles();
-		this.repaint();
+		if (flag) { this.repaint(); }
 		this._waitCheckOldLevels();
 	},
 
@@ -391,7 +391,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
         var gmx = this._gmx;
         var owner = {
 			dateIntervalChanged: function() {
-				this._chkTiles();
+				this._chkTiles(true);
 				if (L.gmx.sendCmd) {
 					var interval = gmx.dataManager.getMaxDateInterval();
 					L.gmx.sendCmd('dateIntervalChanged', {
@@ -435,13 +435,15 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 					}
 					// this.redraw();
 					this.repaint();
-					this._chkTiles();
+					this._chkTiles(true);
 				}
 			},
 			versionchange: this._onVersionChange
 		};
 		events.moveend = this._waitOnMoveEnd.bind(this);
-		events.zoomend = this._waitOnMoveEnd.bind(this);
+		events.zoomend = function () {
+			this._chkTiles(true);
+		};
 
 		return {
 			map: events,
@@ -490,7 +492,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
 				this._resetView();
 				gmx.dataManager.fire('moveend');
 
-				this._chkTiles();
+				this._chkTiles(true);
 				L.gmx.layersVersion.add(this);
 			}
 			// this._addLayerVersion();
@@ -677,7 +679,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                 // this._clearAllSubscriptions();
                 this._gmx.dataManager.enableGeneralization();
                 this.redraw();
-				this._chkTiles();
+				this._chkTiles(true);
             }
         }
     },
@@ -689,7 +691,7 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                 // this._clearAllSubscriptions();
                 this._gmx.dataManager.disableGeneralization();
                 this.redraw();
-				this._chkTiles();
+				this._chkTiles(true);
             }
         }
     },
@@ -1170,6 +1172,10 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
             if ('dateEnd' in meta) {  // фильтр для мультивременного слоя
                 gmx.dateEnd = L.gmxUtil.getDateFromStr(meta.dateEnd.Value || '01.01.1980');
             }
+            if ('showScreenTiles' in meta) {  // показывать границы экранных тайлов
+                gmx.showScreenTiles = meta.showScreenTiles.Value === '1' ? true : false;
+            }
+
             if ('shiftX' in meta || 'shiftY' in meta) {  // сдвиг всего слоя
                 gmx.shiftXlayer = meta.shiftX ? Number(meta.shiftX.Value) : 0;
                 gmx.shiftYlayer = meta.shiftY ? Number(meta.shiftY.Value) : 0;

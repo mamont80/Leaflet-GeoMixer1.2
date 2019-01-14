@@ -947,8 +947,6 @@ var gmxAPIutils = {
 
     pointToCanvas: function(attr) { // Точку в canvas
         var gmx = attr.gmx,
-			topLeft = attr.topLeft,
-            mInPixel = topLeft.mInPixel,
             pointAttr = attr.pointAttr,
             style = attr.style || {},
             item = attr.item,
@@ -986,11 +984,20 @@ var gmxAPIutils = {
             }
             style.rotateRes = currentStyle.rotate || 0;
             if ('opacity' in style) { ctx.globalAlpha = currentStyle.opacity || style.opacity; }
-            if (gmx.transformFlag) {
-//						topLeft = attr.topLeft,
-				ctx.setTransform(mInPixel, 0, 0, mInPixel, -attr.tpx, attr.tpy);
-                ctx.drawImage(image, px1, -py1, sx, sy);
-                ctx.setTransform(mInPixel, 0, 0, -mInPixel, -attr.tpx, attr.tpy);
+            if (gmx.transformFlag) {	// TODO:
+				var topLeft = attr.topLeft,
+					ww = gmxAPIutils.worldWidthMerc,
+					mInPixel = topLeft.mInPixel,
+					// mInPixel2 = 2 * mInPixel,
+					tx = (topLeft.wm.x - ww) * mInPixel + sx / 2,
+					ty = (ww - topLeft.wm.y) * mInPixel - sy / 2;
+				// px1sx = (attr.coords[0] - topLeft.wm.x) * mInPixel - sx / 2;
+				// py1sy = (topLeft.wm.y - attr.coords[1]) * mInPixel - sy / 2;
+				ctx.setTransform(1, 0, 0, 1, -tx, ty);
+                // ctx.drawImage(image, attr.coords[0], attr.coords[1], sx, sy);
+                ctx.drawImage(image, (attr.coords[0] - ww) * mInPixel, (ww - attr.coords[1]) * mInPixel, sx, sy);
+					ctx.setTransform(1, 0, 0, 1, 0, 0);
+                // ctx.setTransform(1, 0, 0, 1, -attr.tpx, attr.tpy);
             } else {
 				if (iconScale !== 1) {
 					sx *= iconScale;

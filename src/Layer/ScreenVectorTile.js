@@ -749,7 +749,9 @@ ScreenVectorTile.prototype = {
 					Promise.all(fArr).then(function() {
 						if (bgImage) { dattr.bgImage = bgImage; }
 
+						// window.tStamp = Date.now();
 						//ctx.save();
+						// var drawCount = 0;
 						for (var i = 0, len = geoItems.length; i < len; i++) {
 							var geoItem = geoItems[i],
 								id = geoItem.id,
@@ -769,12 +771,14 @@ ScreenVectorTile.prototype = {
 // console.log('___bg', _this.ntp, item.skipRasters, item.id, dattr.rasters[item.id]);
 // }
 									L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style);
+									//drawCount += L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style) ? 1 : 0;
 								}
 								if (id in gmx._needPopups && !gmx._needPopups[id]) {
 									gmx._needPopups[id] = true;
 								}
 							}
 						}
+						// console.log('doDraw:', _this.zKey, drawCount, geoItems.length, (Date.now() - window.tStamp) / 1000, ' sec.');
 						//ctx.restore();
 						//_this.rasters = {}; // clear rasters		TODO: растры пропадают из-за быстрых перерисовок permalink=C2YMI
 						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);

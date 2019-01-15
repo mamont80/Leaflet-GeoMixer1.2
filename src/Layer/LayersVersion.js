@@ -22,7 +22,7 @@ var getParams = function(prop, dm, gmx) {
 			beginDate = maxDateInterval.beginDate || gmx.beginDate,
 			endDate = maxDateInterval.endDate || gmx.endDate;
         if (beginDate) { pt.dateBegin = Math.floor(beginDate.getTime() / 1000); }
-        if (endDate) { pt.dateEnd = Math.floor(endDate.getTime() / 1000) - 1; } // TODO на сервере: https://basecamp.com/2465191/projects/5006184/todos/376203532#comment_672280693
+        if (endDate) { pt.dateEnd = Math.floor(endDate.getTime() / 1000); } // TODO на сервере: https://basecamp.com/2465191/projects/5006184/todos/376203532#comment_672280693
     }
     return pt;
 };

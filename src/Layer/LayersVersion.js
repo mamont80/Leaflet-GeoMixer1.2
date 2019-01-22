@@ -6,12 +6,46 @@ var delay = 20000,
     intervalID = null,
     timeoutID = null,
     hostBusy = {},
-    needReq = {};
+    needReq = {},
+	w = gmxAPIutils.worldWidthMerc,
+	WORLDBBOX = JSON.stringify([[-w, -w, w, w]]);
 
 var isExistsTiles = function(prop) {
     var tilesKey = prop.Temporal ? 'TemporalTiles' : 'tiles';
     return tilesKey in prop || prop.currentTiles;
 };
+var getBboxes = function(mbbox) {
+	var minY = mbbox.min.y, maxY = mbbox.max.y,
+		minX = mbbox.min.x, maxX = mbbox.max.x,
+		minX1 = null, maxX1 = null,
+		ww = gmxAPIutils.worldWidthFull,
+		size = mbbox.getSize(),
+		out = [];
+
+	if (size.x > ww) {
+		return WORLDBBOX;
+	}
+
+	if (maxX > w || minX < -w) {
+		var hs = size.x / 2,
+			center = ((maxX + minX) / 2) % ww;
+
+		center = center + (center > w ? -ww : (center < -w ? ww : 0));
+		minX = center - hs; maxX = center + hs;
+		if (minX < -w) {
+			minX1 = minX + ww; maxX1 = w; minX = -w;
+		} else if (maxX > w) {
+			minX1 = -w; maxX1 = maxX - ww; maxX = w;
+		}
+	}
+	out.push([minX, minY, maxX, maxY]);
+
+	if (minX1) {
+		out.push([minX1, minY, maxX1, maxY]);
+	}
+    return JSON.stringify(out);
+};
+
 var getParams = function(prop, dm, gmx) {
     var pt = {
         Name: prop.name,
@@ -22,7 +56,7 @@ var getParams = function(prop, dm, gmx) {
 			beginDate = maxDateInterval.beginDate || gmx.beginDate,
 			endDate = maxDateInterval.endDate || gmx.endDate;
         if (beginDate) { pt.dateBegin = Math.floor(beginDate.getTime() / 1000); }
-        if (endDate) { pt.dateEnd = Math.floor(endDate.getTime() / 1000); } // TODO на сервере: https://basecamp.com/2465191/projects/5006184/todos/376203532#comment_672280693
+        if (endDate) { pt.dateEnd = Math.floor(endDate.getTime() / 1000); }
     }
     return pt;
 };
@@ -132,14 +166,16 @@ var chkVersion = function (layer, callback) {
 
     if (document.body && !L.gmxUtil.isPageHidden()) {
         var hosts = getRequestParams(layer),
-			w = gmxAPIutils.worldWidthMerc,
-			bboxStr = [-w, -w, w, w].join(','),
+			bboxStr = WORLDBBOX,
             chkHost = function(hostName, busyFlag) {
 				var url = L.gmxUtil.protocol + '//' + hostName + script,
                     layersStr = JSON.stringify(hosts[hostName]);
 				var params = 'WrapStyle=None&ftc=osm';
 				if (layersVersion.needBbox) {
-					var zoom = map.getZoom(),
+					var bbox = map.getBounds(),
+						ne = bbox.getNorthEast(),
+						sw = bbox.getSouthWest(),
+						zoom = map.getZoom(),
 						crs = L.Projection.Mercator;
 					params += '&zoom=' + zoom;
 					if (map.options.srs == 3857) {
@@ -149,16 +185,16 @@ var chkVersion = function (layer, callback) {
 					if (map.options.generalized === false) {
 						params += '&generalizedTiles=false';
 					}
-					if (!map.options.allWorld) {
-						var bbox = map.getBounds(),
-							ts = L.gmxUtil.tileSizes[zoom],
-							pb = {x: ts, y: ts},
-							min = crs.project(bbox.getSouthWest())._subtract(pb),
-							max = crs.project(bbox.getNorthEast())._add(pb);
+					if (!map.options.allWorld && (ne.lng - sw.lng) < 180) {
+						var ts = L.gmxUtil.tileSizes[zoom],
+							pb = {x: ts, y: ts};
 
-						bboxStr = [min.x, min.y, max.x, max.y].join(',');
+						bboxStr = getBboxes(L.bounds(
+							crs.project(sw)._subtract(pb),
+							crs.project(ne)._add(pb)
+						));
 					}
-					params += '&bbox=[' + bboxStr + ']';
+					params += '&bboxes=' + bboxStr;
 				}
 				params += '&layers=' + encodeURIComponent(layersStr);
 

@@ -5110,12 +5110,16 @@ var GmxEventsManager = L.Handler.extend({
 
         map.on({
             zoomend: function () {
+				L.gmx._animatingZoom = false;
                 if (map._gmxMouseLatLng) {
 					this._onmousemove({type: 'mousemove', latlng: map._gmxMouseLatLng});
                     // setTimeout(function () {
                         // eventCheck({type: 'mousemove', latlng: map._gmxMouseLatLng});
                     // }, 0);
                 }
+            },
+            zoomanim: function () {
+				L.gmx._animatingZoom = true;
             },
             click: this._eventCheck,
             dblclick: this._eventCheck,
@@ -6523,21 +6527,18 @@ var DataManager = L.Class.extend({
         };
 
         this._observerTileLoader = new ObserverTileLoader(this);
-        this._observerTileLoader.on('tileload', function(event) {
-            var tile = event.tile;
-            // _this._updateItemsFromTile(tile);
-
-            if (_this._tilesTree) {
-                var treeNode = _this._tilesTree.getNode(tile.d, tile.s);
-                treeNode && treeNode.count--; //decrease number of tiles to load inside this node
-            }
-        });
-
         this._observerTileLoader.on('observertileload', function(event) {
             var observer = event.observer;
             if (observer.isActive()) {
                 observer.needRefresh = false;
-                observer.updateData(_this.getItems(observer.id));
+// if (L.gmx._animatingZoom) {
+// console.log('____ observer.updateData', observer.id);
+// return;
+// }
+				observer.updateData(_this.getItems(observer.id));
+				// observer._animId = L.Util.requestAnimFrame(function() {
+					// observer.updateData(_this.getItems(observer.id));
+				// }, _this);
             }
         });
         this.setOptions(options);
@@ -6556,6 +6557,11 @@ var DataManager = L.Class.extend({
 
     _getActiveTileKeys: function() {
 
+// if (L.gmx._animatingZoom) {
+// console.log('___bg', L.gmx._animatingZoom);
+	// return this._activeTileKeys;
+// }
+
         this._chkMaxDateInterval();
         if (this.options.needBbox || !this._needCheckActiveTiles) {
             return this._activeTileKeys;
@@ -6565,14 +6571,14 @@ var DataManager = L.Class.extend({
 		this._needCheckActiveTiles = false;
 
 		if (this._isTemporalLayer) {
-			var newTileKeys = {};
-			if (this._beginDate && this._endDate) {
-				if (!this._tilesTree) {
-					this.initTilesTree();
-				}
-				newTileKeys = this._tilesTree.selectTiles(this._beginDate, this._endDate).tiles;
-			}
-			this._updateActiveTilesList(newTileKeys);
+			// var newTileKeys = {};
+			// if (this._beginDate && this._endDate) {
+				// if (!this._tilesTree) {
+					// this.initTilesTree();
+				// }
+				// newTileKeys = this._tilesTree.selectTiles(this._beginDate, this._endDate).tiles;
+			// }
+			// this._updateActiveTilesList(newTileKeys);
 		} else {
 			this.initTilesList();
 		}
@@ -6663,6 +6669,10 @@ var DataManager = L.Class.extend({
         if (!observer.isActive() && observer.id !== 'hover') {
             return [];
         }
+// if (L.gmx._animatingZoom) {
+// console.log('____ getItems', L.gmx._animatingZoom);
+	// return [];
+// }
 
         //add internal filters
         var layerID = observer.layerID,
@@ -6871,10 +6881,10 @@ var DataManager = L.Class.extend({
         return this._observerTileLoader.getObserverLeftToLoad(observer);
     },
 
-    getTileKeysToLoad: function(beginDate, endDate) {
-		var newTileKeys = this._tilesTree.selectTiles(beginDate, endDate).tiles;
-        return newTileKeys;
-    },
+    // getTileKeysToLoad: function(beginDate, endDate) {
+		// var newTileKeys = this._tilesTree.selectTiles(beginDate, endDate).tiles;
+        // return newTileKeys;
+    // },
 
     getItemsBounds: function() {    // get all objects bounds
         var bounds = gmxAPIutils.bounds(),
@@ -6950,6 +6960,10 @@ var DataManager = L.Class.extend({
     },
 
     checkObservers: function() {
+// if (L.gmx._animatingZoom) {
+// console.log('___ checkObservers', L.gmx._animatingZoom);
+	// return;
+// }
         var observers = this._observers;
         for (var id in this._observers) {
             this.checkObserver(observers[id]);
@@ -6973,6 +6987,10 @@ var DataManager = L.Class.extend({
                 this._observers[id].needRefresh = true;
             }
         }
+// if (L.gmx._animatingZoom) {
+	// return;
+// console.log('____triggerObservers', nsGmx.leafletMap._animatingZoom);
+// }
         this._waitCheckObservers();
     },
 
@@ -7262,7 +7280,7 @@ var DataManager = L.Class.extend({
 
         return vTile;
     },
-
+/*
     initTilesTree: function() {
 		// console.log('_tilesTree', this._tilesTree);
         this._tilesTree = L.gmx.tilesTree(this.options);
@@ -7278,7 +7296,7 @@ var DataManager = L.Class.extend({
             };
         }
     },
-
+*/
     _getVectorTile: function(vKey, createFlag) {
         if (!this._tiles[vKey] && createFlag) {
             var info = L.gmx.VectorTile.parseTileKey(vKey);
@@ -8731,24 +8749,20 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                     bbox: gmx.styleManager.getStyleBounds(coords),
                     filters: ['clipFilter', 'userFilter_' + gmx.layerID, 'styleFilter', 'userFilter'].concat(filters),
                     callback: function(data) {
+// if (L.gmx._animatingZoom) {
+// console.log('____ tileElem.promise', data);
+// }
                         // if (myLayer._tiles[zKey] && !myLayer._map._animatingZoom) {
                         if (myLayer._tiles[zKey]) {
 							myLayer._tiles[zKey].loaded = 0;
 
-							// if (!tileElem.screenTile) {
-								// tileElem.screenTile = new ScreenVectorTile(myLayer, tileElem);
-							// }
-
 							tileElem.screenTile.drawTile(data).then(function(res) {
-								// console.log('resolve', zKey, res, data);
 								if (res) { tileElem.count = res.count; }
 								done(res);
 							}, function(err) {
-								// console.log('reject', zKey, err, data);
 								done(err);
-							});
+							}).catch(console.log);
 						} else {
-							// console.log('bad key', zKey);
 							done();
 						}
                     }
@@ -9476,8 +9490,20 @@ ScreenVectorTile.prototype = {
     },
 
     drawTile: function (data) {
+// if (L.gmx._animatingZoom) {
+		// if (this._animId) { L.Util.cancelAnimFrame(this._animId); }
+// console.log('____ drawTile', L.gmx._animatingZoom);
+		// return new Promise(function(resolve, reject) {
+			// resolve();
+		// });
+
+// }
 		this.destructor();
 		return new Promise(function(resolve, reject) {
+			// if (L.gmx._animatingZoom) {
+				// resolve();
+				// return;
+			// }
 			if (L.gmx._zoomStart && L.gmx._zoomStart !== this.zoom) {
 				resolve();
 				return;
@@ -9488,13 +9514,10 @@ ScreenVectorTile.prototype = {
 			var result = function() {
 				resolve({count: geoItems.length});
 			}.bind(this);
-			var _this = this;
 
 			this._uniqueID++;       // count draw attempt
 
 			if (geoItems) {
-				var tile = _this.tile,
-					ctx = tile.getContext('2d');
 				if (this.layer._gridClusters && this.layer._gridClusters.checkData({
 						geoItems: geoItems,
 						tileElem: this.tileElem,
@@ -9503,104 +9526,124 @@ ScreenVectorTile.prototype = {
 					result();
 					return;
 				}
-				var doDraw = function() {
-					var gmx = _this.gmx,
-						ts = _this.layer.options.tileSize || 256,
-						dattr = {
-							//tileLink: tileLink,
-							tbounds: _this.tbounds,
-							rasters: _this.rasters,
-							gmx: gmx,
-							topLeft: _this.topLeft,
-							tpx: _this.tpx,
-							tpy: _this.tpy,
-							ctx: ctx
-						},
-						tinfo = 'zKey:' + _this.zKey + ' count: ' + geoItems.length;
-					L.DomUtil.addClass(tile, tinfo);
-					_this.tile.width = _this.tile.height = ts;
-
-					if (!_this.layer._gridClusters) {
-						ctx.clearRect(0, 0, ts, ts);
-						if (gmx.showScreenTiles) {
-							ctx.strokeRect(0, 0, ts - 1, ts - 1);
-							ctx.strokeText( _this.zKey + ' ' + geoItems.length, 50, 50);
-						}
-					}
-					var hookInfo = {
-							zKey: _this.zKey,
-							topLeft: _this.topLeft,
-							tpx: _this.tpx,
-							tpy: _this.tpy,
-							x: _this.tilePoint.x,
-							y: _this.tilePoint.y,
-							z: _this.zoom
-						},
-						bgImage;
-
-					var fArr = [];
-					gmx.preRenderHooks.forEach(function (f) {
-						if (!bgImage) {
-							bgImage = document.createElement('canvas');
-							bgImage.width = bgImage.height = ts;
-						}
-						var res = f(bgImage, hookInfo);
-						if (res && res.then) {
-							fArr.push(res);
-						}
-					});
-					Promise.all(fArr).then(function() {
-						if (bgImage) { dattr.bgImage = bgImage; }
-
-						// window.tStamp = Date.now();
-						//ctx.save();
-						// var drawCount = 0;
-						for (var i = 0, len = geoItems.length; i < len; i++) {
-							var geoItem = geoItems[i],
-								id = geoItem.id,
-								item = geoItem;
-								// item = gmx.dataManager.getItem(id);
-							if (item) {     // skip removed items   (bug with screen tile screenTileDrawPromise.cancel on hover repaint)
-								var style = gmx.styleManager.getObjStyle(item, _this.zoom),
-									hover = gmx.lastHover && gmx.lastHover.id === geoItem.id && style;
-
-								if (gmx.multiFilters) {
-									for (var j = 0, len1 = item.multiFilters.length; j < len1; j++) {
-										var it = item.multiFilters[j];
-										L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? it.parsedStyleHover : it.parsedStyle, it.style);
-									}
-								} else {
-// if(!dattr.rasters[item.id]) {
-// console.log('___bg', _this.ntp, item.skipRasters, item.id, dattr.rasters[item.id]);
-// }
-									L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style);
-									//drawCount += L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style) ? 1 : 0;
-								}
-								if (id in gmx._needPopups && !gmx._needPopups[id]) {
-									gmx._needPopups[id] = true;
-								}
-							}
-						}
-						// console.log('doDraw:', _this.zKey, drawCount, geoItems.length, (Date.now() - window.tStamp) / 1000, ' sec.');
-						//ctx.restore();
-						//_this.rasters = {}; // clear rasters		TODO: растры пропадают из-за быстрых перерисовок permalink=C2YMI
-						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
-					}, reject);
-					// _this.layer.appendTileToContainer(_this.tileElem);
-				};
 
 				if (this.showRaster) {
 					this.rastersPromise = this._getTileRasters(geoItems);
-					this.rastersPromise.then(doDraw, reject); //first load all raster images, then render all of them at once
+					this.rastersPromise.then(function() { this._doDraw(geoItems, resolve, reject); }.bind(this), reject); //first load all raster images, then render all of them at once
 				} else {
-					doDraw();
+					this._doDraw(geoItems, resolve, reject);
 				}
 			} else {
 				resolve();
 			}
-		}.bind(this)).catch(function() {
-			// console.warn('catch1:', arguments);
+		}.bind(this)).catch(console.warn);
+    },
+
+    _doDraw: function (geoItems, resolve, reject) {
+// if (L.gmx._animatingZoom) {
+// console.log('____ _doDraw', L.gmx._animatingZoom);
+	// return [];
+// }
+		var _this = this,
+			tile = _this.tile,
+			ctx = tile.getContext('2d'),
+			gmx = _this.gmx,
+			ts = _this.layer.options.tileSize || 256,
+			dattr = {
+				//tileLink: tileLink,
+				tbounds: _this.tbounds,
+				rasters: _this.rasters,
+				gmx: gmx,
+				topLeft: _this.topLeft,
+				tpx: _this.tpx,
+				tpy: _this.tpy,
+				ctx: ctx
+			},
+			tinfo = 'zKey:' + _this.zKey + ' count: ' + geoItems.length;
+		L.DomUtil.addClass(_this.tile, tinfo);
+		_this.tile.width = _this.tile.height = ts;
+
+		if (!_this.layer._gridClusters) {
+			ctx.clearRect(0, 0, ts, ts);
+			if (gmx.showScreenTiles) {
+				ctx.strokeRect(0, 0, ts - 1, ts - 1);
+				ctx.strokeText( _this.zKey + ' ' + geoItems.length, 50, 50);
+			}
+		}
+		var hookInfo = {
+				zKey: _this.zKey,
+				topLeft: _this.topLeft,
+				tpx: _this.tpx,
+				tpy: _this.tpy,
+				x: _this.tilePoint.x,
+				y: _this.tilePoint.y,
+				z: _this.zoom
+			},
+			bgImage;
+
+		var fArr = [];
+		gmx.preRenderHooks.forEach(function (f) {
+			if (!bgImage) {
+				bgImage = document.createElement('canvas');
+				bgImage.width = bgImage.height = ts;
+			}
+			var res = f(bgImage, hookInfo);
+			if (res && res.then) {
+				fArr.push(res);
+			}
 		});
+		Promise.all(fArr).then(function() {
+			if (bgImage) { dattr.bgImage = bgImage; }
+// if (L.gmx._animatingZoom) {
+// console.log('geoItems', geoItems.length, L.gmx._animatingZoom, gmx.preRenderHooks);
+// resolve({count: 0});
+// return;
+// }
+			// window.tStamp = Date.now();
+			//ctx.save();
+			// var drawCount = 0;
+			for (var i = 0, len = geoItems.length; i < len; i++) {
+				var geoItem = geoItems[i],
+					id = geoItem.id,
+					item = geoItem;
+					// item = gmx.dataManager.getItem(id);
+				if (item) {     // skip removed items   (bug with screen tile screenTileDrawPromise.cancel on hover repaint)
+					var style = gmx.styleManager.getObjStyle(item, _this.zoom),
+						hover = gmx.lastHover && gmx.lastHover.id === geoItem.id && style;
+
+					if (gmx.multiFilters) {
+						for (var j = 0, len1 = item.multiFilters.length; j < len1; j++) {
+							var it = item.multiFilters[j];
+							L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? it.parsedStyleHover : it.parsedStyle, it.style);
+						}
+					} else {
+// if(!dattr.rasters[item.id]) {
+// console.log('___bg', _this.ntp, item.skipRasters, item.id, dattr.rasters[item.id]);
+// }
+// geoItem._animId = L.Util.requestAnimFrame(function() {
+// if (L.gmx._animatingZoom) {
+// console.log('__________L.gmxUtil.drawGeoItem_', i, geoItem._animId, geoItems.length);
+// break;
+// }
+	// L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style);
+// }, this);
+
+						L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style);
+						//drawCount += L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style) ? 1 : 0;
+					}
+					if (id in gmx._needPopups && !gmx._needPopups[id]) {
+						gmx._needPopups[id] = true;
+					}
+				}
+			}
+			// console.log('doDraw:', _this.zKey, drawCount, geoItems.length, (Date.now() - window.tStamp) / 1000, ' sec.');
+			//ctx.restore();
+			//_this.rasters = {}; // clear rasters		TODO: растры пропадают из-за быстрых перерисовок permalink=C2YMI
+			Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(function() {
+				resolve({count: geoItems.length});
+			}, reject);
+		}, reject);
+		// _this.layer.appendTileToContainer(_this.tileElem);
     },
 
     _getHooksPromises: function (hooks, obj, options) {
@@ -11531,12 +11574,46 @@ var delay = 20000,
     intervalID = null,
     timeoutID = null,
     hostBusy = {},
-    needReq = {};
+    needReq = {},
+	w = gmxAPIutils.worldWidthMerc,
+	WORLDBBOX = JSON.stringify([[-w, -w, w, w]]);
 
 var isExistsTiles = function(prop) {
     var tilesKey = prop.Temporal ? 'TemporalTiles' : 'tiles';
     return tilesKey in prop || prop.currentTiles;
 };
+var getBboxes = function(mbbox) {
+	var minY = mbbox.min.y, maxY = mbbox.max.y,
+		minX = mbbox.min.x, maxX = mbbox.max.x,
+		minX1 = null, maxX1 = null,
+		ww = gmxAPIutils.worldWidthFull,
+		size = mbbox.getSize(),
+		out = [];
+
+	if (size.x > ww) {
+		return WORLDBBOX;
+	}
+
+	if (maxX > w || minX < -w) {
+		var hs = size.x / 2,
+			center = ((maxX + minX) / 2) % ww;
+
+		center = center + (center > w ? -ww : (center < -w ? ww : 0));
+		minX = center - hs; maxX = center + hs;
+		if (minX < -w) {
+			minX1 = minX + ww; maxX1 = w; minX = -w;
+		} else if (maxX > w) {
+			minX1 = -w; maxX1 = maxX - ww; maxX = w;
+		}
+	}
+	out.push([minX, minY, maxX, maxY]);
+
+	if (minX1) {
+		out.push([minX1, minY, maxX1, maxY]);
+	}
+    return JSON.stringify(out);
+};
+
 var getParams = function(prop, dm, gmx) {
     var pt = {
         Name: prop.name,
@@ -11547,7 +11624,7 @@ var getParams = function(prop, dm, gmx) {
 			beginDate = maxDateInterval.beginDate || gmx.beginDate,
 			endDate = maxDateInterval.endDate || gmx.endDate;
         if (beginDate) { pt.dateBegin = Math.floor(beginDate.getTime() / 1000); }
-        if (endDate) { pt.dateEnd = Math.floor(endDate.getTime() / 1000); } // TODO на сервере: https://basecamp.com/2465191/projects/5006184/todos/376203532#comment_672280693
+        if (endDate) { pt.dateEnd = Math.floor(endDate.getTime() / 1000); }
     }
     return pt;
 };
@@ -11657,14 +11734,16 @@ var chkVersion = function (layer, callback) {
 
     if (document.body && !L.gmxUtil.isPageHidden()) {
         var hosts = getRequestParams(layer),
-			w = gmxAPIutils.worldWidthMerc,
-			bboxStr = [-w, -w, w, w].join(','),
+			bboxStr = WORLDBBOX,
             chkHost = function(hostName, busyFlag) {
 				var url = L.gmxUtil.protocol + '//' + hostName + script,
                     layersStr = JSON.stringify(hosts[hostName]);
 				var params = 'WrapStyle=None&ftc=osm';
 				if (layersVersion.needBbox) {
-					var zoom = map.getZoom(),
+					var bbox = map.getBounds(),
+						ne = bbox.getNorthEast(),
+						sw = bbox.getSouthWest(),
+						zoom = map.getZoom(),
 						crs = L.Projection.Mercator;
 					params += '&zoom=' + zoom;
 					if (map.options.srs == 3857) {
@@ -11674,16 +11753,16 @@ var chkVersion = function (layer, callback) {
 					if (map.options.generalized === false) {
 						params += '&generalizedTiles=false';
 					}
-					if (!map.options.allWorld) {
-						var bbox = map.getBounds(),
-							ts = L.gmxUtil.tileSizes[zoom],
-							pb = {x: ts, y: ts},
-							min = crs.project(bbox.getSouthWest())._subtract(pb),
-							max = crs.project(bbox.getNorthEast())._add(pb);
+					if (!map.options.allWorld && (ne.lng - sw.lng) < 180) {
+						var ts = L.gmxUtil.tileSizes[zoom],
+							pb = {x: ts, y: ts};
 
-						bboxStr = [min.x, min.y, max.x, max.y].join(',');
+						bboxStr = getBboxes(L.bounds(
+							crs.project(sw)._subtract(pb),
+							crs.project(ne)._add(pb)
+						));
 					}
-					params += '&bbox=[' + bboxStr + ']';
+					params += '&bboxes=' + bboxStr;
 				}
 				params += '&layers=' + encodeURIComponent(layersStr);
 

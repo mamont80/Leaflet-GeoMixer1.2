@@ -1328,24 +1328,20 @@ L.gmx.VectorLayer = VectorGridLayer.extend({
                     bbox: gmx.styleManager.getStyleBounds(coords),
                     filters: ['clipFilter', 'userFilter_' + gmx.layerID, 'styleFilter', 'userFilter'].concat(filters),
                     callback: function(data) {
+// if (L.gmx._animatingZoom) {
+// console.log('____ tileElem.promise', data);
+// }
                         // if (myLayer._tiles[zKey] && !myLayer._map._animatingZoom) {
                         if (myLayer._tiles[zKey]) {
 							myLayer._tiles[zKey].loaded = 0;
 
-							// if (!tileElem.screenTile) {
-								// tileElem.screenTile = new ScreenVectorTile(myLayer, tileElem);
-							// }
-
 							tileElem.screenTile.drawTile(data).then(function(res) {
-								// console.log('resolve', zKey, res, data);
 								if (res) { tileElem.count = res.count; }
 								done(res);
 							}, function(err) {
-								// console.log('reject', zKey, err, data);
 								done(err);
-							});
+							}).catch(console.log);
 						} else {
-							// console.log('bad key', zKey);
 							done();
 						}
                     }

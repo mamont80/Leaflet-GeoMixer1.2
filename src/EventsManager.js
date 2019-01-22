@@ -15,12 +15,16 @@ var GmxEventsManager = L.Handler.extend({
 
         map.on({
             zoomend: function () {
+				L.gmx._animatingZoom = false;
                 if (map._gmxMouseLatLng) {
 					this._onmousemove({type: 'mousemove', latlng: map._gmxMouseLatLng});
                     // setTimeout(function () {
                         // eventCheck({type: 'mousemove', latlng: map._gmxMouseLatLng});
                     // }, 0);
                 }
+            },
+            zoomanim: function () {
+				L.gmx._animatingZoom = true;
             },
             click: this._eventCheck,
             dblclick: this._eventCheck,

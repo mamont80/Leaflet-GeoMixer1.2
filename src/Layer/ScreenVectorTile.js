@@ -673,8 +673,20 @@ ScreenVectorTile.prototype = {
     },
 
     drawTile: function (data) {
+// if (L.gmx._animatingZoom) {
+		// if (this._animId) { L.Util.cancelAnimFrame(this._animId); }
+// console.log('____ drawTile', L.gmx._animatingZoom);
+		// return new Promise(function(resolve, reject) {
+			// resolve();
+		// });
+
+// }
 		this.destructor();
 		return new Promise(function(resolve, reject) {
+			// if (L.gmx._animatingZoom) {
+				// resolve();
+				// return;
+			// }
 			if (L.gmx._zoomStart && L.gmx._zoomStart !== this.zoom) {
 				resolve();
 				return;
@@ -685,13 +697,10 @@ ScreenVectorTile.prototype = {
 			var result = function() {
 				resolve({count: geoItems.length});
 			}.bind(this);
-			var _this = this;
 
 			this._uniqueID++;       // count draw attempt
 
 			if (geoItems) {
-				var tile = _this.tile,
-					ctx = tile.getContext('2d');
 				if (this.layer._gridClusters && this.layer._gridClusters.checkData({
 						geoItems: geoItems,
 						tileElem: this.tileElem,
@@ -700,104 +709,124 @@ ScreenVectorTile.prototype = {
 					result();
 					return;
 				}
-				var doDraw = function() {
-					var gmx = _this.gmx,
-						ts = _this.layer.options.tileSize || 256,
-						dattr = {
-							//tileLink: tileLink,
-							tbounds: _this.tbounds,
-							rasters: _this.rasters,
-							gmx: gmx,
-							topLeft: _this.topLeft,
-							tpx: _this.tpx,
-							tpy: _this.tpy,
-							ctx: ctx
-						},
-						tinfo = 'zKey:' + _this.zKey + ' count: ' + geoItems.length;
-					L.DomUtil.addClass(tile, tinfo);
-					_this.tile.width = _this.tile.height = ts;
-
-					if (!_this.layer._gridClusters) {
-						ctx.clearRect(0, 0, ts, ts);
-						if (gmx.showScreenTiles) {
-							ctx.strokeRect(0, 0, ts - 1, ts - 1);
-							ctx.strokeText( _this.zKey + ' ' + geoItems.length, 50, 50);
-						}
-					}
-					var hookInfo = {
-							zKey: _this.zKey,
-							topLeft: _this.topLeft,
-							tpx: _this.tpx,
-							tpy: _this.tpy,
-							x: _this.tilePoint.x,
-							y: _this.tilePoint.y,
-							z: _this.zoom
-						},
-						bgImage;
-
-					var fArr = [];
-					gmx.preRenderHooks.forEach(function (f) {
-						if (!bgImage) {
-							bgImage = document.createElement('canvas');
-							bgImage.width = bgImage.height = ts;
-						}
-						var res = f(bgImage, hookInfo);
-						if (res && res.then) {
-							fArr.push(res);
-						}
-					});
-					Promise.all(fArr).then(function() {
-						if (bgImage) { dattr.bgImage = bgImage; }
-
-						// window.tStamp = Date.now();
-						//ctx.save();
-						// var drawCount = 0;
-						for (var i = 0, len = geoItems.length; i < len; i++) {
-							var geoItem = geoItems[i],
-								id = geoItem.id,
-								item = geoItem;
-								// item = gmx.dataManager.getItem(id);
-							if (item) {     // skip removed items   (bug with screen tile screenTileDrawPromise.cancel on hover repaint)
-								var style = gmx.styleManager.getObjStyle(item, _this.zoom),
-									hover = gmx.lastHover && gmx.lastHover.id === geoItem.id && style;
-
-								if (gmx.multiFilters) {
-									for (var j = 0, len1 = item.multiFilters.length; j < len1; j++) {
-										var it = item.multiFilters[j];
-										L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? it.parsedStyleHover : it.parsedStyle, it.style);
-									}
-								} else {
-// if(!dattr.rasters[item.id]) {
-// console.log('___bg', _this.ntp, item.skipRasters, item.id, dattr.rasters[item.id]);
-// }
-									L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style);
-									//drawCount += L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style) ? 1 : 0;
-								}
-								if (id in gmx._needPopups && !gmx._needPopups[id]) {
-									gmx._needPopups[id] = true;
-								}
-							}
-						}
-						// console.log('doDraw:', _this.zKey, drawCount, geoItems.length, (Date.now() - window.tStamp) / 1000, ' sec.');
-						//ctx.restore();
-						//_this.rasters = {}; // clear rasters		TODO: растры пропадают из-за быстрых перерисовок permalink=C2YMI
-						Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(result, reject);
-					}, reject);
-					// _this.layer.appendTileToContainer(_this.tileElem);
-				};
 
 				if (this.showRaster) {
 					this.rastersPromise = this._getTileRasters(geoItems);
-					this.rastersPromise.then(doDraw, reject); //first load all raster images, then render all of them at once
+					this.rastersPromise.then(function() { this._doDraw(geoItems, resolve, reject); }.bind(this), reject); //first load all raster images, then render all of them at once
 				} else {
-					doDraw();
+					this._doDraw(geoItems, resolve, reject);
 				}
 			} else {
 				resolve();
 			}
-		}.bind(this)).catch(function() {
-			// console.warn('catch1:', arguments);
+		}.bind(this)).catch(console.warn);
+    },
+
+    _doDraw: function (geoItems, resolve, reject) {
+// if (L.gmx._animatingZoom) {
+// console.log('____ _doDraw', L.gmx._animatingZoom);
+	// return [];
+// }
+		var _this = this,
+			tile = _this.tile,
+			ctx = tile.getContext('2d'),
+			gmx = _this.gmx,
+			ts = _this.layer.options.tileSize || 256,
+			dattr = {
+				//tileLink: tileLink,
+				tbounds: _this.tbounds,
+				rasters: _this.rasters,
+				gmx: gmx,
+				topLeft: _this.topLeft,
+				tpx: _this.tpx,
+				tpy: _this.tpy,
+				ctx: ctx
+			},
+			tinfo = 'zKey:' + _this.zKey + ' count: ' + geoItems.length;
+		L.DomUtil.addClass(_this.tile, tinfo);
+		_this.tile.width = _this.tile.height = ts;
+
+		if (!_this.layer._gridClusters) {
+			ctx.clearRect(0, 0, ts, ts);
+			if (gmx.showScreenTiles) {
+				ctx.strokeRect(0, 0, ts - 1, ts - 1);
+				ctx.strokeText( _this.zKey + ' ' + geoItems.length, 50, 50);
+			}
+		}
+		var hookInfo = {
+				zKey: _this.zKey,
+				topLeft: _this.topLeft,
+				tpx: _this.tpx,
+				tpy: _this.tpy,
+				x: _this.tilePoint.x,
+				y: _this.tilePoint.y,
+				z: _this.zoom
+			},
+			bgImage;
+
+		var fArr = [];
+		gmx.preRenderHooks.forEach(function (f) {
+			if (!bgImage) {
+				bgImage = document.createElement('canvas');
+				bgImage.width = bgImage.height = ts;
+			}
+			var res = f(bgImage, hookInfo);
+			if (res && res.then) {
+				fArr.push(res);
+			}
 		});
+		Promise.all(fArr).then(function() {
+			if (bgImage) { dattr.bgImage = bgImage; }
+// if (L.gmx._animatingZoom) {
+// console.log('geoItems', geoItems.length, L.gmx._animatingZoom, gmx.preRenderHooks);
+// resolve({count: 0});
+// return;
+// }
+			// window.tStamp = Date.now();
+			//ctx.save();
+			// var drawCount = 0;
+			for (var i = 0, len = geoItems.length; i < len; i++) {
+				var geoItem = geoItems[i],
+					id = geoItem.id,
+					item = geoItem;
+					// item = gmx.dataManager.getItem(id);
+				if (item) {     // skip removed items   (bug with screen tile screenTileDrawPromise.cancel on hover repaint)
+					var style = gmx.styleManager.getObjStyle(item, _this.zoom),
+						hover = gmx.lastHover && gmx.lastHover.id === geoItem.id && style;
+
+					if (gmx.multiFilters) {
+						for (var j = 0, len1 = item.multiFilters.length; j < len1; j++) {
+							var it = item.multiFilters[j];
+							L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? it.parsedStyleHover : it.parsedStyle, it.style);
+						}
+					} else {
+// if(!dattr.rasters[item.id]) {
+// console.log('___bg', _this.ntp, item.skipRasters, item.id, dattr.rasters[item.id]);
+// }
+// geoItem._animId = L.Util.requestAnimFrame(function() {
+// if (L.gmx._animatingZoom) {
+// console.log('__________L.gmxUtil.drawGeoItem_', i, geoItem._animId, geoItems.length);
+// break;
+// }
+	// L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style);
+// }, this);
+
+						L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style);
+						//drawCount += L.gmxUtil.drawGeoItem(geoItem, item, dattr, hover ? item.parsedStyleHover : item.parsedStyleKeys, style) ? 1 : 0;
+					}
+					if (id in gmx._needPopups && !gmx._needPopups[id]) {
+						gmx._needPopups[id] = true;
+					}
+				}
+			}
+			// console.log('doDraw:', _this.zKey, drawCount, geoItems.length, (Date.now() - window.tStamp) / 1000, ' sec.');
+			//ctx.restore();
+			//_this.rasters = {}; // clear rasters		TODO: растры пропадают из-за быстрых перерисовок permalink=C2YMI
+			Promise.all(_this._getHooksPromises(gmx.renderHooks, tile, hookInfo)).then(function() {
+				resolve({count: geoItems.length});
+			}, reject);
+		}, reject);
+		// _this.layer.appendTileToContainer(_this.tileElem);
     },
 
     _getHooksPromises: function (hooks, obj, options) {

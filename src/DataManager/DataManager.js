@@ -265,21 +265,18 @@ var DataManager = L.Class.extend({
         };
 
         this._observerTileLoader = new ObserverTileLoader(this);
-        this._observerTileLoader.on('tileload', function(event) {
-            var tile = event.tile;
-            // _this._updateItemsFromTile(tile);
-
-            if (_this._tilesTree) {
-                var treeNode = _this._tilesTree.getNode(tile.d, tile.s);
-                treeNode && treeNode.count--; //decrease number of tiles to load inside this node
-            }
-        });
-
         this._observerTileLoader.on('observertileload', function(event) {
             var observer = event.observer;
             if (observer.isActive()) {
                 observer.needRefresh = false;
-                observer.updateData(_this.getItems(observer.id));
+// if (L.gmx._animatingZoom) {
+// console.log('____ observer.updateData', observer.id);
+// return;
+// }
+				observer.updateData(_this.getItems(observer.id));
+				// observer._animId = L.Util.requestAnimFrame(function() {
+					// observer.updateData(_this.getItems(observer.id));
+				// }, _this);
             }
         });
         this.setOptions(options);
@@ -298,6 +295,11 @@ var DataManager = L.Class.extend({
 
     _getActiveTileKeys: function() {
 
+// if (L.gmx._animatingZoom) {
+// console.log('___bg', L.gmx._animatingZoom);
+	// return this._activeTileKeys;
+// }
+
         this._chkMaxDateInterval();
         if (this.options.needBbox || !this._needCheckActiveTiles) {
             return this._activeTileKeys;
@@ -307,14 +309,14 @@ var DataManager = L.Class.extend({
 		this._needCheckActiveTiles = false;
 
 		if (this._isTemporalLayer) {
-			var newTileKeys = {};
-			if (this._beginDate && this._endDate) {
-				if (!this._tilesTree) {
-					this.initTilesTree();
-				}
-				newTileKeys = this._tilesTree.selectTiles(this._beginDate, this._endDate).tiles;
-			}
-			this._updateActiveTilesList(newTileKeys);
+			// var newTileKeys = {};
+			// if (this._beginDate && this._endDate) {
+				// if (!this._tilesTree) {
+					// this.initTilesTree();
+				// }
+				// newTileKeys = this._tilesTree.selectTiles(this._beginDate, this._endDate).tiles;
+			// }
+			// this._updateActiveTilesList(newTileKeys);
 		} else {
 			this.initTilesList();
 		}
@@ -405,6 +407,10 @@ var DataManager = L.Class.extend({
         if (!observer.isActive() && observer.id !== 'hover') {
             return [];
         }
+// if (L.gmx._animatingZoom) {
+// console.log('____ getItems', L.gmx._animatingZoom);
+	// return [];
+// }
 
         //add internal filters
         var layerID = observer.layerID,
@@ -613,10 +619,10 @@ var DataManager = L.Class.extend({
         return this._observerTileLoader.getObserverLeftToLoad(observer);
     },
 
-    getTileKeysToLoad: function(beginDate, endDate) {
-		var newTileKeys = this._tilesTree.selectTiles(beginDate, endDate).tiles;
-        return newTileKeys;
-    },
+    // getTileKeysToLoad: function(beginDate, endDate) {
+		// var newTileKeys = this._tilesTree.selectTiles(beginDate, endDate).tiles;
+        // return newTileKeys;
+    // },
 
     getItemsBounds: function() {    // get all objects bounds
         var bounds = gmxAPIutils.bounds(),
@@ -692,6 +698,10 @@ var DataManager = L.Class.extend({
     },
 
     checkObservers: function() {
+// if (L.gmx._animatingZoom) {
+// console.log('___ checkObservers', L.gmx._animatingZoom);
+	// return;
+// }
         var observers = this._observers;
         for (var id in this._observers) {
             this.checkObserver(observers[id]);
@@ -715,6 +725,10 @@ var DataManager = L.Class.extend({
                 this._observers[id].needRefresh = true;
             }
         }
+// if (L.gmx._animatingZoom) {
+	// return;
+// console.log('____triggerObservers', nsGmx.leafletMap._animatingZoom);
+// }
         this._waitCheckObservers();
     },
 
@@ -1004,7 +1018,7 @@ var DataManager = L.Class.extend({
 
         return vTile;
     },
-
+/*
     initTilesTree: function() {
 		// console.log('_tilesTree', this._tilesTree);
         this._tilesTree = L.gmx.tilesTree(this.options);
@@ -1020,7 +1034,7 @@ var DataManager = L.Class.extend({
             };
         }
     },
-
+*/
     _getVectorTile: function(vKey, createFlag) {
         if (!this._tiles[vKey] && createFlag) {
             var info = L.gmx.VectorTile.parseTileKey(vKey);

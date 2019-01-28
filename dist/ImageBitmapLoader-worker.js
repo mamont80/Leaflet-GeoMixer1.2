@@ -24,6 +24,55 @@ var utils = {
 		}
 		return dest;
 	},
+
+	makeTileKeys: function(it, ptiles) {
+		var tklen = it.tilesOrder.length,
+			arr = it.tiles,
+			tiles = {},
+			newTiles = {};
+
+		while (arr.length) {
+			var t = arr.splice(0, tklen),
+				tk = t.join('_'),
+				tile = ptiles[tk];
+			if (!tile || !tile.data) {
+				if (!tile) {
+					tiles[tk] = {
+						tp: {z: t[0], x: t[1], y: t[2], v: t[3], s: t[4], d: t[5]}
+					};
+				} else {
+					tiles[tk] = tile;
+				}
+				newTiles[tk] = true;
+			} else {
+				tiles[tk] = tile;
+			}
+		}
+		return {tiles: tiles, newTiles: newTiles};
+	},
+
+	getDataSource: function(id, hostName) {
+		var maps = gmx._maps[hostName];
+		for (var mID in maps) {
+			var ds = maps[mID].dataSources[id];
+			if (ds) { return ds; }
+		}
+		return null;
+	},
+
+	getZoomRange: function(info) {
+		var arr = info.properties.styles,
+			out = [40, 0];
+		for (var i = 0, len = arr.length; i < len; i++) {
+			var st = arr[i];
+			out[0] = Math.min(out[0], st.MinZoom);
+			out[1] = Math.max(out[1], st.MaxZoom);
+		}
+		out[0] = out[0] === 40 ? 1 : out[0];
+		out[1] = out[1] === 0 ? 22 : out[1];
+		return out;
+	},
+
 	chkProtocol: function(url) {
 		return url.substr(0, _protocol.length) === _protocol ? url : _protocol + url;
 	},
@@ -199,18 +248,18 @@ var gmxMapManager = {
         var maps = this._maps,
 			serverHost = options.hostName || options.serverHost,
 			mapName = options.MapName;
-log('loadMapProperties', mapName)
+
         if (!maps[serverHost] || !maps[serverHost][mapName]) {
 			var promise = new Promise(function(resolve, reject) {
-			var opt = {
-				WrapStyle: 'None',
-				skipTiles: options.skipTiles || 'All', // All, NotVisible, None
-				MapName: mapName,
-				srs: options.srs || 3857,
-				ftc: options.ftc || 'osm',
-				ModeKey: 'map'
-			};
-			if (options.visibleItemOnly) { opt.visibleItemOnly = true; }
+				var opt = {
+					WrapStyle: 'None',
+					skipTiles: options.skipTiles || 'All', // All, NotVisible, None
+					MapName: mapName,
+					srs: options.srs || 3857,
+					ftc: options.ftc || 'osm',
+					ModeKey: 'map'
+				};
+				if (options.visibleItemOnly) { opt.visibleItemOnly = true; }
 				gmxMapManager.requestSessionKey(serverHost, options.apiKey).then(function(sessionKey) {
 					opt.key = sessionKey;
 					utils.getJson({
@@ -218,6 +267,7 @@ log('loadMapProperties', mapName)
 						params: opt
 					})
 					.then(function(json) {
+// log('loadMapProperties', json)
 						var res = typeof json.res === 'string' ? JSON.parse(json.res) : json.res;
 						if (res.Status === 'ok' && res.Result) {
 							var mapInfo = res.Result,
@@ -247,6 +297,7 @@ log('loadMapProperties', mapName)
 
 								props.hostName = mapProps.hostName;
 								dataSources[options.id] = {
+									zoomRange: utils.getZoomRange(layerInfo),
 									info: layerInfo,
 									options: options
 								};
@@ -265,7 +316,7 @@ log('loadMapProperties', mapName)
 							reject(json);
 						}
 					}.bind(this))
-					.catch(reject);
+					.catch(log);
 				}, reject);
 			});
             maps[serverHost] = maps[serverHost] || {};
@@ -547,8 +598,6 @@ var layersVersion = {
 	_intervalID: null,
 	_timeoutID: null,
 	_lastParams: {},
-	_hosts: {},
-	_layers: {},
 
     _getSourceParams: function(ds, options) {
 		options = options || {};
@@ -596,31 +645,31 @@ var layersVersion = {
     },
 	chkVersion: function() {
 // log('chkVersion', gmx._zoom, gmx._bbox, this, this._hosts, layersVersion._intervalID, Date.now())
-        for (var hostName in this._hosts) {
-			var hosts = this._hosts[hostName],
-				opt = {
-					WrapStyle: 'None',
-					layers: JSON.stringify(Object.keys(hosts).map(function(key) {return hosts[key];})),
-					bbox: JSON.stringify(gmx._bbox),
-					zoom: gmx._zoom,
-					srs: 3857,
-					ftc: 'osm'
-				},
-				body = utils.getFormBody(opt);
-			if (this._lastParams[hostName] !== body) {
-				utils.getJson({
-					url: '//' + hostName + '/Layer/CheckVersion.ashx',
-					params: opt
-				})
-				.then(function(json) {
-					this._lastParams[hostName] = body;
-					var res = typeof json.res === 'string' ? JSON.parse(json.res) : json.res;
-					if (res.Status === 'ok' && res.Result) {
-						this._parseResponse(res.Result, gmx._maps[hostName]);
-					}
-				}.bind(this)).catch(log);
-			}
-        }
+        // for (var hostName in this._hosts) {
+			// var hosts = this._hosts[hostName],
+				// opt = {
+					// WrapStyle: 'None',
+					// layers: JSON.stringify(Object.keys(hosts).map(function(key) {return hosts[key];})),
+					// bbox: JSON.stringify(gmx._bbox),
+					// zoom: gmx._zoom,
+					// srs: 3857,
+					// ftc: 'osm'
+				// },
+				// body = utils.getFormBody(opt);
+			// if (this._lastParams[hostName] !== body) {
+				// utils.getJson({
+					// url: '//' + hostName + '/Layer/CheckVersion.ashx',
+					// params: opt
+				// })
+				// .then(function(json) {
+					// this._lastParams[hostName] = body;
+					// var res = typeof json.res === 'string' ? JSON.parse(json.res) : json.res;
+					// if (res.Status === 'ok' && res.Result) {
+						// this._parseResponse(res.Result, gmx._maps[hostName]);
+					// }
+				// }.bind(this)).catch(log);
+			// }
+        // }
     },
 
     _update: function(ds, options) {
@@ -666,6 +715,106 @@ var layersVersion = {
         if (msec) {this. _delay = msec; }
         layersVersion.stop();
         this._intervalID = setInterval(this.chkVersion.bind(this), this._delay);
+    },
+
+	_hosts: {},
+	_layers: {},
+    getLayersVersion: function(data) {
+// log('getLayersVersion', data)
+		Promise.all(data.inp.pars.map(function(it) {
+			return utils.getJson({
+				hostName: it.hostName,
+				url: '//' + it.hostName + '/Layer/CheckVersion.ashx',
+				params: it.pars
+			})
+			.then(function(json) {
+// log('getLayersVersion_1__', json, gmx)
+
+				var hostName = json.queue.hostName,
+					arr = json.res.Result;
+
+				arr.map(function(it) {
+					var id = it.name,
+						ds = utils.getDataSource(id, hostName);
+
+					if (ds) {
+						ds.ninfo = {properties: it.properties, geometry: it.geometry};
+						var pt = utils.makeTileKeys(it, ds.tiles || {});
+						ds.tiles = pt.tiles;
+						ds.newTiles = pt.newTiles;
+						ds.tilesPromises = Object.keys(pt.newTiles).map(function(tk) {
+							var tile = ds.tiles[tk],
+								tp = tile.tp,
+								opt = ds.options,
+								requestParams = {
+									ModeKey: 'tile',
+									// r: 'j',
+									sw: gmx._sw || 1,
+									srs: opt.srs, ftc: opt.ftc,
+									LayerName: opt.dataSource,
+									z: tp.z, x: tp.x, y: tp.y, v: tp.v
+								};
+
+							if (tp.d !== -1) {
+								requestParams.Level = tp.d;
+								requestParams.Span = tp.s;
+							}
+							var url = '//' + hostName + '/TileSender.ashx?' + Object.keys(requestParams).map(function(name) {
+								return name + '=' + requestParams[name];
+							}).join('&');
+							return fetch(url, {
+								mode: 'cors',
+								credentials: 'include'
+							})
+								.then(function(response) {
+									if (response.status === 404) {
+										//reject(response);
+										return '';
+									}
+									return response.text();
+								})
+								.then(function(txt) {
+									if (txt) {
+										var pref = 'gmxAPI._vectorTileReceiver(';
+										if (txt.substr(0, pref.length) === pref) {
+											txt = txt.replace(pref, '');
+											txt = txt.substr(0, txt.length -1);
+										}
+										tile.data = JSON.parse(txt);
+									} else {
+										tile.data = {
+											srs: '3857', isGeneralized: false,
+											values: [],
+											//bbox: [],
+											LayerName: tp.layerID,
+											z: tp.z, x: tp.x, y: tp.y, v: tp.v,
+											level: tp.d,
+											span: tp.s
+										};
+									}
+								})
+								.catch(log);
+						});
+// log('____', id, ds)
+					} else {
+						log('DataSource not found for Layer:', id);
+					}
+					// for (var mID in maps) {
+						// if (maps[mID].dataSources[id]
+					// }
+				});
+// gmx._maps = {};			// свойства слоев по картам
+// gmx._clientLayers = {};	// свойства слоев без карт (клиентские слои)
+
+				// var res = typeof json.res === 'string' ? JSON.parse(json.res) : json.res;
+				// if (res.Status === 'ok' && res.Result) {
+					// this._parseResponse(res.Result, gmx._maps[hostName]);
+				// }
+			}.bind(this)).catch(log);
+		}
+		)).then(function() {
+// log('getLayersVersion___', arr, gmx)
+		})
     }
 };
 
@@ -693,12 +842,10 @@ var cmdProxy = function(data) {
 				out.error = err.toString();
 				handler.workerContext.postMessage(out);
 			});
-	} else if (cmd === 'onmoveend') {			// сменилось положение карты
+	} else if (cmd === 'getLayersVersion') {	// сменилось положение карты
 		out.load = true;
 		handler.workerContext.postMessage(out);
-		gmx._zoom = options.zoom;				// текущий zoom карты
-		gmx._bbox = options.bbox;				// текущий экран карты
-		layersVersion.now();
+		layersVersion.getLayersVersion(out);
 	} else if (cmd === 'dateIntervalChanged') {
 		out.load = true;
 		layersVersion.add(options);

@@ -57,6 +57,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
 					'&x=' + x +
 					'&y=' + y;
 			if (gmx.srs) { url += '&srs=' + gmx.srs; }
+			if (L.gmx._sw) { url += '&sw=' + L.gmx._sw; }
 			if (gmx.crossOrigin) { url += '&cross=' + gmx.crossOrigin; }
 			url += '&LayerName=' + gmx.layerID;
 			if (gmx.sessionKey) { url += '&key=' + encodeURIComponent(gmx.sessionKey); }

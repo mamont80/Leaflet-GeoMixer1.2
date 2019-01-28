@@ -166,10 +166,12 @@ var chkVersion = function (layer, callback) {
 
     if (document.body && !L.gmxUtil.isPageHidden()) {
         var hosts = getRequestParams(layer),
+			workerParams = [],
 			bboxStr = WORLDBBOX,
             chkHost = function(hostName, busyFlag) {
 				var url = L.gmxUtil.protocol + '//' + hostName + script,
                     layersStr = JSON.stringify(hosts[hostName]);
+				var ph = {WrapStyle: 'None', ftc: 'osm'};
 				var params = 'WrapStyle=None&ftc=osm';
 				if (layersVersion.needBbox) {
 					var bbox = map.getBounds(),
@@ -178,12 +180,15 @@ var chkVersion = function (layer, callback) {
 						zoom = map.getZoom(),
 						crs = L.Projection.Mercator;
 					params += '&zoom=' + zoom;
+					ph.zoom = zoom;
 					if (map.options.srs == 3857) {
 						params += '&srs=3857';
+						ph.srs = 3857;
 						crs = L.CRS.EPSG3857;
 					}
 					if (map.options.generalized === false) {
 						params += '&generalizedTiles=false';
+						ph.generalizedTiles = false;
 					}
 					if (!map.options.allWorld && (ne.lng - sw.lng) < 180) {
 						var ts = L.gmxUtil.tileSizes[zoom],
@@ -195,9 +200,15 @@ var chkVersion = function (layer, callback) {
 						));
 					}
 					params += '&bboxes=' + bboxStr;
+					ph.bboxes = bboxStr;
 				}
+				ph.layers = layersStr;
 				params += '&layers=' + encodeURIComponent(layersStr);
 
+				if (L.gmx.sendCmd) {
+					workerParams.push({hostName: hostName, pars: ph});
+					return;
+				}
 				if ('FormData' in window) {
 					hostBusy[hostName] = true;
 					L.gmxUtil.request({
@@ -248,6 +259,14 @@ var chkVersion = function (layer, callback) {
 				needReq[hostName] = true;
 			}
         }
+
+		if (L.gmx.sendCmd && workerParams.length) {
+			L.gmx.sendCmd('getLayersVersion', {
+				pars: workerParams
+			}).then(function() {
+				// console.log('gggg', arguments);
+			});
+		}
     }
 };
 
@@ -349,10 +368,6 @@ var layersVersion = {
     chkVersion: chkVersion,
 
     now: function() {
-		// if (timeoutID) { cancelIdleCallback(timeoutID); }
-		// timeoutID = requestIdleCallback(function() {
-			// chkVersion();
-		// }, {timeout: 25});
 		if (timeoutID) { clearTimeout(timeoutID); }
 		timeoutID = setTimeout(chkVersion, 0);
     },
@@ -404,18 +419,6 @@ L.Map.addInitHook(function () {
 			chkVersion();
 			prev.z = z;
 			prev.center = center;
-			if (L.gmx.sendCmd) {
-				var bbox = map.getBounds(),
-					crs = L.CRS.EPSG3857,
-					min = crs.project(bbox.getSouthWest()),
-					max = crs.project(bbox.getNorthEast()),
-					bboxArr = [min.x, min.y, max.x, max.y];
-
-				L.gmx.sendCmd('onmoveend', {
-					zoom: z,
-					bbox: bboxArr
-				});
-			}
 		}
 	});
 });

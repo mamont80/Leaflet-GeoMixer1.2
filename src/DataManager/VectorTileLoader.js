@@ -52,6 +52,19 @@ var gmxVectorTileLoader = {
 								txt = txt.substr(0, txt.length -1);
 							}
 							resolve(JSON.parse(txt));
+						} else {
+							resolve({
+								srs: '3857', isGeneralized: false,
+								values: [],
+								//bbox: [],
+								LayerName: tileInfo.layerID,
+								level: tileInfo.d,
+								span: tileInfo.s,
+								v: tileInfo.v,
+								x: tileInfo.x,
+								y: tileInfo.y,
+								z: tileInfo.z
+							});
 						}
 					})
 					.catch(console.log);

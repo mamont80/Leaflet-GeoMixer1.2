@@ -2420,7 +2420,7 @@ var gmxAPIutils = {
         }
         var matches = str.match(/\[([^\]]+)\]/ig);
         if (matches) {
-            var tileAttributeTypes = options.tileAttributeTypes,
+            var tileAttributeTypes = options.tileAttributeTypes || {},
                 unitOptions = options.unitOptions,
                 geometries = options.geometries;
             for (var i = 0, len = matches.length; i < len; i++) {
@@ -4869,10 +4869,11 @@ L.gmx = L.gmx || {};
 L.gmx._maps = {};			// свойства слоев по картам
 L.gmx._clientLayers = {};	// свойства слоев без карт (клиентские слои)
 
-if (/\bsw=1\b/.test(location.search)) {
-	L.gmx._sw = 1;	// признак загрузки данных через Service Worker
+var arr = /\bsw=(\d+)\b/.exec(location.search);
+if (arr && arr.length === 2) {
+	L.gmx._sw = arr[1];	// признак загрузки данных через Service Worker
 	if ('serviceWorker' in navigator) {
-		navigator.serviceWorker.register('./gmx-sw1.js')
+		navigator.serviceWorker.register('./gmx-sw' + L.gmx._sw + '.js')
 		  .then(function(registration) {
 			console.log('ServiceWorker registration successful with scope: ', registration.scope);
 		  })
@@ -5438,6 +5439,19 @@ var gmxVectorTileLoader = {
 								txt = txt.substr(0, txt.length -1);
 							}
 							resolve(JSON.parse(txt));
+						} else {
+							resolve({
+								srs: '3857', isGeneralized: false,
+								values: [],
+								//bbox: [],
+								LayerName: tileInfo.layerID,
+								level: tileInfo.d,
+								span: tileInfo.s,
+								v: tileInfo.v,
+								x: tileInfo.x,
+								y: tileInfo.y,
+								z: tileInfo.z
+							});
 						}
 					})
 					.catch(console.log);
@@ -11338,7 +11352,8 @@ L.gmx.VectorLayer.include({
             }
             if (!objBounds.contains(point)) { continue; }
 
-            var fill = currentStyle.fillStyle || currentStyle.canvasPattern || parsedStyle.bgImage || parsedStyle.fillColor,
+            var fill = currentStyle.fillStyle || currentStyle.canvasPattern || parsedStyle.bgImage ||
+				('fillColor' in parsedStyle) || parsedStyle.fillPattern,
                 marker = parsedStyle && parsedStyle.image ? parsedStyle.image : null,
                 chktype = type,
                 hiddenLines = dataOption.hiddenLines || [],
@@ -11734,10 +11749,12 @@ var chkVersion = function (layer, callback) {
 
     if (document.body && !L.gmxUtil.isPageHidden()) {
         var hosts = getRequestParams(layer),
+			workerParams = [],
 			bboxStr = WORLDBBOX,
             chkHost = function(hostName, busyFlag) {
 				var url = L.gmxUtil.protocol + '//' + hostName + script,
                     layersStr = JSON.stringify(hosts[hostName]);
+				var ph = {WrapStyle: 'None', ftc: 'osm'};
 				var params = 'WrapStyle=None&ftc=osm';
 				if (layersVersion.needBbox) {
 					var bbox = map.getBounds(),
@@ -11746,12 +11763,15 @@ var chkVersion = function (layer, callback) {
 						zoom = map.getZoom(),
 						crs = L.Projection.Mercator;
 					params += '&zoom=' + zoom;
+					ph.zoom = zoom;
 					if (map.options.srs == 3857) {
 						params += '&srs=3857';
+						ph.srs = 3857;
 						crs = L.CRS.EPSG3857;
 					}
 					if (map.options.generalized === false) {
 						params += '&generalizedTiles=false';
+						ph.generalizedTiles = false;
 					}
 					if (!map.options.allWorld && (ne.lng - sw.lng) < 180) {
 						var ts = L.gmxUtil.tileSizes[zoom],
@@ -11763,9 +11783,15 @@ var chkVersion = function (layer, callback) {
 						));
 					}
 					params += '&bboxes=' + bboxStr;
+					ph.bboxes = bboxStr;
 				}
+				ph.layers = layersStr;
 				params += '&layers=' + encodeURIComponent(layersStr);
 
+				if (L.gmx.sendCmd) {
+					workerParams.push({hostName: hostName, pars: ph});
+					return;
+				}
 				if ('FormData' in window) {
 					hostBusy[hostName] = true;
 					L.gmxUtil.request({
@@ -11816,6 +11842,14 @@ var chkVersion = function (layer, callback) {
 				needReq[hostName] = true;
 			}
         }
+
+		if (L.gmx.sendCmd && workerParams.length) {
+			L.gmx.sendCmd('getLayersVersion', {
+				pars: workerParams
+			}).then(function() {
+				// console.log('gggg', arguments);
+			});
+		}
     }
 };
 
@@ -11917,10 +11951,6 @@ var layersVersion = {
     chkVersion: chkVersion,
 
     now: function() {
-		// if (timeoutID) { cancelIdleCallback(timeoutID); }
-		// timeoutID = requestIdleCallback(function() {
-			// chkVersion();
-		// }, {timeout: 25});
 		if (timeoutID) { clearTimeout(timeoutID); }
 		timeoutID = setTimeout(chkVersion, 0);
     },
@@ -11972,18 +12002,6 @@ L.Map.addInitHook(function () {
 			chkVersion();
 			prev.z = z;
 			prev.center = center;
-			if (L.gmx.sendCmd) {
-				var bbox = map.getBounds(),
-					crs = L.CRS.EPSG3857,
-					min = crs.project(bbox.getSouthWest()),
-					max = crs.project(bbox.getNorthEast()),
-					bboxArr = [min.x, min.y, max.x, max.y];
-
-				L.gmx.sendCmd('onmoveend', {
-					zoom: z,
-					bbox: bboxArr
-				});
-			}
 		}
 	});
 });
@@ -12050,6 +12068,7 @@ L.gmx.RasterLayer = L.gmx.VectorLayer.extend(
 					'&x=' + x +
 					'&y=' + y;
 			if (gmx.srs) { url += '&srs=' + gmx.srs; }
+			if (L.gmx._sw) { url += '&sw=' + L.gmx._sw; }
 			if (gmx.crossOrigin) { url += '&cross=' + gmx.crossOrigin; }
 			url += '&LayerName=' + gmx.layerID;
 			if (gmx.sessionKey) { url += '&key=' + encodeURIComponent(gmx.sessionKey); }

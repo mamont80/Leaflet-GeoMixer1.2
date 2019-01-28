@@ -48,7 +48,8 @@ L.gmx.VectorLayer.include({
             }
             if (!objBounds.contains(point)) { continue; }
 
-            var fill = currentStyle.fillStyle || currentStyle.canvasPattern || parsedStyle.bgImage || parsedStyle.fillColor,
+            var fill = currentStyle.fillStyle || currentStyle.canvasPattern || parsedStyle.bgImage ||
+				('fillColor' in parsedStyle) || parsedStyle.fillPattern,
                 marker = parsedStyle && parsedStyle.image ? parsedStyle.image : null,
                 chktype = type,
                 hiddenLines = dataOption.hiddenLines || [],

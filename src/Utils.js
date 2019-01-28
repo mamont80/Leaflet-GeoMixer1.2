@@ -2404,7 +2404,7 @@ var gmxAPIutils = {
         }
         var matches = str.match(/\[([^\]]+)\]/ig);
         if (matches) {
-            var tileAttributeTypes = options.tileAttributeTypes,
+            var tileAttributeTypes = options.tileAttributeTypes || {},
                 unitOptions = options.unitOptions,
                 geometries = options.geometries;
             for (var i = 0, len = matches.length; i < len; i++) {

@@ -204,10 +204,11 @@ L.gmx = L.gmx || {};
 L.gmx._maps = {};			// свойства слоев по картам
 L.gmx._clientLayers = {};	// свойства слоев без карт (клиентские слои)
 
-if (/\bsw=1\b/.test(location.search)) {
-	L.gmx._sw = 1;	// признак загрузки данных через Service Worker
+var arr = /\bsw=(\d+)\b/.exec(location.search);
+if (arr && arr.length === 2) {
+	L.gmx._sw = arr[1];	// признак загрузки данных через Service Worker
 	if ('serviceWorker' in navigator) {
-		navigator.serviceWorker.register('./gmx-sw1.js')
+		navigator.serviceWorker.register('./gmx-sw' + L.gmx._sw + '.js')
 		  .then(function(registration) {
 			console.log('ServiceWorker registration successful with scope: ', registration.scope);
 		  })

@@ -2410,10 +2410,14 @@ var gmxAPIutils = {
             for (var i = 0, len = matches.length; i < len; i++) {
                 var key1 = matches[i],
                     key = key1.substr(1, key1.length - 2),
+                    keyLC = key.toLowerCase(),
+                    val = properties[key] || properties[keyLC],
+                    type = tileAttributeTypes[key] || tileAttributeTypes[keyLC],
                     res = '';
 
-                if (key in properties) {
-                    res = L.gmxUtil.attrToString(tileAttributeTypes[key], properties[key]);
+                //if (key in properties) {
+                if (val != undefined) {
+                    res = L.gmxUtil.attrToString(type, val);
                 } else if (key === 'SUMMARY') {
                     res = options.summary || L.gmxUtil.getGeometriesSummary(geometries, unitOptions);
                 }
